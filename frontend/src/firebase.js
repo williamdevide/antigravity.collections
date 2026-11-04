@@ -135,6 +135,8 @@ export async function saveComic(comic) {
       const docRef = doc(db, 'comics', comic.id);
       await setDoc(docRef, {
         name: comic.name,
+        type: comic.type || 'Mensal',
+        publisher: comic.publisher || 'Marvel',
         ownedNumbers: comic.ownedNumbers || [],
         isCompleted: Boolean(comic.isCompleted),
         completedUntil: comic.completedUntil || null,

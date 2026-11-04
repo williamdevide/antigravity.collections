@@ -47,3 +47,20 @@ Resposta do Usuário: já informei o que precisa no arquivo .env
 ```text
 no github já publiquei, mas no vercel o comando não funcionou, criei o projeto lá manualmente, mas para qual diretorio devo apontar?
 ```
+
+### Prompt 3
+```text
+/agente-orquestrador /grill-me /goal ao adicionar cada novo titulo quero após o nome um botão de alternancia com os valores (Mensal / Especial / Minissérie), inclusive utilize a cor atual do card (azul escuro para mensais, vermelho escuro para especiais e verde escuro para minissérie. quero também poder filtrar somente por cada um desses tipos, somente encerrados ou em andamento, exibir somente edições que eu tenho ou edições faltantes. deixe na frente do botão do tipo um botão da editora (Marvel / DC / Vertigo / Outras) e crie tambem esse filtro
+```
+
+### Resposta Grill-Me / Interação 7
+```text
+Pergunta: Como deve se comportar o filtro de 'exibir somente edições que eu tenho ou edições faltantes'?
+Resposta do Usuário: (Recommended) Alternância visual nos cards: no topo ou nos filtros, permitir alternar para exibir apenas as bolinhas já adquiridas ou destacar/mostrar apenas os números que faltam comprar
+```
+
+### Resposta Grill-Me / Interação 8
+```text
+Pergunta: Depois que a HQ já estiver cadastrada na lista, como você prefere alterar o Tipo ou a Editora caso necessário?
+Resposta do Usuário: (Recommended) Permitir alternar o Tipo e a Editora com um clique rápido diretamente no badge do card e também dentro do modal de edição
+```
