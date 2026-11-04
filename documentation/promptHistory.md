@@ -128,6 +128,13 @@ Resposta do Usuário: (Recommended) Campo 'Começar no nº' (no cadastro e na ed
 a partir de agora sempre que for pedido alterações, mudanças, acescimos, correções ou verificações você controlará o numero da versão sozinho, alterando os 3 digitos de acordo com tipo de coisa que foi solicitado.
 ```
 
+### Prompt 9
+```text
+/agente-orquestrador /grill-me /goal no header abaixo do nome do sistema tinha uma frase de slogan, volte ela. o modo edição e modo consulta exibe só o icone no botão, sem escrito.
+o modo de inclusão detalhada tambem é só o icone sem escrito, para caber ao lado do campo incio nº
+```
+
+
 
 
 

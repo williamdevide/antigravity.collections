@@ -603,34 +603,29 @@ export default function App() {
                 </span>
               </h1>
               <p className="text-[11px] text-slate-400 truncate">
-                {isEditMode ? 'Modo Edição Ativo' : 'Modo Consulta Ativo'}
+                Controle Ágil de Coleções
               </p>
             </div>
           </div>
 
           {/* ÁREA DIREITA: BOTÃO DE ALTERNÂNCIA (CONSULTA / EDIÇÃO) + STATUS */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* BOTÃO DE ALTERNÂNCIA DE MODO (PADRÃO: MODO CONSULTA) */}
+            {/* BOTÃO DE ALTERNÂNCIA DE MODO (PADRÃO: MODO CONSULTA) - SOMENTE ÍCONE */}
             <button
               type="button"
               onClick={() => setAppMode(isEditMode ? 'consulta' : 'edicao')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 border ${
+              className={`p-2 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 border flex items-center justify-center ${
                 isEditMode
                   ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-300 shadow-amber-500/30'
                   : 'bg-slate-800/90 hover:bg-slate-700/90 text-cyan-300 border-cyan-500/40 hover:border-cyan-400 shadow-cyan-950/40'
               }`}
-              title={isEditMode ? "Clique para alternar para o Modo Consulta" : "Clique para alternar para o Modo Edição"}
+              title={isEditMode ? "Modo Edição Ativo - Clique para Modo Consulta" : "Modo Consulta Ativo - Clique para Modo Edição"}
+              aria-label={isEditMode ? "Alternar para Modo Consulta" : "Alternar para Modo Edição"}
             >
               {isEditMode ? (
-                <>
-                  <Pencil className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>Modo Edição</span>
-                </>
+                <Pencil className="w-4 h-4 stroke-[2.5]" />
               ) : (
-                <>
-                  <Eye className="w-3.5 h-3.5 text-cyan-400 stroke-[2.5]" />
-                  <span>Modo Consulta</span>
-                </>
+                <Eye className="w-4 h-4 text-cyan-400 stroke-[2.5]" />
               )}
             </button>
 
@@ -723,18 +718,22 @@ export default function App() {
                     title="Defina o número inicial se começou adiante (ex: 32)"
                   />
                 </div>
+
+                {/* Botão de Inclusão Detalhada (Apenas Ícone para caber ao lado de Início nº) */}
+                <button
+                  type="button"
+                  onClick={handleOpenDetailedAdd}
+                  className="p-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/50 transition active:scale-95 shadow-sm flex items-center justify-center"
+                  title="Inclusão Detalhada (Ano de Início, Editora Brasil, Herói/Grupo)"
+                  aria-label="Inclusão Detalhada"
+                >
+                  <FileText className="w-4 h-4 text-indigo-300" />
+                </button>
               </div>
 
-              {/* Botão de Inclusão Detalhada */}
-              <button
-                type="button"
-                onClick={handleOpenDetailedAdd}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/50 transition active:scale-95 shadow-sm ml-auto"
-                title="Cadastrar com campos extras: Ano de Início, Editora Brasil, Herói/Grupo"
-              >
-                <FileText className="w-3.5 h-3.5 text-indigo-300" />
-                <span>Inclusão Detalhada</span>
-              </button>
+              <span className="text-[10px] text-slate-500 hidden sm:inline">
+                Toque nos botões para alternar
+              </span>
             </div>
           </form>
         </section>
