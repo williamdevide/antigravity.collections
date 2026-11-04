@@ -14,20 +14,26 @@ import {
   HardDrive, 
   AlertTriangle,
   X,
-  Filter,
   Layers,
   Building2,
   ListFilter,
   Eye,
-  SlidersHorizontal
+  SlidersHorizontal,
+  GripVertical,
+  ArrowDownAZ,
+  ArrowDownZA,
+  Tag,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { 
   subscribeComics, 
   saveComic, 
-  deleteComic 
+  deleteComic,
+  saveAllComicsOrder
 } from './firebase';
 
-const COMIC_TYPES = ['Mensal', 'Especial', 'Minissérie'];
+const COMIC_TYPES = ['Mensal', 'Especial', 'Minissérie', 'Coleção'];
 const PUBLISHERS = ['Marvel', 'DC', 'Vertigo', 'Outras'];
 
 export default function App() {
@@ -36,9 +42,12 @@ export default function App() {
   const [newComicType, setNewComicType] = useState('Mensal');
   const [newComicPublisher, setNewComicPublisher] = useState('Marvel');
   
+  // Ordenação
+  const [sortOrder, setSortOrder] = useState('A-Z'); // 'A-Z' | 'Z-A' | 'personal'
+
   // Filtros
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState('Todos'); // 'Todos' | 'Mensal' | 'Especial' | 'Minissérie'
+  const [filterType, setFilterType] = useState('Todos'); // 'Todos' | 'Mensal' | 'Especial' | 'Minissérie' | 'Coleção'
   const [filterPublisher, setFilterPublisher] = useState('Todas'); // 'Todas' | 'Marvel' | 'DC' | 'Vertigo' | 'Outras'
   const [filterStatus, setFilterStatus] = useState('Todos'); // 'Todos' | 'Em Andamento' | 'Encerrados'
   const [viewMode, setViewMode] = useState('all'); // 'all' | 'owned' | 'missing'
@@ -47,12 +56,20 @@ export default function App() {
   // Status de Conexão
   const [connectionStatus, setConnectionStatus] = useState({ status: 'connecting', message: 'Conectando...' });
   
-  // Estado para Edição do Nome e Exclusão
+  // Modal de Edição de Nome, Tipo e Editora
   const [editingComic, setEditingComic] = useState(null);
   const [editNameInput, setEditNameInput] = useState('');
   const [editTypeInput, setEditTypeInput] = useState('Mensal');
   const [editPublisherInput, setEditPublisherInput] = useState('Marvel');
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
+  // Modal de Título de Edição Específica (Minissérie e Coleção)
+  const [issueTitleModal, setIssueTitleModal] = useState(null); // { comic, issueNum, currentTitle }
+  const [issueTitleInput, setIssueTitleInput] = useState('');
+
+  // Drag and Drop State
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
 
   const inputRef = useRef(null);
 
@@ -89,15 +106,21 @@ export default function App() {
     const trimmed = newComicName.trim();
     if (!trimmed) return;
 
+    // Próxima posição na ordem pessoal
+    const nextPosition = comics.length > 0 
+      ? Math.max(...comics.map(c => typeof c.position === 'number' ? c.position : 0)) + 1 
+      : 0;
+
     const newComic = {
       id: 'comic_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
       name: trimmed,
       type: newComicType,
       publisher: newComicPublisher,
       ownedNumbers: [],
+      issueTitles: {},
+      position: nextPosition,
       isCompleted: false,
       completedUntil: null,
-      highestOpenedChunk: 10, // Bloco inicial (1 a 10)
       expandedChunks: [],
       createdAt: new Date().toISOString()
     };
@@ -126,7 +149,7 @@ export default function App() {
     setComics(updated);
   };
 
-  // Alternar seleção de um número específico (ex: 1, 5, 10, 11)
+  // Alternar seleção de um número específico (com recálculo dinâmico estrito de blocos)
   const handleToggleNumber = async (comic, num) => {
     const isOwned = comic.ownedNumbers?.includes(num);
     let newOwned = isOwned
@@ -135,16 +158,9 @@ export default function App() {
 
     newOwned.sort((a, b) => a - b);
 
-    // Se marcou o limite da dezena atual, abre a próxima dezena
-    let currentChunkLimit = comic.highestOpenedChunk || 10;
-    if (num >= currentChunkLimit) {
-      currentChunkLimit = Math.ceil(num / 10) * 10 + 10;
-    }
-
     const updatedComic = {
       ...comic,
-      ownedNumbers: newOwned,
-      highestOpenedChunk: currentChunkLimit
+      ownedNumbers: newOwned
     };
 
     const updated = await saveComic(updatedComic);
@@ -235,35 +251,168 @@ export default function App() {
     setEditingComic(null);
   };
 
-  // Filtros combinados e Ordenação Alfabética (A-Z)
-  const filteredComics = useMemo(() => {
+  // Abertura do Modal de Título de Edição Específica
+  const handleOpenIssueTitleModal = (comic, issueNum) => {
+    if (comic.type !== 'Minissérie' && comic.type !== 'Coleção') return;
+    const currentTitle = comic.issueTitles?.[issueNum] || '';
+    setIssueTitleModal({ comic, issueNum, currentTitle });
+    setIssueTitleInput(currentTitle);
+  };
+
+  // Salvar Título de Edição
+  const handleSaveIssueTitle = async () => {
+    if (!issueTitleModal) return;
+    const { comic, issueNum } = issueTitleModal;
+    const trimmed = issueTitleInput.trim();
+    const updatedTitles = { ...(comic.issueTitles || {}) };
+    
+    if (trimmed) {
+      updatedTitles[issueNum] = trimmed;
+    } else {
+      delete updatedTitles[issueNum];
+    }
+
+    const updatedComic = {
+      ...comic,
+      issueTitles: updatedTitles
+    };
+
+    const updated = await saveComic(updatedComic);
+    setComics(updated);
+    setIssueTitleModal(null);
+  };
+
+  // Remover Título de Edição
+  const handleRemoveIssueTitle = async () => {
+    if (!issueTitleModal) return;
+    const { comic, issueNum } = issueTitleModal;
+    const updatedTitles = { ...(comic.issueTitles || {}) };
+    delete updatedTitles[issueNum];
+
+    const updatedComic = {
+      ...comic,
+      issueTitles: updatedTitles
+    };
+
+    const updated = await saveComic(updatedComic);
+    setComics(updated);
+    setIssueTitleModal(null);
+  };
+
+  // Drag and Drop Handlers
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', index);
+  };
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDrop = async (e, targetIndex) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    // Clonar lista atual filtrada/ordenada
+    const updatedList = [...sortedAndFilteredComics];
+    const [movedItem] = updatedList.splice(draggedIndex, 1);
+    updatedList.splice(targetIndex, 0, movedItem);
+
+    // Atualizar índices de posição e mudar ordenação para 'personal'
+    setSortOrder('personal');
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+
+    // Mapear posições atualizadas
+    const reindexedList = updatedList.map((item, idx) => ({
+      ...item,
+      position: idx
+    }));
+
+    // Mesclar com a lista completa caso haja itens filtrados
+    const fullComicsMap = new Map(comics.map(c => [c.id, c]));
+    reindexedList.forEach(item => fullComicsMap.set(item.id, item));
+    const fullList = Array.from(fullComicsMap.values());
+
+    setComics(fullList);
+    await saveAllComicsOrder(fullList);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  // Mover card para cima/baixo manualmente (acessibilidade e mobile)
+  const handleMoveCard = async (index, direction) => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= sortedAndFilteredComics.length) return;
+
+    const updatedList = [...sortedAndFilteredComics];
+    const [movedItem] = updatedList.splice(index, 1);
+    updatedList.splice(targetIndex, 0, movedItem);
+
+    setSortOrder('personal');
+
+    const reindexedList = updatedList.map((item, idx) => ({
+      ...item,
+      position: idx
+    }));
+
+    const fullComicsMap = new Map(comics.map(c => [c.id, c]));
+    reindexedList.forEach(item => fullComicsMap.set(item.id, item));
+    const fullList = Array.from(fullComicsMap.values());
+
+    setComics(fullList);
+    await saveAllComicsOrder(fullList);
+  };
+
+  // Filtragem e Ordenação (A-Z, Z-A, Ordem Pessoal)
+  const sortedAndFilteredComics = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
 
-    return comics
-      .filter((comic) => {
-        // Busca textual
-        if (query && !comic.name.toLowerCase().includes(query)) {
-          return false;
-        }
-        // Filtro por Tipo
-        if (filterType !== 'Todos' && (comic.type || 'Mensal') !== filterType) {
-          return false;
-        }
-        // Filtro por Editora
-        if (filterPublisher !== 'Todas' && (comic.publisher || 'Marvel') !== filterPublisher) {
-          return false;
-        }
-        // Filtro por Status
-        if (filterStatus === 'Em Andamento' && comic.isCompleted) {
-          return false;
-        }
-        if (filterStatus === 'Encerrados' && !comic.isCompleted) {
-          return false;
-        }
-        return true;
-      })
-      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }));
-  }, [comics, searchQuery, filterType, filterPublisher, filterStatus]);
+    // 1. Filtragem
+    const filtered = comics.filter((comic) => {
+      if (query && !comic.name.toLowerCase().includes(query)) {
+        return false;
+      }
+      if (filterType !== 'Todos' && (comic.type || 'Mensal') !== filterType) {
+        return false;
+      }
+      if (filterPublisher !== 'Todas' && (comic.publisher || 'Marvel') !== filterPublisher) {
+        return false;
+      }
+      if (filterStatus === 'Em Andamento' && comic.isCompleted) {
+        return false;
+      }
+      if (filterStatus === 'Encerrados' && !comic.isCompleted) {
+        return false;
+      }
+      return true;
+    });
+
+    // 2. Ordenação
+    return filtered.sort((a, b) => {
+      if (sortOrder === 'A-Z') {
+        return a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' });
+      }
+      if (sortOrder === 'Z-A') {
+        return b.name.localeCompare(a.name, 'pt-BR', { sensitivity: 'base' });
+      }
+      // 'personal' (Ordem Pessoal manual)
+      const posA = typeof a.position === 'number' ? a.position : 0;
+      const posB = typeof b.position === 'number' ? b.position : 0;
+      return posA - posB;
+    });
+  }, [comics, searchQuery, filterType, filterPublisher, filterStatus, sortOrder]);
 
   // Estatísticas Rápidas
   const totalComics = comics.length;
@@ -281,6 +430,8 @@ export default function App() {
         return 'bg-red-500/20 text-red-300 border-red-500/40 hover:bg-red-500/30';
       case 'Minissérie':
         return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30';
+      case 'Coleção':
+        return 'bg-purple-500/20 text-purple-300 border-purple-500/40 hover:bg-purple-500/30';
       case 'Mensal':
       default:
         return 'bg-blue-500/20 text-blue-300 border-blue-500/40 hover:bg-blue-500/30';
@@ -298,7 +449,7 @@ export default function App() {
         return 'bg-neutral-800 text-amber-300 border border-amber-500/40 font-bold';
       case 'Outras':
       default:
-        return 'bg-purple-800 text-purple-200 border border-purple-600/40 font-bold';
+        return 'bg-purple-900 text-purple-200 border border-purple-600/40 font-bold';
     }
   };
 
@@ -347,7 +498,7 @@ export default function App() {
       {/* CONTEÚDO PRINCIPAL - TELA ÚNICA */}
       <main className="flex-1 max-w-xl w-full mx-auto p-3.5 sm:p-4 space-y-3.5">
         
-        {/* BARRA DE ADICIONAR NOVO TÍTULO COM BOTÕES DE TIPO E EDITORA */}
+        {/* BARRA DE ADICIONAR NOVO TÍTULO COM TIPO E EDITORA */}
         <section className="bg-[#12192B] p-3 rounded-2xl border border-slate-700/70 shadow-xl space-y-2.5">
           <form onSubmit={handleAddComic} className="space-y-2">
             <div className="flex gap-1.5">
@@ -356,7 +507,7 @@ export default function App() {
                 type="text"
                 value={newComicName}
                 onChange={(e) => setNewComicName(e.target.value)}
-                placeholder="Nome da HQ (ex: X-Men, Batman)..."
+                placeholder="Nome da HQ (ex: Sandman, Batman, Watchmen)..."
                 className="flex-1 bg-slate-900/90 text-white placeholder-slate-500 px-3.5 py-2.5 rounded-xl border border-slate-700/80 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-sm transition"
               />
               <button
@@ -372,13 +523,13 @@ export default function App() {
 
             {/* BOTÕES DE ALTERNÂNCIA: TIPO E EDITORA */}
             <div className="flex items-center justify-between text-xs pt-0.5">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 {/* Botão Tipo */}
                 <button
                   type="button"
                   onClick={handleCycleNewType}
                   className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 ${getTypeBadgeStyle(newComicType)}`}
-                  title="Clique para alternar o Tipo (Mensal / Especial / Minissérie)"
+                  title="Clique para alternar o Tipo (Mensal / Especial / Minissérie / Coleção)"
                 >
                   <Layers className="w-3 h-3 opacity-70" />
                   <span>Tipo: <strong>{newComicType}</strong></span>
@@ -397,14 +548,60 @@ export default function App() {
               </div>
 
               <span className="text-[10px] text-slate-500 hidden sm:inline">
-                Toque nos botões para alternar
+                Toque para alternar
               </span>
             </div>
           </form>
         </section>
 
-        {/* BUSCA RÁPIDA E BOTÃO EXPANDIR FILTROS */}
+        {/* CONTROLES: ORDENAÇÃO + BUSCA + FILTROS */}
         <section className="space-y-2">
+          {/* BARRA DE ORDENAÇÃO (A-Z / Z-A / ORDEM PESSOAL) */}
+          <div className="flex items-center justify-between bg-[#0F1626] p-1.5 rounded-xl border border-slate-800 text-xs">
+            <span className="text-[11px] font-semibold text-slate-400 pl-2">Ordenar por:</span>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setSortOrder('A-Z')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${
+                  sortOrder === 'A-Z'
+                    ? 'bg-amber-500 text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+                title="Ordem Alfabética Crescente (A-Z)"
+              >
+                <ArrowDownAZ className="w-3.5 h-3.5" />
+                <span>A-Z</span>
+              </button>
+
+              <button
+                onClick={() => setSortOrder('Z-A')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${
+                  sortOrder === 'Z-A'
+                    ? 'bg-amber-500 text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+                title="Ordem Alfabética Decrescente (Z-A)"
+              >
+                <ArrowDownZA className="w-3.5 h-3.5" />
+                <span>Z-A</span>
+              </button>
+
+              <button
+                onClick={() => setSortOrder('personal')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${
+                  sortOrder === 'personal'
+                    ? 'bg-amber-500 text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+                title="Ordem Pessoal (Arrastar e Soltar)"
+              >
+                <GripVertical className="w-3.5 h-3.5" />
+                <span>Pessoal</span>
+              </button>
+            </div>
+          </div>
+
+          {/* BUSCA RÁPIDA E BOTÃO FILTROS */}
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
@@ -551,7 +748,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Botão para limpar filtros */}
+              {/* Limpar Filtros */}
               {hasActiveFilters && (
                 <div className="pt-1 flex justify-end">
                   <button
@@ -572,9 +769,9 @@ export default function App() {
           )}
         </section>
 
-        {/* LISTAGEM DE QUADRINHOS */}
+        {/* LISTAGEM DE QUADRINHOS COM DRAG & DROP NATIVO */}
         <section className="space-y-3 pb-8">
-          {filteredComics.length === 0 ? (
+          {sortedAndFilteredComics.length === 0 ? (
             <div className="bg-[#101726]/80 rounded-2xl border border-dashed border-slate-800 p-8 text-center space-y-2">
               <BookOpen className="w-10 h-10 text-slate-600 mx-auto" />
               <p className="text-sm font-semibold text-slate-300">
@@ -587,25 +784,103 @@ export default function App() {
               </p>
             </div>
           ) : (
-            filteredComics.map((comic) => (
-              <ComicRow 
-                key={comic.id} 
-                comic={comic} 
-                viewMode={viewMode}
-                onToggleNumber={(num) => handleToggleNumber(comic, num)}
-                onToggleChunkExpand={(chunkStart) => handleToggleChunkExpand(comic, chunkStart)}
-                onToggleComplete={() => handleToggleCompleteSeries(comic)}
-                onCycleType={() => handleCycleComicType(comic)}
-                onCyclePublisher={() => handleCycleComicPublisher(comic)}
-                onStartEdit={() => handleStartEdit(comic)}
-                getTypeBadgeStyle={getTypeBadgeStyle}
-                getPublisherBadgeStyle={getPublisherBadgeStyle}
-                format2={format2}
-              />
+            sortedAndFilteredComics.map((comic, index) => (
+              <div
+                key={comic.id}
+                draggable
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDrop={(e) => handleDrop(e, index)}
+                onDragEnd={handleDragEnd}
+                className={`transition-all duration-150 ${
+                  dragOverIndex === index ? 'border-t-4 border-amber-400 pt-1' : ''
+                } ${draggedIndex === index ? 'opacity-40 scale-[0.98]' : 'opacity-100'}`}
+              >
+                <ComicRow 
+                  comic={comic} 
+                  index={index}
+                  totalItems={sortedAndFilteredComics.length}
+                  viewMode={viewMode}
+                  onToggleNumber={(num) => handleToggleNumber(comic, num)}
+                  onToggleChunkExpand={(chunkStart) => handleToggleChunkExpand(comic, chunkStart)}
+                  onToggleComplete={() => handleToggleCompleteSeries(comic)}
+                  onCycleType={() => handleCycleComicType(comic)}
+                  onCyclePublisher={() => handleCycleComicPublisher(comic)}
+                  onStartEdit={() => handleStartEdit(comic)}
+                  onOpenIssueTitleModal={(num) => handleOpenIssueTitleModal(comic, num)}
+                  onMoveCard={(dir) => handleMoveCard(index, dir)}
+                  getTypeBadgeStyle={getTypeBadgeStyle}
+                  getPublisherBadgeStyle={getPublisherBadgeStyle}
+                  format2={format2}
+                />
+              </div>
             ))
           )}
         </section>
       </main>
+
+      {/* MODAL DE EDIÇÃO DE TÍTULO DA EDIÇÃO (MINISSÉRIE E COLEÇÃO) */}
+      {issueTitleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-[#12192B] border border-purple-800/80 w-full max-w-sm rounded-2xl p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-700/80 pb-3">
+              <h3 className="font-bold text-base text-white flex items-center gap-2">
+                <Tag className="w-4 h-4 text-purple-400" /> Título da Edição #{format2(issueTitleModal.issueNum)}
+              </h3>
+              <button 
+                onClick={() => setIssueTitleModal(null)}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-400">
+              Defina um nome específico para o fascículo #{format2(issueTitleModal.issueNum)} da {issueTitleModal.comic.type.toLowerCase()} <strong>"{issueTitleModal.comic.name}"</strong>:
+            </p>
+
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={issueTitleInput}
+                onChange={(e) => setIssueTitleInput(e.target.value)}
+                placeholder="Ex: Ano Um, O Longo Dia das Bruxas..."
+                className="w-full bg-slate-900 text-white px-3.5 py-2.5 rounded-xl border border-slate-700 text-sm focus:outline-none focus:border-purple-500"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveIssueTitle();
+                }}
+              />
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setIssueTitleModal(null)}
+                  className="flex-1 px-3 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSaveIssueTitle}
+                  className="flex-1 px-3 py-2 rounded-xl bg-purple-600 text-white text-xs font-bold hover:bg-purple-500 transition shadow-md shadow-purple-600/30"
+                >
+                  Salvar Título
+                </button>
+              </div>
+
+              {issueTitleModal.currentTitle && (
+                <button
+                  onClick={handleRemoveIssueTitle}
+                  className="w-full py-1.5 text-xs text-red-400 hover:text-red-300 hover:underline transition"
+                >
+                  Remover título personalizado
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL DE EDIÇÃO E EXCLUSÃO DO TÍTULO */}
       {editingComic && (
@@ -639,7 +914,7 @@ export default function App() {
               {/* Tipo */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-300">Tipo de Publicação</label>
-                <div className="grid grid-cols-3 gap-1.5">
+                <div className="grid grid-cols-2 gap-1.5">
                   {COMIC_TYPES.map((t) => (
                     <button
                       key={t}
@@ -739,10 +1014,12 @@ export default function App() {
 }
 
 /**
- * Componente de Linha de Quadrinho com Chunking de 10 em 10 e Estilo Cromático por Tipo
+ * Componente de Linha de Quadrinho com Chunking Estrito, Drag Handle e Título de Edição
  */
 function ComicRow({ 
   comic, 
+  index,
+  totalItems,
   viewMode,
   onToggleNumber, 
   onToggleChunkExpand, 
@@ -750,6 +1027,8 @@ function ComicRow({
   onCycleType,
   onCyclePublisher,
   onStartEdit, 
+  onOpenIssueTitleModal,
+  onMoveCard,
   getTypeBadgeStyle,
   getPublisherBadgeStyle,
   format2 
@@ -759,33 +1038,63 @@ function ComicRow({
 
   const comicType = comic.type || 'Mensal';
   const comicPublisher = comic.publisher || 'Marvel';
+  const issueTitles = comic.issueTitles || {};
 
-  // Cores do Card conforme especificado pelo usuário:
+  // Pode ter títulos de edição específicos se for Minissérie ou Coleção
+  const supportsIssueTitles = comicType === 'Minissérie' || comicType === 'Coleção';
+
+  // Cores do Card por Tipo
   // - Mensal: Azul escuro
   // - Especial: Vermelho escuro
   // - Minissérie: Verde escuro
+  // - Coleção: Roxo escuro / Violeta
   const getCardThemeClasses = (type) => {
     switch (type) {
       case 'Especial':
         return 'bg-[#220B10] border-red-950/80 hover:border-red-800/80 shadow-red-950/20';
       case 'Minissérie':
         return 'bg-[#0B2117] border-emerald-950/80 hover:border-emerald-800/80 shadow-emerald-950/20';
+      case 'Coleção':
+        return 'bg-[#200A2C] border-purple-950/80 hover:border-purple-800/80 shadow-purple-950/30';
       case 'Mensal':
       default:
         return 'bg-[#0E1A30] border-blue-950/80 hover:border-blue-800/80 shadow-blue-950/20';
     }
   };
 
-  // Se estiver encerrado como minissérie/série
+  // Se estiver encerrado como minissérie/coleção/série
   if (comic.isCompleted && comic.completedUntil) {
     const endNum = comic.completedUntil;
     const isExpanded = expandedChunksSet.has('completed');
 
     return (
       <div className={`border rounded-2xl p-3.5 shadow-md transition ${getCardThemeClasses(comicType)}`}>
-        {/* TOPO DO CARD: NOME + TIPO + EDITORA + STATUS */}
+        {/* TOPO DO CARD: ALÇA DE ARRASTO + NOME + TIPO + EDITORA + STATUS */}
         <div className="flex items-center justify-between mb-2 gap-2">
-          <div className="flex items-center gap-2 overflow-hidden flex-wrap">
+          <div className="flex items-center gap-2 overflow-hidden flex-wrap flex-1">
+            {/* Alça de Arrasto e Botões de Subir/Descer */}
+            <div className="flex items-center gap-0.5 text-slate-500 shrink-0">
+              <span className="cursor-grab active:cursor-grabbing p-1 hover:text-white" title="Arraste para reordenar">
+                <GripVertical className="w-4 h-4" />
+              </span>
+              <button 
+                onClick={() => onMoveCard('up')} 
+                disabled={index === 0} 
+                className="disabled:opacity-20 hover:text-white p-0.5"
+                title="Mover para cima"
+              >
+                <ArrowUp className="w-3 h-3" />
+              </button>
+              <button 
+                onClick={() => onMoveCard('down')} 
+                disabled={index === totalItems - 1} 
+                className="disabled:opacity-20 hover:text-white p-0.5"
+                title="Mover para baixo"
+              >
+                <ArrowDown className="w-3 h-3" />
+              </button>
+            </div>
+
             <button
               onClick={onStartEdit}
               className="text-left font-bold text-sm text-white hover:text-amber-400 transition truncate flex items-center gap-1.5"
@@ -826,7 +1135,7 @@ function ComicRow({
           </div>
         </div>
 
-        {/* Resumo da Minissérie */}
+        {/* Resumo da Minissérie/Coleção */}
         <div className="flex items-center flex-wrap gap-2 pt-1">
           <button
             onClick={() => onToggleChunkExpand('completed')}
@@ -841,38 +1150,65 @@ function ComicRow({
 
         {/* Números expandidos se solicitado */}
         {isExpanded && (
-          <div className="mt-3 pt-3 border-t border-slate-800/80 grid grid-cols-5 sm:grid-cols-10 gap-1.5">
-            {Array.from({ length: endNum }, (_, i) => i + 1).map((n) => {
-              const isChecked = ownedSet.has(n);
-              if (viewMode === 'owned' && !isChecked) return null;
-              if (viewMode === 'missing' && isChecked) return null;
+          <div className="mt-3 pt-3 border-t border-slate-800/80 space-y-2">
+            {supportsIssueTitles && (
+              <p className="text-[10px] text-purple-300/80 italic">
+                * Dê duplo clique em uma edição para adicionar ou editar o título do fascículo.
+              </p>
+            )}
+            <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
+              {Array.from({ length: endNum }, (_, i) => i + 1).map((n) => {
+                const isChecked = ownedSet.has(n);
+                if (viewMode === 'owned' && !isChecked) return null;
+                if (viewMode === 'missing' && isChecked) return null;
 
-              return (
-                <button
-                  key={n}
-                  onClick={() => onToggleNumber(n)}
-                  className={`h-9 rounded-full text-xs font-bold flex items-center justify-center transition-all active:scale-90 shadow-sm ${
-                    isChecked
-                      ? 'bg-emerald-500 text-slate-950 font-black shadow-emerald-500/20'
-                      : 'bg-slate-900/90 text-slate-400 border border-slate-700 hover:border-slate-500'
-                  }`}
-                >
-                  {format2(n)}
-                </button>
-              );
-            })}
+                const specificTitle = issueTitles[n];
+
+                return (
+                  <button
+                    key={n}
+                    onClick={() => onToggleNumber(n)}
+                    onDoubleClick={() => onOpenIssueTitleModal(n)}
+                    className={`relative h-9 rounded-full text-xs font-bold flex items-center justify-center transition-all active:scale-90 shadow-sm ${
+                      isChecked
+                        ? 'bg-emerald-500 text-slate-950 font-black shadow-emerald-500/20'
+                        : 'bg-slate-900/90 text-slate-400 border border-slate-700 hover:border-slate-500'
+                    }`}
+                    title={specificTitle ? `Edição #${format2(n)}: ${specificTitle}` : `Edição #${format2(n)}`}
+                  >
+                    {format2(n)}
+                    {specificTitle && (
+                      <span 
+                        className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-purple-400 border border-slate-950 shadow-sm" 
+                        title={`Título: ${specificTitle}`}
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
     );
   }
 
-  // Lógica normal de blocos de 10 em 10
-  const highestOwned = comic.ownedNumbers && comic.ownedNumbers.length > 0 
-    ? Math.max(...comic.ownedNumbers) 
-    : 0;
-  
-  const currentChunkLimit = Math.max(comic.highestOpenedChunk || 10, Math.ceil(highestOwned / 10) * 10 || 10);
+  // CÁLCULO ESTRITO E DINÂMICO DOS BLOCOS DE 10 EM 10:
+  // Se não tem números marcados: limite = 10 (apenas 1..10)
+  // Se tem números marcados:
+  //   - Se o maior marcado for múltiplo de 10 (ex: 10, 20, 30), abre a próxima dezena (+10).
+  //   - Se for qualquer outro número (ex: 9, 14), o limite é somente a dezena correspondente!
+  // Dessa forma, se desmarcar o 10 e ficar com 9 ou menos, o bloco 11..20 NÃO é exibido.
+  const ownedNumbers = comic.ownedNumbers || [];
+  let currentChunkLimit = 10;
+  if (ownedNumbers.length > 0) {
+    const highestOwned = Math.max(...ownedNumbers);
+    if (highestOwned % 10 === 0) {
+      currentChunkLimit = highestOwned + 10;
+    } else {
+      currentChunkLimit = Math.ceil(highestOwned / 10) * 10;
+    }
+  }
 
   const chunkStarts = [];
   for (let start = 1; start <= currentChunkLimit; start += 10) {
@@ -881,9 +1217,32 @@ function ComicRow({
 
   return (
     <div className={`border rounded-2xl p-3.5 shadow-md transition ${getCardThemeClasses(comicType)}`}>
-      {/* CABEÇALHO DO CARD: NOME + TIPO + EDITORA + BOTÃO ENCERRAR */}
+      {/* CABEÇALHO DO CARD: ALÇA DE ARRASTO + NOME + TIPO + EDITORA + BOTÃO ENCERRAR */}
       <div className="flex items-center justify-between mb-2.5 gap-2">
-        <div className="flex items-center gap-2 overflow-hidden flex-wrap">
+        <div className="flex items-center gap-2 overflow-hidden flex-wrap flex-1">
+          {/* Alça de Arrasto e Botões de Subir/Descer */}
+          <div className="flex items-center gap-0.5 text-slate-500 shrink-0">
+            <span className="cursor-grab active:cursor-grabbing p-1 hover:text-white" title="Arraste para reordenar">
+              <GripVertical className="w-4 h-4" />
+            </span>
+            <button 
+              onClick={() => onMoveCard('up')} 
+              disabled={index === 0} 
+              className="disabled:opacity-20 hover:text-white p-0.5"
+              title="Mover para cima"
+            >
+              <ArrowUp className="w-3 h-3" />
+            </button>
+            <button 
+              onClick={() => onMoveCard('down')} 
+              disabled={index === totalItems - 1} 
+              className="disabled:opacity-20 hover:text-white p-0.5"
+              title="Mover para baixo"
+            >
+              <ArrowDown className="w-3 h-3" />
+            </button>
+          </div>
+
           <button
             onClick={onStartEdit}
             className="text-left font-bold text-sm text-white hover:text-amber-400 transition truncate flex items-center gap-1.5"
@@ -916,7 +1275,7 @@ function ComicRow({
           <button
             onClick={onToggleComplete}
             className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-slate-700/80 hover:text-amber-300 transition font-medium"
-            title="Encerrar minissérie/série no número atual"
+            title="Encerrar minissérie/coleção no número atual"
           >
             <Flag className="w-3 h-3 text-amber-400" />
             <span>Encerrar</span>
@@ -968,7 +1327,13 @@ function ComicRow({
                 </span>
               </div>
 
-              {/* As bolinhas numéricas com suporte ao modo de visualização */}
+              {supportsIssueTitles && (
+                <p className="text-[10px] text-purple-300/80 italic px-1">
+                  * Dê duplo clique em uma edição para nomeá-la.
+                </p>
+              )}
+
+              {/* As bolinhas numéricas com suporte a duplo clique para nomear */}
               {visibleNumbers.length === 0 ? (
                 <div className="py-1 text-center text-[11px] text-slate-500 italic">
                   {viewMode === 'owned' ? 'Nenhuma edição adquirida neste bloco' : 'Todas as edições deste bloco já foram adquiridas! 🎉'}
@@ -977,20 +1342,34 @@ function ComicRow({
                 <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
                   {visibleNumbers.map((num) => {
                     const isChecked = ownedSet.has(num);
+                    const specificTitle = issueTitles[num];
+
                     return (
                       <button
                         key={num}
                         onClick={() => onToggleNumber(num)}
-                        className={`h-9 rounded-full text-xs font-bold flex items-center justify-center transition-all active:scale-90 ${
+                        onDoubleClick={() => onOpenIssueTitleModal(num)}
+                        className={`relative h-9 rounded-full text-xs font-bold flex items-center justify-center transition-all active:scale-90 ${
                           isChecked
                             ? 'bg-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/30'
                             : viewMode === 'missing'
                               ? 'bg-red-950/40 text-red-300 border border-red-500/50 hover:border-red-400 hover:text-white'
                               : 'bg-slate-900/90 text-slate-300 border border-slate-700/80 hover:border-slate-500 hover:text-white'
                         }`}
-                        title={`Edição #${format2(num)} ${isChecked ? '(Adquirida)' : '(Faltante)'}`}
+                        title={
+                          specificTitle 
+                            ? `Edição #${format2(num)}: ${specificTitle} ${isChecked ? '(Adquirida)' : '(Faltante)'}` 
+                            : `Edição #${format2(num)} ${isChecked ? '(Adquirida)' : '(Faltante)'}`
+                        }
                       >
                         {format2(num)}
+                        {/* Indicador de título personalizado para Minissérie ou Coleção */}
+                        {specificTitle && (
+                          <span 
+                            className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-purple-400 border border-slate-950 shadow-sm" 
+                            title={`Título: ${specificTitle}`}
+                          />
+                        )}
                       </button>
                     );
                   })}

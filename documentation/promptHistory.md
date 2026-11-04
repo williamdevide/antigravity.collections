@@ -64,3 +64,29 @@ Resposta do Usuário: (Recommended) Alternância visual nos cards: no topo ou no
 Pergunta: Depois que a HQ já estiver cadastrada na lista, como você prefere alterar o Tipo ou a Editora caso necessário?
 Resposta do Usuário: (Recommended) Permitir alternar o Tipo e a Editora com um clique rápido diretamente no badge do card e também dentro do modal de edição
 ```
+
+### Prompt 4
+```text
+/agente-orquestrador /grill-me /goal quero poder mover o card daquela hq em relação aos outros somente arrastando, mas ter um botão para exibir em ordem alfabetica A-Z, Z-A ou Ordem Pessoal.
+se cliquei no 10 ele esta abrindo do 11 ao 20, mas se eu desmarcar o 10 e sair da aplicação sem preencher ninguem do 11 ao 20, na proxima vez que entrar não deve exibir o 11 ao 20.
+crie o tipo coleção também.
+tem minisséries ou coleção que cada edição tem um nome especifico, se for desses tipo e eu der duplo clique sobre o numero deve permitir colocar um titulo para aquele numero
+```
+
+### Resposta Grill-Me / Interação 9
+```text
+Pergunta: Qual cor de fundo e destaque você prefere para o card do novo tipo 'Coleção'?
+Resposta do Usuário: (Recommended) Roxo Escuro / Violeta (#240D33 com detalhes em lilás), combinando com Azul Escuro (Mensal), Vermelho Escuro (Especial) e Verde Escuro (Minissérie)
+```
+
+### Resposta Grill-Me / Interação 10
+```text
+Pergunta: Como você prefere que o título individual da edição seja visualizado e acessado nos cards de Minissérie ou Coleção?
+Resposta do Usuário: (Recommended) Exibir um pequeno indicador visual na bolinha (ex: ponto lilás) que mostra o título ao tocar, além de abrir o modal de edição ao dar duplo clique ou toque prolongado
+```
+
+### Resposta Grill-Me / Interação 11
+```text
+Pergunta: Como você prefere acionar o arrastar e soltar (Drag and Drop) dos cards no mobile e desktop?
+Resposta do Usuário: (Recommended) Incluir um ícone de alça de arrasto (':::') no card, permitindo arrastar suavemente tanto no celular quanto no desktop sem conflitar com o scroll da tela
+```

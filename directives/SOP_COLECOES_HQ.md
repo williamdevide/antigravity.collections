@@ -1,43 +1,31 @@
 # 📋 Diretiva: Controle Rápido de Coleções de HQs (Mobile-First)
 
 ## 1. Visão Geral e Propósito
-Desenvolver uma aplicação Web First Mobile para controle ágil de coleções de Histórias em Quadrinhos (HQs, especiais e minisséries). A experiência é concentrada em uma única tela, com alta responsividade tátil, carregamento instantâneo e categorização rica por Tipo e Editora.
+Aplicação Web First Mobile para controle ágil de coleções de Histórias em Quadrinhos, Especiais, Minisséries e Coleções em tela única.
 
-## 2. Requisitos Funcionais e Especificações
+## 2. Tipos de Publicação e Identidade Visual
+* **Mensal:** Fundo Azul Escuro (`#0E1A30`), bordas azuis.
+* **Especial:** Fundo Vermelho Escuro (`#220B10`), bordas carmesim.
+* **Minissérie:** Fundo Verde Escuro (`#0B2117`), bordas esmeralda.
+* **Coleção:** Fundo Roxo Escuro / Violeta (`#240D33`), bordas lilás/púrpura.
 
-### 2.1 Cadastro Rápido de Título
-* **Nome:** Campo de texto ágil.
-* **Tipo da HQ (Botão de Alternância):**
-  - Valores: `Mensal`, `Especial`, `Minissérie`.
-  - Padrão inicial: `Mensal`.
-* **Editora (Botão de Alternância):**
-  - Valores: `Marvel`, `DC`, `Vertigo`, `Outras`.
-  - Padrão inicial: `Marvel`.
-* **Adicionar:** Tecla `Enter` ou botão `+`.
+## 3. Títulos Individuais por Edição
+* Para títulos do tipo **Minissérie** ou **Coleção**, edições individuais podem ter nomes específicos.
+* Acionado por **duplo clique** (desktop) ou **toque prolongado / clique duplo** (mobile).
+* As bolinhas com título personalizado exibem um indicador visual (dot lilás) e tooltip com o título da edição.
 
-### 2.2 Estilização Cromática dos Cards por Tipo
-* **Mensal:** Fundo e bordas em tons de Azul Escuro (`#0f172a` / `#1e293b` com acentos azulados).
-* **Especial:** Fundo e bordas em tons de Vermelho Escuro (`#2a0d12` / `#3b1118` com acentos carmesim).
-* **Minissérie:** Fundo e bordas em tons de Verde Escuro (`#0b2318` / `#133824` com acentos esmeralda).
+## 4. Ordenação e Reordenação Manual (Drag & Drop)
+* **Modos de Ordenação:**
+  - `A-Z`: Alfabética crescente.
+  - `Z-A`: Alfabética decrescente.
+  - `Ordem Pessoal`: Ordem customizada manual pelo colecionador.
+* Alça de arrasto (`:::`) em cada card para movimentação suave em dispositivos móveis e desktop sem conflito de rolagem.
+* Ao soltar um card, a ordem pessoal é atualizada e salva automaticamente no Firestore e LocalStorage.
 
-### 2.3 Mecanismo de Chunking (10 em 10)
-* Bolinhas numéricas táteis ergonômicas para toque móvel.
-* Ao marcar a 10ª edição de um bloco:
-  - Se todas as 10 estiverem marcadas: resumo automático em `01..10` e abre a próxima dezena (`11..20`).
-  - Se faltarem números anteriores: abre `11..20`, mas mantém `01..10` detalhado.
-  - Ao completar os números faltantes: colapsa automaticamente.
-* Clicar no badge resumido (ex: `01..10`) alterna entre expandir e recolher as 10 bolinhas para ajustes rápidos.
+## 5. Dinâmica Estrita dos Blocos de 10 em 10
+* Se o número `10` estiver marcado: abre o bloco `11..20`.
+* Se o número `10` for desmarcado e nenhuma edição de `11..20` estiver selecionada: o bloco `11..20` é fechado imediatamente e não reaparece em sessões futuras.
 
-### 2.4 Encerramento de Itens (Minisséries / Títulos Encerrados)
-* Botão **Encerrar**: sintetiza a sequência no maior número marcado (ex: `01..06`), alternável a qualquer momento.
-
-### 2.5 Sistema de Filtros Avançado na Tela Única
-* **Filtro por Tipo:** Todos | Mensal | Especial | Minissérie.
-* **Filtro por Editora:** Todas | Marvel | DC | Vertigo | Outras.
-* **Filtro por Status:** Todos | Em Andamento | Encerrados.
-* **Filtro de Edições:** Todas as Edições | Somente as que Tenho | Somente Faltantes.
-
-### 2.6 Persistência e Sincronização
-* Sincronização em tempo real com Firebase Firestore.
-* Cache e funcionamento imediato Offline-First via `LocalStorage`.
-* Versionamento Git integrado e deploy contínuo na Vercel via GitHub.
+## 6. Persistência e Deploy
+* Armazenamento híbrido: Offline-First LocalStorage + Firestore em tempo real.
+* Deploy contínuo na Vercel sincronizado com o repositório GitHub.

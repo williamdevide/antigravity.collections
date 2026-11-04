@@ -138,6 +138,8 @@ export async function saveComic(comic) {
         type: comic.type || 'Mensal',
         publisher: comic.publisher || 'Marvel',
         ownedNumbers: comic.ownedNumbers || [],
+        issueTitles: comic.issueTitles || {},
+        position: typeof comic.position === 'number' ? comic.position : 0,
         isCompleted: Boolean(comic.isCompleted),
         completedUntil: comic.completedUntil || null,
         highestOpenedChunk: comic.highestOpenedChunk || 10,
@@ -172,6 +174,27 @@ export async function deleteComic(comicId) {
   }
 
   return updated;
+}
+
+/**
+ * Salva a ordenação personalizada de todas as HQs (Ordem Pessoal)
+ */
+export async function saveAllComicsOrder(comicsList) {
+  saveToLocalStorage(comicsList);
+
+  if (db && isFirebaseInitialized) {
+    try {
+      const promises = comicsList.map((comic, idx) => {
+        const docRef = doc(db, 'comics', comic.id);
+        return setDoc(docRef, { position: idx }, { merge: true });
+      });
+      await Promise.all(promises);
+    } catch (e) {
+      console.warn('⚠️ Falha ao salvar ordem no Firestore:', e.message);
+    }
+  }
+
+  return comicsList;
 }
 
 export { db };
