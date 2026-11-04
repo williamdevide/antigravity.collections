@@ -166,3 +166,15 @@ Pergunta: Ao clicar no botão de rejeitar capa (sem texto), qual comportamento v
 Resposta do Usuário: (Recommended) Marcar a imagem como rejeitada para não sugerir novamente e permitir tentar buscar outra alternativa com um clique
 ```
 
+### Prompt 13
+```text
+/agente-orquestrador /grill-me /goal na hora de buscar as capas, busque sempre pelas edições mais novas, se for rejeitada dai busca mais antigas (exemplo as edições mensais do wolverine são de 2025 e 2026, mas esta exibindo capas das mais antigas e sempre busque pela numeração, ele está sugerindo a mesma capa para mais de uma edição
+```
+
+### Resposta Grill-Me / Interação 15
+```text
+Pergunta: Para coleções com muitos relançamentos (ex: Wolverine, Batman), qual regra de prioridade temporal você prefere?
+Resposta do Usuário: (Recommended) Priorizar sempre o lançamento mais recente (2025/2026 / maior volume). Ao rejeitar, buscar progressivamente os volumes/anos anteriores
+```
+
+

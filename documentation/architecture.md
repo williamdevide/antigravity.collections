@@ -1,7 +1,7 @@
-# 🏛️ Arquitetura do Sistema: HQs Collections `v1.2.0`
+# 🏛️ Arquitetura do Sistema: HQs Collections `v1.2.1`
 
 ## 1. Visão Geral
-O **HQs Collections** é um sistema projetado para colecionadores de quadrinhos com foco em extrema agilidade no ambiente mobile ("Mobile First"). A aplicação opera em **tela única**, minimizando cliques, eliminando navegações desnecessárias, agrupando edições em blocos táteis de 10 em 10, categorizando coleções por Tipo e Editora, permitindo ordenação personalizada com **Drag & Drop**, títulos específicos por fascículo, suporte a início em edições avançadas (`startFrom`), **ciclo interativo de 4 estágios com destaque em neon**, **scraper forçado na Panini Brasil via curl e serverless**, **painel detalhado de status de busca de capas** e **curadoria de capas sem texto (Aprovar ✓ / Rejeitar ✗)**.
+O **HQs Collections** é um sistema projetado para colecionadores de quadrinhos com foco em extrema agilidade no ambiente mobile ("Mobile First"). A aplicação opera em **tela única**, minimizando cliques, eliminando navegações desnecessárias, agrupando edições em blocos táteis de 10 em 10, categorizando coleções por Tipo e Editora, permitindo ordenação personalizada com **Drag & Drop**, títulos específicos por fascículo, suporte a início em edições avançadas (`startFrom`), **ciclo interativo de 4 estágios com destaque em neon**, **scraper com prioridade cronológica decrescente (lançamentos 2025/2026 e maiores volumes primeiro)**, **validador estrito de número de edição (`matchIssueNumber`)** e **fallback progressivo para edições mais antigas ao rejeitar uma capa**.
 
 ---
 
@@ -12,43 +12,37 @@ flowchart TD
     User["📱 Usuário (Colecionador no Mobile / Desktop)"] --> UI["🖥️ Interface Web Mobile First (Vite + React)"]
 
     subgraph HeaderSection ["Cabeçalho e Navegação"]
-        UI --> Brand["Logotipo + Versão v1.2.0 + Badge Mobile + Slogan"]
+        UI --> Brand["Logotipo + Versão v1.2.1 + Badge Mobile + Slogan"]
         UI --> CoverProgressBtn["Botão Tátil [🖼️ XX%] (Apenas Ícone e Porcentagem)"]
         UI --> ModeToggle["Alternador de Modo (Consulta 👁️ / Edição ✏️)"]
         UI --> ConnectionBadge["Status Conexão [☁️ Nuvem / 💾 Local] + Contadores [XX HQs • YY ed.]"]
     end
 
-    subgraph CoverDashboard ["Painel Detalhado de Status da Busca de Capas"]
-        CoverProgressBtn --> CoverModal["Modal de Monitoramento de Capas"]
-        CoverModal --> MetricsBar["Métricas: % Progresso, Buscadas, Fixadas, Pendentes"]
-        CoverModal --> TabsFilter["Abas: Todas / Encontradas / Em Busca / Sem Capa & Rejeitadas"]
-        CoverModal --> IssueSearchFilter["Filtro Instantâneo por Título da HQ"]
-        CoverModal --> CoverApprovalAction["Aprovação e Rejeição Direta por Edição [✓] [✗]"]
+    subgraph ScraperEngine ["Motor de Busca Cronológico & Validador de Edições"]
+        CoverProgressBtn --> BackgroundWorker["Worker Assíncrono em Segundo Plano"]
+        BackgroundWorker --> ScraperEndpoint["/api/scrape-cover (Vercel Serverless / Backend Express)"]
+        
+        ScraperEndpoint --> StrictValidator["Validador matchIssueNumber(title, issueNum)"]
+        StrictValidator --> YearFilter["Isola anos de 4 dígitos (ex: 2025/2026) da numeração"]
+        StrictValidator --> VolumeDetector["Diferencia Volume de Edição (ex: Vol 8 #2)"]
+        
+        ScraperEndpoint --> ChronoRanker["Classificador Cronológico Decrescente"]
+        ChronoRanker --> PaniniNewest["Panini Brasil: Anos 2026 > 2025 > 2024..."]
+        ChronoRanker --> FandomVolRank["Fandom: Rank = (Volume * 10000) + Ano"]
+        
+        ScraperEndpoint --> AntiDuplicate["Garantia de Unicidade por Coleção (Sem repetição)"]
+        ScraperEndpoint --> ProgressiveFallback["Fallback Progressivo: Rejeição busca próximo candidato mais antigo"]
     end
 
     subgraph ComicListSection ["Lista de Coleções (Cards com Drag & Drop Nativo)"]
         UI --> ComicList["Lista de Cards"]
-        ComicList --> StartFromLogic["Ponto de Partida Customizado (startFrom)"]
-        StartFromLogic --> HiddenChip["Chip de Dezenas Anteriores Ocultas (01..XX)"]
-        StartFromLogic --> ActiveChunks["Dezenas Ativas a partir da Faixa Inicial"]
-        
         ComicList --> ChunkEngine["Mecanismo Estrito de Blocos de 10 (Chunking)"]
         ChunkEngine --> TactileCircles["Bolinhas Táteis em Linha Única (grid-cols-10)"]
         TactileCircles --> FourStageCycle["Ciclo de 4 Estágios (Owned -> Read -> Wishlist -> None)"]
         
         ChunkEngine --> IssueDetailModal["Modal de Detalhes da Edição (Modo Consulta)"]
         IssueDetailModal --> CoverFrame["Moldura Estética de Capa (2:3)"]
-        IssueDetailModal --> TextFreeCurator["Curadoria Sem Texto: Botão Aprovar [✓] e Botão Rejeitar [✗]"]
-    end
-
-    subgraph ScraperEngine ["Motor de Busca de Capas Forçado na Panini Brasil"]
-        UI --> BackgroundWorker["Hook Assíncrono em Segundo Plano"]
-        BackgroundWorker --> PaniniEndpoint["/api/scrape-cover (Vercel Serverless / Backend Express)"]
-        PaniniEndpoint --> PaniniCurl["curl.exe em panini.com.br/catalogsearch/result/?q=..."]
-        PaniniCurl --> PaniniHTML["Parser Magento 2 / Elasticsuite (HTML e Cloudfront)"]
-        PaniniHTML --> QualityUpgrade["Elevação para Imagem Alta Resolução (-S600- ou JPEG 897x1373)"]
-        PaniniEndpoint --> FallbackFandom["Fallback: Fandom MediaWiki (DC / Marvel / Vertigo)"]
-        PaniniEndpoint --> FallbackOpenLib["Fallback: OpenLibrary API"]
+        IssueDetailModal --> TextFreeCurator["Curadoria Sem Texto: Aprovar [✓] e Rejeitar [✗]"]
     end
 
     subgraph DataSync ["Motor de Sincronização Híbrida"]
@@ -60,26 +54,31 @@ flowchart TD
 
 ---
 
-## 3. Fluxo de Curadoria de Capa (Aprovar ✓ vs. Rejeitar ✗)
+## 3. Lógica do Validador Estrito e Fallback Cronológico
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor User as Usuário
     participant UI as HQs Collections UI
-    participant Storage as Firestore / LocalStorage
+    participant Engine as Scraper Engine
+    participant Sources as Panini / Fandom / OpenLib
 
-    Note over User,UI: Usuário abre detalhes da edição ou painel de status de capas
-    alt Aprovar Capa (Botão Verde ✓ sem texto)
+    User->>UI: Solicita capa da Edição #2 do Wolverine
+    UI->>Engine: searchIssueCover('Wolverine', 2, rejectedUrls=[])
+    Engine->>Sources: Busca por edições com numeração #2
+    Sources-->>Engine: Retorna candidatos (Vol 8 #2 [2025], Vol 7 #2 [2020], Vol 1 #2 [1988])
+    Note over Engine: Filtra páginas sem #2 (descarta retratos e posters)
+    Note over Engine: Ordena por Rank: Vol 8 (2025) > Vol 7 (2020) > Vol 1 (1988)
+    Engine-->>UI: Sugere capa da edição mais nova: Wolverine Vol 8 #2 (2025)
+    
+    alt Usuário aprova a capa
         User->>UI: Clica em [✓]
-        UI->>Storage: Move capa de `pendingCovers` para `issueCovers`
-        Storage-->>UI: Confirma persistência oficial da capa
-        UI-->>User: Exibe badge verde "✓ Fixada" com moldura 2:3
-    else Rejeitar Capa (Botão Vermelho ✗ sem texto)
+        UI->>UI: Fixa como capa oficial da Edição #2
+    else Usuário rejeita a capa
         User->>UI: Clica em [✗]
-        UI->>Storage: Remove de `pendingCovers` e registra em `rejectedCovers`
-        Storage-->>UI: Confirma descarte
-        UI-->>User: Remove sugestão e disponibiliza botão de nova busca
+        UI->>Engine: Re-busca adicionando URL de 2025 em rejectedUrls
+        Engine-->>UI: Retorna próxima alternativa mais antiga: Wolverine Vol 7 #2 (2020)
     end
 ```
 

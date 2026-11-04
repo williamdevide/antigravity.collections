@@ -63,10 +63,76 @@ app.post('/api/comics', (req, res) => {
 });
 
 /**
+ * Validador estrito de número de edição
+ * Impede que edições diferentes recebam a mesma capa genérica
+ * e garante que anos de 4 dígitos (ex: 2025) não sejam confundidos com o número do fascículo
+ */
+function matchIssueNumber(title, issueNum) {
+  const num = parseInt(issueNum, 10);
+  if (isNaN(num)) return false;
+
+  // 1. Remover anos de 4 dígitos (1950 a 2035) para não confundir anos como 2025 ou 2026 com edições
+  let cleaned = title.replace(/\b(19\d{2}|20[0-3]\d)\b/g, ' ');
+
+  // 2. Tratar padrão Fandom: "Vol <volume_num> <issue_num>" (ex: "Wolverine Vol 8 2" -> volume 8, edição 2)
+  const fandomVolMatch = cleaned.match(/\bVol(?:ume|\.)?\s+(\d+)\s+(\d+)\b/i);
+  if (fandomVolMatch) {
+    const pageIssue = parseInt(fandomVolMatch[2], 10);
+    return pageIssue === num;
+  }
+
+  // Se tem apenas "Vol 2" sem número depois (ex: "Wolverine Vol 2"), é a página do volume/coleção inteira, NÃO a edição individual
+  if (/\bVol(?:ume|\.)?\s+\d+\b/i.test(cleaned) && !/\b(?:#|n[º°]|ed(?:ição|\.)?)\s*\d+/i.test(cleaned)) {
+    return false;
+  }
+
+  // 3. Padrão Panini e Geral: "Wolverine 02", "Wolverine 2", "Wolverine nº 02", "Wolverine #2"
+  const numRegex = new RegExp(`(?:^|[\\s#nº°\\-/:,(])0*${num}(?:$|[\\s\\-/:,)])`, 'i');
+  if (!numRegex.test(cleaned)) {
+    return false;
+  }
+
+  // 4. Garantir que não é parte de outro número (ex: 2 dentro de 12, 20, 25)
+  const candidates = [...cleaned.matchAll(/\b0*(\d+)\b/g)].map(m => parseInt(m[1], 10));
+  return candidates.includes(num);
+}
+
+// Mapeamento de títulos frequentes para busca no acervo internacional Fandom
+const TITLE_MAP = {
+  'homem-aranha': 'Spider-Man',
+  'homem aranha': 'Spider-Man',
+  'o espetacular homem-aranha': 'The Amazing Spider-Man',
+  'vingadores': 'Avengers',
+  'os vingadores': 'Avengers',
+  'homem de ferro': 'Iron Man',
+  'capitao america': 'Captain America',
+  'capitão américa': 'Captain America',
+  'quarteto fantastico': 'Fantastic Four',
+  'quarteto fantástico': 'Fantastic Four',
+  'liga da justica': 'Justice League',
+  'liga da justiça': 'Justice League',
+  'demolidor': 'Daredevil',
+  'mulher-maravilha': 'Wonder Woman',
+  'mulher maravilha': 'Wonder Woman',
+  'arqueiro verde': 'Green Arrow',
+  'lanterna verde': 'Green Lantern',
+  'novissima wolverine': 'All-New Wolverine',
+  'novíssima wolverine': 'All-New Wolverine',
+  'justiceiro': 'The Punisher',
+  'o justiceiro': 'The Punisher'
+};
+
+function getEnglishTitle(title) {
+  const normalized = title.trim().toLowerCase();
+  return TITLE_MAP[normalized] || title;
+}
+
+/**
  * Busca forçada no site oficial da Panini Brasil (panini.com.br)
  * Utiliza o binário curl para ultrapassar firewalls/Fastly e extrair capas originais
+ * Prioriza estritamente os anos mais recentes (2026 > 2025 > 2024...) e filtra URLs rejeitadas
  */
-function searchPaniniBrasil(title, issueNum) {
+function searchPaniniBrasil(title, issueNum, rejectedUrls = []) {
   return new Promise((resolve) => {
     const issueStr = String(issueNum || '1').trim();
     const issuePad = issueStr.padStart(2, '0');
@@ -112,41 +178,41 @@ function searchPaniniBrasil(title, issueNum) {
             let imgUrl = imgMatch ? imgMatch[1] : '';
 
             if (imgUrl && prodTitle) {
+              // 1. Validação estrita do número da edição
+              if (!matchIssueNumber(prodTitle, issueNum)) {
+                continue;
+              }
+
               imgUrl = imgUrl.replace(/&amp;/g, '&');
-              // Se for Cloudfront, converter thumbnail -S170- para alta resolução -S600-
+              // Elevação de resolução
               if (imgUrl.includes('-S170-')) {
                 imgUrl = imgUrl.replace('-S170-', '-S600-');
               }
-              // Se for media/catalog/product, remover parâmetros para obter a arte original em alta resolução
               if (imgUrl.includes('/media/catalog/product/')) {
                 imgUrl = imgUrl.split('?')[0];
               }
 
-              // Detectar se o título possui o número da edição desejada
-              const numRegex = new RegExp(`(^|\\D)(0?${issueStr}|#0?${issueStr}|vol\\.?\\s*0?${issueStr}|n[º°]\\s*0?${issueStr})($|\\D)`, 'i');
-              const hasNum = numRegex.test(prodTitle);
+              // 2. Pular capas já rejeitadas
+              if (rejectedUrls.includes(imgUrl)) {
+                continue;
+              }
 
-              // Detectar ano
+              // Detectar ano de publicação (ex: "Wolverine (2025) 02" -> 2025)
               const yearMatch = prodTitle.match(/\b(20[0-2][0-9]|19[5-9][0-9])\b/);
-              const parsedYear = yearMatch ? parseInt(yearMatch[1], 10) : 2025;
+              const parsedYear = yearMatch ? parseInt(yearMatch[1], 10) : 2020;
 
               candidates.push({
                 title: prodTitle,
                 coverUrl: imgUrl,
                 source: 'Panini Brasil (panini.com.br)',
-                year: parsedYear,
-                hasNum
+                year: parsedYear
               });
             }
           }
 
           if (candidates.length > 0) {
-            // Prioriza correspondência com o número da edição e ano mais recente decrescente
-            candidates.sort((a, b) => {
-              if (a.hasNum && !b.hasNum) return -1;
-              if (!a.hasNum && b.hasNum) return 1;
-              return b.year - a.year;
-            });
+            // Ordenar estritamente do ano mais recente para trás (2026 > 2025 > 2024...)
+            candidates.sort((a, b) => b.year - a.year);
             return resolve(candidates[0]);
           }
 
@@ -162,11 +228,149 @@ function searchPaniniBrasil(title, issueNum) {
 }
 
 /**
+ * Busca no Fandom MediaWiki com ordenação estrita do maior volume (mais novo) para o menor
+ * e fallback progressivo para volumes anteriores caso uma capa seja rejeitada
+ */
+function searchFandom(title, issueNum, publisher, rejectedUrls = []) {
+  return new Promise(async (resolve) => {
+    let wiki = 'marvel';
+    if (publisher && (String(publisher).toLowerCase().includes('dc') || String(publisher).toLowerCase().includes('vertigo'))) {
+      wiki = 'dc';
+    }
+
+    const engTitle = getEnglishTitle(title);
+    const issueStr = String(issueNum);
+
+    // Passo A: Consultar diretamente os volumes de 10 a 1 em lote (Titles API)
+    // Volumes maiores correspondem às publicações mais recentes (ex: Wolverine Vol 8 = 2024-2026)
+    const directTitles = [];
+    for (let v = 10; v >= 1; v--) {
+      directTitles.push(`${engTitle.replace(/\s+/g, '_')}_Vol_${v}_${issueStr}`);
+    }
+    if (engTitle !== title) {
+      for (let v = 10; v >= 1; v--) {
+        directTitles.push(`${title.replace(/\s+/g, '_')}_Vol_${v}_${issueStr}`);
+      }
+    }
+
+    const titlesParam = encodeURIComponent(directTitles.join('|'));
+    const directPath = `/api.php?action=query&format=json&titles=${titlesParam}&prop=pageimages|info&piprop=original|thumbnail&pithumbsize=600&origin=*`;
+
+    const directCandidates = await new Promise((resDirect) => {
+      https.get({
+        hostname: `${wiki}.fandom.com`,
+        path: directPath,
+        headers: { 'User-Agent': 'HQTrackerBot/1.0' }
+      }, (resp) => {
+        let body = '';
+        resp.on('data', c => body += c);
+        resp.on('end', () => {
+          try {
+            const parsed = JSON.parse(body);
+            if (!parsed.query || !parsed.query.pages) return resDirect([]);
+
+            const pages = Object.values(parsed.query.pages).filter(p => !p.missing);
+            const found = [];
+
+            for (const p of pages) {
+              const url = p.original?.source || p.thumbnail?.source;
+              if (!url || rejectedUrls.includes(url)) continue;
+
+              if (!matchIssueNumber(p.title, issueNum)) continue;
+
+              const volMatch = p.title.match(/\bVol(?:ume|\.)?\s*(\d+)\b/i);
+              const vol = volMatch ? parseInt(volMatch[1], 10) : 1;
+
+              const cbYearMatch = url.match(/[?&]cb=(20[0-2][0-9]|19[5-9][0-9])/);
+              const yr = cbYearMatch ? parseInt(cbYearMatch[1], 10) : 2020;
+
+              found.push({
+                title: p.title,
+                coverUrl: url,
+                source: `${wiki.toUpperCase()} Fandom (Vol ${vol})`,
+                volume: vol,
+                year: yr,
+                rank: (vol * 10000) + yr
+              });
+            }
+
+            // Maior volume e ano mais recente primeiro
+            found.sort((a, b) => b.rank - a.rank);
+            resDirect(found);
+          } catch {
+            resDirect([]);
+          }
+        });
+      }).on('error', () => resDirect([]));
+    });
+
+    if (directCandidates.length > 0) {
+      return resolve(directCandidates[0]);
+    }
+
+    // Passo B: Fallback para busca genérica do Fandom com limite expandido (gsrlimit=30)
+    const searchQuery = `${engTitle} ${issueStr}`;
+    const fandomPath = `/api.php?action=query&format=json&generator=search&gsrsearch=${encodeURIComponent(searchQuery)}&gsrlimit=30&prop=pageimages|extracts|info&piprop=original|thumbnail&pithumbsize=600&origin=*`;
+
+    https.get({
+      hostname: `${wiki}.fandom.com`,
+      path: fandomPath,
+      headers: { 'User-Agent': 'HQTrackerBot/1.0' }
+    }, (resp) => {
+      let body = '';
+      resp.on('data', c => body += c);
+      resp.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          if (!parsed.query || !parsed.query.pages) return resolve(null);
+
+          const pages = Object.values(parsed.query.pages);
+          const candidates = [];
+
+          for (const p of pages) {
+            const url = p.original?.source || p.thumbnail?.source;
+            if (!url || rejectedUrls.includes(url)) continue;
+
+            // Filtro estrito: título da página DEVE conter o número da edição
+            if (!matchIssueNumber(p.title, issueNum)) continue;
+
+            const volMatch = p.title.match(/\bVol(?:ume|\.)?\s*(\d+)\b/i);
+            const vol = volMatch ? parseInt(volMatch[1], 10) : 1;
+
+            const cbYearMatch = url.match(/[?&]cb=(20[0-2][0-9]|19[5-9][0-9])/);
+            const textYearMatch = (p.title + ' ' + (p.extract || '')).match(/\b(20[0-2][0-9]|19[5-9][0-9])\b/);
+            const yr = cbYearMatch ? parseInt(cbYearMatch[1], 10) : (textYearMatch ? parseInt(textYearMatch[1], 10) : 1990);
+
+            candidates.push({
+              title: p.title,
+              coverUrl: url,
+              source: `${wiki.toUpperCase()} Fandom`,
+              volume: vol,
+              year: yr,
+              rank: (vol * 10000) + yr
+            });
+          }
+
+          candidates.sort((a, b) => b.rank - a.rank);
+          if (candidates.length > 0) {
+            return resolve(candidates[0]);
+          }
+          resolve(null);
+        } catch {
+          resolve(null);
+        }
+      });
+    }).on('error', () => resolve(null));
+  });
+}
+
+/**
  * Endpoint de Scraping / Busca de Capas de Quadrinhos
- * Busca preferencialmente na Panini / Web com ordenação do ano mais recente para trás
+ * Busca preferencialmente na Panini / Web com ordenação estrita do mais recente para trás
+ * e suporte a fallback progressivo caso uma capa tenha sido rejeitada
  */
 app.get('/api/scrape-cover', async (req, res) => {
-  const { title, issue, publisher, year } = req.query;
+  const { title, issue, publisher, rejected } = req.query;
   if (!title) {
     return res.status(400).json({ found: false, message: 'Parâmetro "title" é obrigatório.' });
   }
@@ -174,9 +378,14 @@ app.get('/api/scrape-cover', async (req, res) => {
   const issueNum = issue || '1';
   const cleanTitle = String(title).trim();
 
+  // Lista de URLs já rejeitadas pelo usuário para este fascículo
+  const rejectedUrls = rejected 
+    ? String(rejected).split(',').map(u => decodeURIComponent(u.trim())).filter(Boolean)
+    : [];
+
   try {
     // 1. Tentar forçar a busca a todo custo no site oficial da Panini Brasil (panini.com.br)
-    const paniniResult = await searchPaniniBrasil(cleanTitle, issueNum);
+    const paniniResult = await searchPaniniBrasil(cleanTitle, issueNum, rejectedUrls);
     if (paniniResult) {
       return res.json({
         found: true,
@@ -187,72 +396,20 @@ app.get('/api/scrape-cover', async (req, res) => {
       });
     }
 
-    // 2. Se não encontrar na Panini, tentar busca no Fandom MediaWiki (DC / Marvel / Vertigo / Star Wars)
-    let wiki = 'marvel';
-    if (publisher && String(publisher).toLowerCase().includes('dc')) {
-      wiki = 'dc';
-    } else if (publisher && String(publisher).toLowerCase().includes('vertigo')) {
-      wiki = 'dc';
-    }
-
-    const searchQuery = `${cleanTitle} ${issueNum}`;
-    const fandomPath = `/api.php?action=query&format=json&generator=search&gsrsearch=${encodeURIComponent(searchQuery)}&gsrlimit=5&prop=pageimages|extracts|info&piprop=original|thumbnail&pithumbsize=600&origin=*`;
-
-    const fandomResult = await new Promise((resolve) => {
-      https.get({
-        hostname: `${wiki}.fandom.com`,
-        path: fandomPath,
-        headers: { 'User-Agent': 'HQTrackerBot/1.0 (Mozilla/5.0)' }
-      }, (resp) => {
-        let body = '';
-        resp.on('data', c => body += c);
-        resp.on('end', () => {
-          try {
-            const parsed = JSON.parse(body);
-            if (parsed.query && parsed.query.pages) {
-              const pages = Object.values(parsed.query.pages);
-              // Procurar páginas que tenham imagem
-              const candidates = pages
-                .filter(p => p.original?.source || p.thumbnail?.source)
-                .map(p => {
-                  const url = p.original?.source || p.thumbnail?.source;
-                  // Tentar extrair ano do título ou texto
-                  const yearMatch = (p.title + ' ' + (p.extract || '')).match(/\b(20[0-2][0-9]|19[5-9][0-9])\b/);
-                  const parsedYear = yearMatch ? parseInt(yearMatch[1], 10) : 2024;
-                  return {
-                    url,
-                    title: p.title,
-                    year: parsedYear,
-                    source: `${wiki.toUpperCase()} Fandom`
-                  };
-                });
-
-              // Ordenar do ano mais recente para trás
-              candidates.sort((a, b) => b.year - a.year);
-              if (candidates.length > 0) {
-                return resolve(candidates[0]);
-              }
-            }
-            resolve(null);
-          } catch {
-            resolve(null);
-          }
-        });
-      }).on('error', () => resolve(null));
-    });
-
+    // 2. Se não encontrar na Panini ou se foi rejeitada, buscar no Fandom (maior volume / mais recente primeiro)
+    const fandomResult = await searchFandom(cleanTitle, issueNum, publisher, rejectedUrls);
     if (fandomResult) {
       return res.json({
         found: true,
-        coverUrl: fandomResult.url,
+        coverUrl: fandomResult.coverUrl,
         source: fandomResult.source,
         year: fandomResult.year,
         title: fandomResult.title
       });
     }
 
-    // 3. Fallback para OpenLibrary
-    const olPath = `/search.json?title=${encodeURIComponent(cleanTitle)}&limit=5`;
+    // 3. Fallback para OpenLibrary com validação de número e ordenação por ano
+    const olPath = `/search.json?title=${encodeURIComponent(cleanTitle)}&limit=15`;
     const olResult = await new Promise((resolve) => {
       https.get({
         hostname: 'openlibrary.org',
@@ -270,9 +427,10 @@ app.get('/api/scrape-cover', async (req, res) => {
                 .map(d => ({
                   url: `https://covers.openlibrary.org/b/id/${d.cover_i}-L.jpg`,
                   title: d.title,
-                  year: d.first_publish_year || 2024,
+                  year: d.first_publish_year || 1995,
                   source: 'Open Library'
-                }));
+                }))
+                .filter(c => matchIssueNumber(c.title, issueNum) && !rejectedUrls.includes(c.url));
 
               withCovers.sort((a, b) => b.year - a.year);
               if (withCovers.length > 0) {

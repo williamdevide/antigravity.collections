@@ -268,22 +268,41 @@ export default function App() {
           if (!isMounted) break;
           const key = `${comic.id}_${n}`;
 
-          // Se já tem capa, já foi pesquisado nesta sessão ou foi rejeitado, pula
-          if (covers[n] || pending[n] || (rejected[n] && rejected[n].length > 0) || searched[n] || scrapingQueueRef.current.has(key)) {
+          // Se já tem capa fixada, ou capa pendente aguardando aprovação, ou já está sendo buscado, pula
+          if (covers[n] || pending[n] || scrapingQueueRef.current.has(key)) {
             continue;
           }
+
+          // Se já foi pesquisado e não possui rejeições novas a explorar, pula
+          if (searched[n] && (!rejected[n] || rejected[n].length === 0)) {
+            continue;
+          }
+
+          // Coletar capas já usadas em outras edições desta mesma HQ para garantir 100% de unicidade
+          const otherCoverUrls = Object.entries(comic.issueCovers || {})
+            .filter(([k]) => k !== String(n))
+            .map(([, url]) => url)
+            .concat(
+              Object.entries(comic.pendingCovers || {})
+                .filter(([k]) => k !== String(n))
+                .map(([, p]) => p?.coverUrl)
+                .filter(Boolean)
+            );
+
+          const issueRejected = comic.rejectedCovers?.[n] || [];
+          const excludedUrls = Array.from(new Set([...issueRejected, ...otherCoverUrls]));
 
           scrapingQueueRef.current.add(key);
           setIsScrapingActive(true);
 
           try {
-            const res = await searchIssueCover(comic, n);
+            const res = await searchIssueCover(comic, n, excludedUrls);
             if (!isMounted) break;
 
             const updatedSearched = { ...(comic.searchedIssues || {}), [n]: true };
             let updatedPending = { ...(comic.pendingCovers || {}) };
 
-            if (res.found && res.coverUrl) {
+            if (res.found && res.coverUrl && !excludedUrls.includes(res.coverUrl)) {
               updatedPending[n] = {
                 coverUrl: res.coverUrl,
                 source: res.source,
@@ -503,6 +522,7 @@ export default function App() {
   };
 
   // Rejeitar Capa Pendente (Botão com X vermelho sem texto)
+  // Ao rejeitar, busca progressivamente edições mais antigas e impede repetição de capas
   const handleRejectCover = async (comicId, issueNum) => {
     const comic = comics.find(c => c.id === comicId);
     if (!comic) return;
@@ -515,8 +535,15 @@ export default function App() {
 
     const updatedRejected = { ...(comic.rejectedCovers || {}) };
     if (rejectedUrl) {
-      updatedRejected[issueNum] = [...(updatedRejected[issueNum] || []), rejectedUrl];
+      const prevList = updatedRejected[issueNum] || [];
+      if (!prevList.includes(rejectedUrl)) {
+        updatedRejected[issueNum] = [...prevList, rejectedUrl];
+      }
     }
+
+    // Libera a fila para permitir buscar a próxima (mais antiga)
+    const queueKey = `${comicId}_${issueNum}`;
+    scrapingQueueRef.current.delete(queueKey);
 
     const updatedComic = {
       ...comic,
@@ -530,6 +557,47 @@ export default function App() {
     if (viewingIssueDetail && viewingIssueDetail.comic.id === comicId) {
       setViewingIssueDetail({ comic: updatedComic, issueNum });
     }
+
+    // Buscar imediatamente o próximo candidato mais antigo disponível
+    setTimeout(async () => {
+      const otherCoverUrls = Object.entries(updatedComic.issueCovers || {})
+        .filter(([k]) => k !== String(issueNum))
+        .map(([, url]) => url)
+        .concat(
+          Object.entries(updatedComic.pendingCovers || {})
+            .filter(([k]) => k !== String(issueNum))
+            .map(([, p]) => p?.coverUrl)
+            .filter(Boolean)
+        );
+
+      const allExcluded = Array.from(new Set([...(updatedRejected[issueNum] || []), ...otherCoverUrls]));
+
+      try {
+        const nextRes = await searchIssueCover(updatedComic, issueNum, allExcluded);
+        if (nextRes.found && nextRes.coverUrl && !allExcluded.includes(nextRes.coverUrl)) {
+          const freshPending = {
+            ...(updatedComic.pendingCovers || {}),
+            [issueNum]: {
+              coverUrl: nextRes.coverUrl,
+              source: nextRes.source,
+              year: nextRes.year,
+              title: nextRes.title
+            }
+          };
+          const nextComic = {
+            ...updatedComic,
+            pendingCovers: freshPending
+          };
+          const saved = await saveComic(nextComic);
+          setComics(saved);
+          if (viewingIssueDetail && viewingIssueDetail.comic.id === comicId) {
+            setViewingIssueDetail({ comic: nextComic, issueNum });
+          }
+        }
+      } catch (err) {
+        console.warn('Erro ao buscar alternativa mais antiga:', err);
+      }
+    }, 150);
   };
 
   // Desvincular / Remover Capa Fixada
@@ -557,8 +625,20 @@ export default function App() {
   const handleManualSearchCover = async (comic, issueNum) => {
     setIsSearchingSingleCover(true);
     try {
-      const res = await searchIssueCover(comic, issueNum);
-      if (res.found && res.coverUrl) {
+      const otherCoverUrls = Object.entries(comic.issueCovers || {})
+        .filter(([k]) => k !== String(issueNum))
+        .map(([, url]) => url)
+        .concat(
+          Object.entries(comic.pendingCovers || {})
+            .filter(([k]) => k !== String(issueNum))
+            .map(([, p]) => p?.coverUrl)
+            .filter(Boolean)
+        );
+
+      const allExcluded = Array.from(new Set([...(comic.rejectedCovers?.[issueNum] || []), ...otherCoverUrls]));
+
+      const res = await searchIssueCover(comic, issueNum, allExcluded);
+      if (res.found && res.coverUrl && !allExcluded.includes(res.coverUrl)) {
         const updatedPending = {
           ...(comic.pendingCovers || {}),
           [issueNum]: {
