@@ -104,6 +104,11 @@ export default function App() {
   const [viewingIssueDetail, setViewingIssueDetail] = useState(null); // { comic, issueNum }
   const [isSearchingSingleCover, setIsSearchingSingleCover] = useState(false);
 
+  // Modal Detalhado de Status da Busca de Capas
+  const [showCoverSearchModal, setShowCoverSearchModal] = useState(false);
+  const [coverModalTab, setCoverModalTab] = useState('all'); // 'all' | 'searching' | 'found' | 'missing'
+  const [coverModalSearchText, setCoverModalSearchText] = useState('');
+
   // Modal de Título de Edição Específica (Minissérie e Coleção no Modo Edição)
   const [issueTitleModal, setIssueTitleModal] = useState(null); // { comic, issueNum, currentTitle }
   const [issueTitleInput, setIssueTitleInput] = useState('');
@@ -152,6 +157,7 @@ export default function App() {
       const covers = comic.issueCovers || {};
       const pending = comic.pendingCovers || {};
       const searched = comic.searchedIssues || {};
+      const rejected = comic.rejectedCovers || {};
 
       for (let n = initialChunkStart; n <= currentLimit; n++) {
         totalIssues++;
@@ -161,6 +167,8 @@ export default function App() {
         } else if (pending[n]) {
           pendingCount++;
           searchedCount++;
+        } else if (rejected[n] && rejected[n].length > 0) {
+          searchedCount++;
         } else if (searched[n]) {
           searchedCount++;
         }
@@ -169,6 +177,63 @@ export default function App() {
 
     const percentage = totalIssues > 0 ? Math.round((searchedCount / totalIssues) * 100) : 100;
     return { totalIssues, searchedCount, fixedCount, pendingCount, percentage };
+  }, [comics]);
+
+  // Lista unificada de todas as edições monitoradas para o modal de status de capas
+  const allTrackedIssues = useMemo(() => {
+    const list = [];
+    comics.forEach((comic) => {
+      const startFrom = typeof comic.startFrom === 'number' && comic.startFrom > 1 ? comic.startFrom : 1;
+      const initialChunkStart = Math.floor((startFrom - 1) / 10) * 10 + 1;
+      const ownedNumbers = comic.ownedNumbers || [];
+      
+      let currentLimit = initialChunkStart + 9;
+      if (ownedNumbers.length > 0) {
+        const highestOwned = Math.max(...ownedNumbers);
+        if (highestOwned % 10 === 0) {
+          currentLimit = Math.max(currentLimit, highestOwned + 10);
+        } else {
+          currentLimit = Math.max(currentLimit, Math.ceil(highestOwned / 10) * 10);
+        }
+      }
+
+      const covers = comic.issueCovers || {};
+      const pending = comic.pendingCovers || {};
+      const searched = comic.searchedIssues || {};
+      const rejected = comic.rejectedCovers || {};
+
+      for (let n = initialChunkStart; n <= currentLimit; n++) {
+        let status = 'searching';
+        let coverUrl = null;
+        let source = null;
+
+        if (covers[n]) {
+          status = 'fixed';
+          coverUrl = covers[n];
+        } else if (pending[n]) {
+          status = 'pending';
+          coverUrl = pending[n].coverUrl;
+          source = pending[n].source;
+        } else if (rejected[n] && rejected[n].length > 0) {
+          status = 'rejected';
+        } else if (searched[n]) {
+          status = 'missing';
+        }
+
+        list.push({
+          comicId: comic.id,
+          comicName: comic.name,
+          comicType: comic.type || 'Mensal',
+          comicPublisher: comic.publisher || 'Marvel',
+          issueNum: n,
+          status,
+          coverUrl,
+          source,
+          comic
+        });
+      }
+    });
+    return list;
   }, [comics]);
 
   // Efeito do Scraper em Segundo Plano (Background Worker)
@@ -197,13 +262,14 @@ export default function App() {
         const covers = comic.issueCovers || {};
         const pending = comic.pendingCovers || {};
         const searched = comic.searchedIssues || {};
+        const rejected = comic.rejectedCovers || {};
 
         for (let n = initialChunkStart; n <= currentLimit; n++) {
           if (!isMounted) break;
           const key = `${comic.id}_${n}`;
 
-          // Se já tem capa ou já foi pesquisado nesta sessão, pula
-          if (covers[n] || pending[n] || searched[n] || scrapingQueueRef.current.has(key)) {
+          // Se já tem capa, já foi pesquisado nesta sessão ou foi rejeitado, pula
+          if (covers[n] || pending[n] || (rejected[n] && rejected[n].length > 0) || searched[n] || scrapingQueueRef.current.has(key)) {
             continue;
           }
 
@@ -410,7 +476,7 @@ export default function App() {
     }
   };
 
-  // Aprovar Capa Pendente (Botão com V verde)
+  // Aprovar Capa Pendente (Botão com V verde sem texto)
   const handleApproveCover = async (comicId, issueNum) => {
     const comic = comics.find(c => c.id === comicId);
     if (!comic) return;
@@ -426,6 +492,36 @@ export default function App() {
       ...comic,
       issueCovers: updatedCovers,
       pendingCovers: updatedPending
+    };
+
+    const updated = await saveComic(updatedComic);
+    setComics(updated);
+
+    if (viewingIssueDetail && viewingIssueDetail.comic.id === comicId) {
+      setViewingIssueDetail({ comic: updatedComic, issueNum });
+    }
+  };
+
+  // Rejeitar Capa Pendente (Botão com X vermelho sem texto)
+  const handleRejectCover = async (comicId, issueNum) => {
+    const comic = comics.find(c => c.id === comicId);
+    if (!comic) return;
+
+    const pendingCover = comic.pendingCovers?.[issueNum];
+    const rejectedUrl = pendingCover?.coverUrl;
+
+    const updatedPending = { ...(comic.pendingCovers || {}) };
+    delete updatedPending[issueNum];
+
+    const updatedRejected = { ...(comic.rejectedCovers || {}) };
+    if (rejectedUrl) {
+      updatedRejected[issueNum] = [...(updatedRejected[issueNum] || []), rejectedUrl];
+    }
+
+    const updatedComic = {
+      ...comic,
+      pendingCovers: updatedPending,
+      rejectedCovers: updatedRejected
     };
 
     const updated = await saveComic(updatedComic);
@@ -813,50 +909,58 @@ export default function App() {
           ? 'bg-[#0e274a]/95 border-cyan-500/40' 
           : 'bg-[#0A0F1D]/95 border-slate-800/80'
       }`}>
-        <div className="max-w-xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-2.5">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold shadow-lg transition ${
+        <div className="max-w-xl mx-auto flex items-center justify-between gap-2">
+          {/* Logo & Marca com Slogan e Badges */}
+          <div className="flex items-center space-x-2.5 min-w-0">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold shadow-lg transition shrink-0 ${
               appMode === 'edicao'
                 ? 'bg-gradient-to-tr from-cyan-400 to-blue-500 text-slate-950 shadow-cyan-500/30'
                 : 'bg-gradient-to-tr from-amber-500 to-amber-300 text-slate-950 shadow-amber-500/20'
             }`}>
               <BookOpen className="w-5 h-5 text-slate-950" />
             </div>
-            <div>
-              <div className="flex items-center gap-1.5">
+            <div className="truncate">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <h1 className="text-base sm:text-lg font-black tracking-tight text-white leading-tight">
                   {APP_NAME}
                 </h1>
-                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-amber-400 border border-slate-700 shrink-0">
                   v{APP_VERSION}
                 </span>
+                <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
+                  Mobile
+                </span>
               </div>
-              <p className="text-[11px] text-slate-400 leading-none mt-0.5">Controle Ágil de Coleções</p>
+              <p className="text-[11px] text-slate-400 leading-none mt-0.5 truncate">Controle Ágil de Coleções</p>
             </div>
           </div>
 
-          {/* ÁREA DIREITA DO HEADER: MODO + PROGRESSO DE CAPAS + CONEXÃO */}
-          <div className="flex items-center gap-2">
-            {/* Indicador de Progresso de Busca de Capas em Segundo Plano */}
-            <div 
-              className={`flex items-center gap-1.5 px-2 py-1 rounded-xl text-[11px] border transition shadow-sm ${
+          {/* ÁREA DIREITA DO HEADER: MODO + PROGRESSO DE CAPAS + CONEXÃO & STATS */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Indicador de Progresso de Busca de Capas (Apenas Ícone e % sem texto "Capas", Clicável) */}
+            <button 
+              type="button"
+              onClick={() => setShowCoverSearchModal(true)}
+              className={`flex items-center gap-1.5 px-2 py-1.5 rounded-xl text-xs border transition shadow-sm active:scale-95 cursor-pointer ${
                 isScrapingActive
-                  ? 'bg-amber-500/15 border-amber-500/50 text-amber-300'
-                  : 'bg-slate-900/80 border-slate-800 text-slate-300'
+                  ? 'bg-amber-500/20 border-amber-500/60 text-amber-300 hover:bg-amber-500/30'
+                  : 'bg-slate-900/80 hover:bg-slate-800 border-slate-800 text-slate-300'
               }`}
-              title={`Busca de capas em segundo plano: ${coverStats.searchedCount} de ${coverStats.totalIssues} edições verificadas (${coverStats.fixedCount} fixadas, ${coverStats.pendingCount} pendentes)`}
+              title={`Busca de capas: ${coverStats.percentage}% (${coverStats.searchedCount}/${coverStats.totalIssues}) - Toque para detalhes`}
+              aria-label="Status da busca de capas"
             >
-              <ImageIcon className={`w-3.5 h-3.5 text-amber-400 ${isScrapingActive ? 'animate-pulse' : ''}`} />
-              <span className="font-semibold text-[11px]">
-                Capas: <strong className="text-amber-400">{coverStats.percentage}%</strong>
+              <ImageIcon className={`w-3.5 h-3.5 text-amber-400 shrink-0 ${isScrapingActive ? 'animate-pulse' : ''}`} />
+              <span className="font-black text-[11px] text-amber-400">
+                {coverStats.percentage}%
               </span>
               {isScrapingActive && (
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping shrink-0" />
               )}
-            </div>
+            </button>
 
             {/* Botão de Alternância de Modo (Consulta / Edição) - Somente Ícone */}
             <button
+              type="button"
               onClick={() => setAppMode(appMode === 'consulta' ? 'edicao' : 'consulta')}
               className={`p-2 rounded-xl border text-xs font-bold transition flex items-center justify-center active:scale-95 shadow-sm ${
                 appMode === 'edicao'
@@ -864,6 +968,7 @@ export default function App() {
                   : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
               }`}
               title={appMode === 'edicao' ? 'Modo Edição Ativo (Toque para voltar ao Modo Consulta)' : 'Modo Consulta Ativo (Toque para entrar no Modo Edição)'}
+              aria-label={appMode === 'edicao' ? 'Modo Edição' : 'Modo Consulta'}
             >
               {appMode === 'edicao' ? (
                 <Pencil className="w-4 h-4 stroke-[2.5]" />
@@ -871,6 +976,24 @@ export default function App() {
                 <Eye className="w-4 h-4 stroke-[2.5]" />
               )}
             </button>
+
+            {/* BADGE DE CONEXÃO & ESTATÍSTICAS RESTAURADO */}
+            <div className="flex flex-col items-end text-right border-l border-slate-700/60 pl-2 shrink-0">
+              <div className="flex items-center gap-1 text-[11px]">
+                {connectionStatus.status === 'connected' ? (
+                  <span className="flex items-center gap-1 text-emerald-400 font-medium">
+                    <Cloud className="w-3 h-3" /> <span className="hidden xs:inline">Nuvem</span>
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-amber-400 font-medium" title={connectionStatus.message}>
+                    <HardDrive className="w-3 h-3" /> <span className="hidden xs:inline">Local</span>
+                  </span>
+                )}
+              </div>
+              <div className="text-[10px] text-slate-400">
+                <span className="text-white font-semibold">{totalComics}</span> HQs • <span className="text-amber-400 font-semibold">{totalIssuesOwned}</span> ed.
+              </div>
+            </div>
           </div>
         </div>
       </header>
@@ -1500,25 +1623,29 @@ export default function App() {
                       className="w-full h-auto max-h-[300px] object-cover"
                       loading="lazy"
                     />
+                  </div>
 
-                    {/* Botão de Aprovação com V em Verde flutuante sobre a capa */}
+                  {/* Botões de Ação: Aprovar (Verde ✓) e Rejeitar (Vermelho ✗) - Ambos SEM TEXTO */}
+                  <div className="flex items-center justify-center gap-3 w-full max-w-[220px]">
                     <button
+                      type="button"
                       onClick={() => handleApproveCover(viewingIssueDetail.comic.id, viewingIssueDetail.issueNum)}
-                      className="absolute bottom-2 right-2 p-2.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black shadow-lg shadow-emerald-500/40 active:scale-90 transition flex items-center justify-center"
-                      title="Clique aqui para aprovar e fixar esta capa!"
+                      className="flex-1 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm flex items-center justify-center shadow-lg shadow-emerald-600/30 active:scale-95 transition border border-emerald-400/40"
+                      title="Aprovar e fixar capa oficial"
+                      aria-label="Aprovar capa"
                     >
                       <Check className="w-5 h-5 stroke-[3]" />
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRejectCover(viewingIssueDetail.comic.id, viewingIssueDetail.issueNum)}
+                      className="flex-1 py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-sm flex items-center justify-center shadow-lg shadow-rose-600/30 active:scale-95 transition border border-rose-400/40"
+                      title="Rejeitar esta capa"
+                      aria-label="Rejeitar capa"
+                    >
+                      <X className="w-5 h-5 stroke-[3]" />
+                    </button>
                   </div>
-
-                  {/* Botão Principal de Aprovação (V em Verde) */}
-                  <button
-                    onClick={() => handleApproveCover(viewingIssueDetail.comic.id, viewingIssueDetail.issueNum)}
-                    className="w-full max-w-[280px] py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 active:scale-95 transition"
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                    <span>Aprovar e Fixar Capa Oficial</span>
-                  </button>
                 </div>
               ) : (
                 /* CENÁRIO 3: Sem Capa / Em Busca */
@@ -1819,6 +1946,292 @@ export default function App() {
                   Remover título personalizado
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DETALHADO DE STATUS DA BUSCA DE CAPAS */}
+      {showCoverSearchModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn overflow-y-auto">
+          <div className="bg-[#101726] border border-cyan-500/40 w-full max-w-lg rounded-2xl p-4 sm:p-5 shadow-2xl space-y-4 my-auto max-h-[90vh] flex flex-col">
+            {/* Header do Modal */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                  <ImageIcon className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-white leading-tight">
+                    Status da Busca de Capas
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Monitoramento assíncrono Panini Brasil & Web
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowCoverSearchModal(false)}
+                className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Barra de Estatísticas em Tempo Real */}
+            <div className="grid grid-cols-4 gap-2 bg-slate-950/80 p-3 rounded-xl border border-slate-800 text-center shrink-0">
+              <div className="p-1">
+                <div className="text-base font-black text-amber-400">{coverStats.percentage}%</div>
+                <div className="text-[10px] text-slate-400 uppercase font-semibold">Progresso</div>
+              </div>
+              <div className="p-1 border-l border-slate-800">
+                <div className="text-base font-black text-white">{coverStats.searchedCount}/{coverStats.totalIssues}</div>
+                <div className="text-[10px] text-slate-400 uppercase font-semibold">Buscadas</div>
+              </div>
+              <div className="p-1 border-l border-slate-800">
+                <div className="text-base font-black text-emerald-400">{coverStats.fixedCount}</div>
+                <div className="text-[10px] text-slate-400 uppercase font-semibold">Fixadas</div>
+              </div>
+              <div className="p-1 border-l border-slate-800">
+                <div className="text-base font-black text-amber-300">{coverStats.pendingCount}</div>
+                <div className="text-[10px] text-slate-400 uppercase font-semibold">Pendentes</div>
+              </div>
+            </div>
+
+            {/* Status da Fila em Segundo Plano */}
+            <div className={`p-2.5 rounded-xl text-xs flex items-center justify-between border shrink-0 ${
+              isScrapingActive 
+                ? 'bg-blue-500/10 border-blue-500/30 text-blue-300' 
+                : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+            }`}>
+              <span className="flex items-center gap-2">
+                {isScrapingActive ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-400 shrink-0" />
+                    <span>Scraper ativo em segundo plano (consultando Panini Brasil)...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    <span>Busca de capas ociosa (todas as edições foram consultadas)</span>
+                  </>
+                )}
+              </span>
+            </div>
+
+            {/* Abas e Filtro por Nome */}
+            <div className="space-y-2 shrink-0">
+              <div className="flex items-center gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800 overflow-x-auto">
+                <button
+                  type="button"
+                  onClick={() => setCoverModalTab('all')}
+                  className={`flex-1 py-1 px-2 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                    coverModalTab === 'all'
+                      ? 'bg-amber-500 text-slate-950 shadow'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Todas ({allTrackedIssues.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCoverModalTab('found')}
+                  className={`flex-1 py-1 px-2 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                    coverModalTab === 'found'
+                      ? 'bg-emerald-600 text-white shadow'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Encontradas ({allTrackedIssues.filter(i => i.status === 'fixed' || i.status === 'pending').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCoverModalTab('searching')}
+                  className={`flex-1 py-1 px-2 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                    coverModalTab === 'searching'
+                      ? 'bg-cyan-600 text-white shadow'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Em Busca ({allTrackedIssues.filter(i => i.status === 'searching').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCoverModalTab('missing')}
+                  className={`flex-1 py-1 px-2 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                    coverModalTab === 'missing'
+                      ? 'bg-rose-900/60 text-rose-200 border border-rose-700/50 shadow'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Sem Capa ({allTrackedIssues.filter(i => i.status === 'missing' || i.status === 'rejected').length})
+                </button>
+              </div>
+
+              {/* Input de filtro por nome */}
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Filtrar por título de HQ..."
+                  value={coverModalSearchText}
+                  onChange={(e) => setCoverModalSearchText(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+            </div>
+
+            {/* Lista com Scroll das Edições */}
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[220px]">
+              {(() => {
+                const filtered = allTrackedIssues.filter(item => {
+                  if (coverModalTab === 'found' && !(item.status === 'fixed' || item.status === 'pending')) return false;
+                  if (coverModalTab === 'searching' && item.status !== 'searching') return false;
+                  if (coverModalTab === 'missing' && !(item.status === 'missing' || item.status === 'rejected')) return false;
+                  if (coverModalSearchText) {
+                    return item.comicName.toLowerCase().includes(coverModalSearchText.toLowerCase());
+                  }
+                  return true;
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="py-12 text-center text-slate-500 text-xs">
+                      Nenhuma edição encontrada nesta aba com os filtros atuais.
+                    </div>
+                  );
+                }
+
+                return filtered.map((item) => {
+                  return (
+                    <div 
+                      key={`${item.comicId}_${item.issueNum}`}
+                      className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-slate-700 transition flex items-center justify-between gap-3"
+                    >
+                      {/* Miniatura ou Placeholder */}
+                      <div className="w-10 h-14 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden shrink-0 flex items-center justify-center relative">
+                        {item.coverUrl ? (
+                          <img 
+                            src={item.coverUrl} 
+                            alt={`${item.comicName} #${item.issueNum}`} 
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <ImageIcon className="w-4 h-4 text-slate-600" />
+                        )}
+                        {item.status === 'fixed' && (
+                          <div className="absolute top-0.5 right-0.5 bg-emerald-600 text-white rounded p-0.5 shadow">
+                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Informações da Edição */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <h4 className="font-bold text-xs text-white truncate">
+                            {item.comicName}
+                          </h4>
+                          <span className="font-mono text-xs font-black text-amber-400 shrink-0">
+                            #{format2(item.issueNum)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-slate-400">
+                          <span className={`px-1.5 py-0.2 rounded border ${getTypeBadgeStyle(item.comicType)}`}>
+                            {item.comicType}
+                          </span>
+                          <span>•</span>
+                          <span>{item.comicPublisher}</span>
+                          {item.source && (
+                            <>
+                              <span>•</span>
+                              <span className="text-amber-400/80 truncate max-w-[120px]">{item.source}</span>
+                            </>
+                          )}
+                        </div>
+                        <div className="mt-1">
+                          {item.status === 'fixed' && (
+                            <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-950/50 border border-emerald-800/60 px-1.5 py-0.5 rounded">
+                              ✓ Capa Fixada
+                            </span>
+                          )}
+                          {item.status === 'pending' && (
+                            <span className="text-[10px] font-semibold text-amber-300 bg-amber-950/50 border border-amber-800/60 px-1.5 py-0.5 rounded animate-pulse">
+                              ⏳ Pendente de Aprovação
+                            </span>
+                          )}
+                          {item.status === 'searching' && (
+                            <span className="text-[10px] font-semibold text-blue-300 bg-blue-950/50 border border-blue-800/60 px-1.5 py-0.5 rounded flex items-center gap-1 w-max">
+                              <RefreshCw className="w-2.5 h-2.5 animate-spin" /> Na Fila / Buscando
+                            </span>
+                          )}
+                          {item.status === 'missing' && (
+                            <span className="text-[10px] text-slate-400 bg-slate-900 border border-slate-800 px-1.5 py-0.5 rounded">
+                              Sem Capa Localizada
+                            </span>
+                          )}
+                          {item.status === 'rejected' && (
+                            <span className="text-[10px] text-rose-300 bg-rose-950/50 border border-rose-800/60 px-1.5 py-0.5 rounded">
+                              ✗ Capa Rejeitada
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Botões Rápidos de Ação (Aprovar / Rejeitar / Re-buscar) SEM TEXTO */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {item.status === 'pending' && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleApproveCover(item.comicId, item.issueNum)}
+                              className="p-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm active:scale-95 transition"
+                              title="Aprovar capa"
+                              aria-label="Aprovar capa"
+                            >
+                              <Check className="w-4 h-4 stroke-[3]" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRejectCover(item.comicId, item.issueNum)}
+                              className="p-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white shadow-sm active:scale-95 transition"
+                              title="Rejeitar capa"
+                              aria-label="Rejeitar capa"
+                            >
+                              <X className="w-4 h-4 stroke-[3]" />
+                            </button>
+                          </>
+                        )}
+
+                        {item.status === 'fixed' && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveFixedCover(item.comicId, item.issueNum)}
+                            className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950/80 text-slate-400 hover:text-rose-300 border border-slate-700/80 active:scale-95 transition"
+                            title="Desvincular capa"
+                            aria-label="Desvincular capa"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+
+                        {(item.status === 'missing' || item.status === 'rejected' || item.status === 'searching') && (
+                          <button
+                            type="button"
+                            onClick={() => handleManualSearchCover(item.comic, item.issueNum)}
+                            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 active:scale-95 transition"
+                            title="Buscar na Panini Brasil"
+                            aria-label="Buscar na Panini Brasil"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
         </div>

@@ -8,11 +8,36 @@ export async function searchIssueCover(comic, issueNum) {
   const publisher = comic.publisher || 'Marvel';
   const issue = String(issueNum);
 
-  // 1. Tentar chamada à API do backend se estiver ativa
+  // 1. Tentar primeiro o endpoint relativo /api/scrape-cover (Vercel Serverless / Proxy local)
+  try {
+    const relativeUrl = `/api/scrape-cover?title=${encodeURIComponent(title)}&issue=${encodeURIComponent(issue)}&publisher=${encodeURIComponent(publisher)}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+    const resp = await fetch(relativeUrl, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data && data.found && data.coverUrl) {
+        return {
+          found: true,
+          coverUrl: data.coverUrl,
+          source: data.source || 'Panini Brasil (panini.com.br)',
+          year: data.year || 2025,
+          title: data.title || `${title} #${issue}`
+        };
+      }
+    }
+  } catch {
+    // Prosseguir para tentar o servidor Express local na porta 3001
+  }
+
+  // 2. Tentar endpoint do backend Express local se estiver ativo na porta 3001
   try {
     const backendUrl = `http://localhost:3001/api/scrape-cover?title=${encodeURIComponent(title)}&issue=${encodeURIComponent(issue)}&publisher=${encodeURIComponent(publisher)}`;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
 
     const resp = await fetch(backendUrl, { signal: controller.signal });
     clearTimeout(timeoutId);
@@ -23,8 +48,8 @@ export async function searchIssueCover(comic, issueNum) {
         return {
           found: true,
           coverUrl: data.coverUrl,
-          source: data.source || 'Panini / Web',
-          year: data.year || 2024,
+          source: data.source || 'Panini Brasil (panini.com.br)',
+          year: data.year || 2025,
           title: data.title || `${title} #${issue}`
         };
       }
@@ -109,3 +134,4 @@ export async function searchIssueCover(comic, issueNum) {
 
   return { found: false, message: 'Nenhuma capa encontrada.' };
 }
+

@@ -147,7 +147,22 @@ quero que comece a buscar as capas para exibir no card de detalhes onde já crio
 /agente-orquestrador /grill-me /goal a busca de capas deve ocorrer em segundo plano e no header ter a porcentagem de buscas completas em relação ao numero de edições
 ```
 
+### Prompt 12
+```text
+/agente-orquestrador /grill-me /goal volte os outros itens que você removeu do header. o icone de capas deixe só o icone e a porcentagem, sem o texto "capas". se clicar nesse objeto do icone e porcentagem ele abre uma tela detalhada dessa busca de capas, exibindo os titulos que estão sendo buscados e quais já foram encontrados.
+alem do botão aprovar capa, precisamos tambem do rejeitar capa. mas deixe ambos sem texto.
+force a busca para tentar a todo custo no panini.com.br
+```
 
+### Resposta Grill-Me / Interação 13
+```text
+Pergunta: Como você prefere que a tela detalhada de busca de capas organize os títulos e capas encontradas?
+Resposta do Usuário: (Recommended) Em abas ou filtros rápidos ('Todas', 'Em Busca', 'Encontradas/Pendentes', 'Sem Capa'), com miniaturas e botões rápidos de aprovar (✓) e rejeitar (✗) direto na lista
+```
 
-
+### Resposta Grill-Me / Interação 14
+```text
+Pergunta: Ao clicar no botão de rejeitar capa (sem texto), qual comportamento você prefere?
+Resposta do Usuário: (Recommended) Marcar a imagem como rejeitada para não sugerir novamente e permitir tentar buscar outra alternativa com um clique
+```
 

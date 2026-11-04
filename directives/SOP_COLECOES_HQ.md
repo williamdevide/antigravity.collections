@@ -3,29 +3,33 @@
 ## 1. Visão Geral e Propósito
 Aplicação Web First Mobile para controle ágil de coleções de Histórias em Quadrinhos, Especiais, Minisséries e Coleções em tela única.
 * **Nome Oficial:** `HQs Collections`
-* **Versão:** `1.1.0`
+* **Versão:** `1.2.0`
 
-## 2. Sistema de 4 Estágios por Edição (Modo Edição)
+## 2. Header & Navegação Mobile First
+* **Marca e Identidade:** Logotipo `BookOpen`, Título `HQs Collections`, versão SemVer (`v1.2.0`), badge `Mobile` e slogan `Controle Ágil de Coleções`.
+* **Monitor de Capas no Header:** Objeto tátil composto estritamente pelo ícone e pela porcentagem (ex: `🖼️ 85%`), sem o texto "capas". Ao tocar nesse objeto, abre o **Modal Detalhado de Status da Busca de Capas**.
+* **Alternador de Modos:** Ícone único de alternância (Lápis para Edição / Olho para Consulta).
+* **Badge de Conexão e Estatísticas:** Status em tempo real (`Nuvem` / `Local`) e contagem total (`XX HQs • YY ed.`).
+
+## 3. Sistema de 4 Estágios por Edição (Modo Edição)
 * **Estágio 0 (Original / Desmarcado):** Não tenho e não pretendo comprar (`none`).
 * **Estágio 1 (Amarelo Sólido):** Comprei / Tenho a edição (`owned`).
 * **Estágio 2 (Amarelo com Borda Azul Neon):** Tenho e Já Li a edição (`read`).
 * **Estágio 3 (Desmarcado com Borda Pink Neon):** Quero Comprar / Lista de Desejos (`wishlist`).
 * Ciclo ao clicar no Modo Edição: `none ➔ owned ➔ read ➔ wishlist ➔ none`.
 
-## 3. Filtros por Estágio de Edição
-O painel de filtros permite visualizar:
-* Todas as Edições.
-* Compradas (Tenho).
-* Já Lidas (Tenho e Li).
-* Quero Comprar (Pink Neon).
-* Não Pretendo Comprar.
+## 4. Scraper Panini Brasil & Web em Segundo Plano
+* **Busca Forçada no panini.com.br:** O scraper executa buscas automatizadas no catálogo oficial da Panini Brasil utilizando curl/serverless com múltiplas variações de consulta (`nome edição`, `nome 0N`, `nome`) para contornar bloqueios de CDN/Fastly e capturar capas originais de alta resolução (897x1373 ou Cloudfront -S600-).
+* **Fallback Inteligente:** Caso não conste na Panini, consulta Fandom MediaWiki (DC / Marvel / Vertigo) com CORS ativado e OpenLibrary.
+* **Ordenação Cronológica:** Ordenação padrão do **ano mais recente para trás**.
 
-## 4. Scraper de Capas Panini & Web em Segundo Plano
-* Busca automática em segundo plano, preferencialmente Panini Brasil (`panini.com.br`) com fallback geral na web (Fandom/OpenLibrary).
-* Ordenação por padrão do **ano mais recente para trás**.
-* **Progresso no Header:** Exibe a porcentagem de buscas completas em relação ao número total de edições ativas (ex: `🖼️ Capas: XX%`).
-* **Fluxo de Aprovação com V Verde:** Quando a capa é localizada, ela fica no estado "Pendente de Aprovação". Na tela de detalhes da edição, o usuário clica no botão verde com `V` (`✓ Fixar Capa`) para fixá-la definitivamente à edição.
+## 5. Modal de Status da Busca de Capas
+* Acessível diretamente pelo botão de porcentagem no cabeçalho.
+* Métricas em tempo real: `% Progresso`, `Buscadas`, `Fixadas` e `Pendentes`.
+* Abas de navegação rápida: `Todas`, `Encontradas`, `Em Busca` e `Sem Capa / Rejeitadas`.
+* Ações diretas por edição sem texto: Aprovar (✓ verde), Rejeitar (✗ vermelho), Desvincular e Re-buscar.
 
-## 5. Tela de Detalhes da Edição (Modo Consulta)
-* Ao clicar sobre o número da edição no Modo Consulta, abre a tela de detalhes com moldura estética ampliada de gibi (proporção 2:3).
-* Apresenta o status da edição, título do fascículo, ano de início, editora no Brasil e herói principal.
+## 6. Fluxo de Curadoria de Capa (Aprovar / Rejeitar sem texto)
+* Tanto no card de detalhes da edição quanto no modal de busca de capas, a capa encontrada pendente apresenta dois botões dedicados **SEM TEXTO**:
+  - **Aprovar:** Botão verde com ícone `Check` (`✓`) que fixa a capa como imagem oficial daquela edição no Firestore e LocalStorage.
+  - **Rejeitar:** Botão vermelho com ícone `X` (`✗`) que descarta a imagem e registra a URL como rejeitada para não sugerir novamente, permitindo nova busca com um toque.

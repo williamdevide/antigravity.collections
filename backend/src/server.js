@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import https from 'https';
+import { exec } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -62,6 +63,105 @@ app.post('/api/comics', (req, res) => {
 });
 
 /**
+ * Busca forçada no site oficial da Panini Brasil (panini.com.br)
+ * Utiliza o binário curl para ultrapassar firewalls/Fastly e extrair capas originais
+ */
+function searchPaniniBrasil(title, issueNum) {
+  return new Promise((resolve) => {
+    const issueStr = String(issueNum || '1').trim();
+    const issuePad = issueStr.padStart(2, '0');
+
+    // Múltiplas variações de busca para tentar a todo custo
+    const queries = [
+      `${title} ${issueStr}`,
+      `${title} ${issuePad}`,
+      `${title}`
+    ];
+
+    let currentIdx = 0;
+
+    function tryNextQuery() {
+      if (currentIdx >= queries.length) {
+        return resolve(null);
+      }
+
+      const q = queries[currentIdx++];
+      const url = `https://panini.com.br/catalogsearch/result/?q=${encodeURIComponent(q)}`;
+      const curlBin = process.platform === 'win32' ? 'curl.exe' : 'curl';
+      const cmd = `${curlBin} -s -L --max-time 8 "${url}"`;
+
+      exec(cmd, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
+        if (err || !stdout) {
+          return tryNextQuery();
+        }
+
+        try {
+          const itemRegex = /<li[^>]*class=["'][^"']*product-item[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi;
+          const items = [...stdout.matchAll(itemRegex)];
+          if (!items || items.length === 0) {
+            return tryNextQuery();
+          }
+
+          const candidates = [];
+          for (const item of items) {
+            const content = item[1];
+            const titleMatch = content.match(/class=["'][^"']*product-item-link[^"']*["'][^>]*>\s*([\s\S]*?)\s*<\/a>/i);
+            const prodTitle = titleMatch ? titleMatch[1].trim().replace(/\s+/g, ' ') : '';
+            const imgMatch = content.match(/<img[^>]*class=["'][^"']*product-image-photo[^"']*["'][^>]*src=["']([^"']+)["']/i) ||
+                             content.match(/<img[^>]*src=["']([^"']+)["']/i);
+            let imgUrl = imgMatch ? imgMatch[1] : '';
+
+            if (imgUrl && prodTitle) {
+              imgUrl = imgUrl.replace(/&amp;/g, '&');
+              // Se for Cloudfront, converter thumbnail -S170- para alta resolução -S600-
+              if (imgUrl.includes('-S170-')) {
+                imgUrl = imgUrl.replace('-S170-', '-S600-');
+              }
+              // Se for media/catalog/product, remover parâmetros para obter a arte original em alta resolução
+              if (imgUrl.includes('/media/catalog/product/')) {
+                imgUrl = imgUrl.split('?')[0];
+              }
+
+              // Detectar se o título possui o número da edição desejada
+              const numRegex = new RegExp(`(^|\\D)(0?${issueStr}|#0?${issueStr}|vol\\.?\\s*0?${issueStr}|n[º°]\\s*0?${issueStr})($|\\D)`, 'i');
+              const hasNum = numRegex.test(prodTitle);
+
+              // Detectar ano
+              const yearMatch = prodTitle.match(/\b(20[0-2][0-9]|19[5-9][0-9])\b/);
+              const parsedYear = yearMatch ? parseInt(yearMatch[1], 10) : 2025;
+
+              candidates.push({
+                title: prodTitle,
+                coverUrl: imgUrl,
+                source: 'Panini Brasil (panini.com.br)',
+                year: parsedYear,
+                hasNum
+              });
+            }
+          }
+
+          if (candidates.length > 0) {
+            // Prioriza correspondência com o número da edição e ano mais recente decrescente
+            candidates.sort((a, b) => {
+              if (a.hasNum && !b.hasNum) return -1;
+              if (!a.hasNum && b.hasNum) return 1;
+              return b.year - a.year;
+            });
+            return resolve(candidates[0]);
+          }
+
+          tryNextQuery();
+        } catch {
+          tryNextQuery();
+        }
+      });
+    }
+
+    tryNextQuery();
+  });
+}
+
+/**
  * Endpoint de Scraping / Busca de Capas de Quadrinhos
  * Busca preferencialmente na Panini / Web com ordenação do ano mais recente para trás
  */
@@ -75,7 +175,19 @@ app.get('/api/scrape-cover', async (req, res) => {
   const cleanTitle = String(title).trim();
 
   try {
-    // 1. Tentar busca no Fandom MediaWiki (DC / Marvel / Star Wars)
+    // 1. Tentar forçar a busca a todo custo no site oficial da Panini Brasil (panini.com.br)
+    const paniniResult = await searchPaniniBrasil(cleanTitle, issueNum);
+    if (paniniResult) {
+      return res.json({
+        found: true,
+        coverUrl: paniniResult.coverUrl,
+        source: paniniResult.source,
+        year: paniniResult.year,
+        title: paniniResult.title
+      });
+    }
+
+    // 2. Se não encontrar na Panini, tentar busca no Fandom MediaWiki (DC / Marvel / Vertigo / Star Wars)
     let wiki = 'marvel';
     if (publisher && String(publisher).toLowerCase().includes('dc')) {
       wiki = 'dc';
@@ -139,7 +251,7 @@ app.get('/api/scrape-cover', async (req, res) => {
       });
     }
 
-    // 2. Fallback para OpenLibrary
+    // 3. Fallback para OpenLibrary
     const olPath = `/search.json?title=${encodeURIComponent(cleanTitle)}&limit=5`;
     const olResult = await new Promise((resolve) => {
       https.get({

@@ -143,6 +143,7 @@ export async function saveComic(comic) {
         issueStates: comic.issueStates || {},
         issueCovers: comic.issueCovers || {},
         pendingCovers: comic.pendingCovers || {},
+        rejectedCovers: comic.rejectedCovers || {},
         searchedIssues: comic.searchedIssues || {},
         issueTitles: comic.issueTitles || {},
         position: typeof comic.position === 'number' ? comic.position : 0,
