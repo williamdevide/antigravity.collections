@@ -134,6 +134,19 @@ a partir de agora sempre que for pedido alterações, mudanças, acescimos, corr
 o modo de inclusão detalhada tambem é só o icone sem escrito, para caber ao lado do campo incio nº
 ```
 
+### Prompt 10
+```text
+/agente-orquestrador /grill-me /goal melhorias a serem criadas:
+em cada edição (numero) quando esta no modo edição, se eu clico uma vez ela fica marcada na cor amarela (já esta assim) e isso quer dizer que eu comprei (que eu tenho a edição) se clico de novo cria uma borda azul neon e quer dizer que eu tenho e já li essa edição, se clico de novo volta para a cor de desmarcado, mas fica com uma borda pink neon e quer dizer que eu quero comprar e se clico de novo fica como o riginal e quer dizer que eu não tenho e não pretendo comprar.
+esses 4 estagios podem ser filtros para pesquisa.
+quero que comece a buscar as capas para exibir no card de detalhes onde já criou a previa. o scrapper será feito preferencialmente no site da panini (panini.com.br), mas quando não achar lá busca geral na internet, quando traz a capa para a pagina de detalhes a imagem ainda deve ficar pendente de aprovação (um pequeno botão com V em verde) se clicar dai fixa a imagem a edição. por padrão procure sempre do ano mais recentepara trás. melhore a estetica do card de detalhes para podermos ter uma imagem um pouco maior.
+```
+
+### Prompt 11
+```text
+/agente-orquestrador /grill-me /goal a busca de capas deve ocorrer em segundo plano e no header ter a porcentagem de buscas completas em relação ao numero de edições
+```
+
 
 
 
