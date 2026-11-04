@@ -1069,9 +1069,10 @@ function ComicRow({
 
     return (
       <div className={`border rounded-2xl p-3.5 shadow-md transition ${getCardThemeClasses(comicType)}`}>
-        {/* TOPO DO CARD: ALÇA DE ARRASTO + NOME + TIPO + EDITORA + STATUS */}
+        {/* TOPO DO CARD: ALÇA DE ARRASTO + NOME + (TIPO + EDITORA + STATUS ALINHADOS À DIREITA) */}
         <div className="flex items-center justify-between mb-2 gap-2">
-          <div className="flex items-center gap-2 overflow-hidden flex-wrap flex-1">
+          {/* Lado Esquerdo: Alça + Nome da HQ */}
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
             {/* Alça de Arrasto e Botões de Subir/Descer */}
             <div className="flex items-center gap-0.5 text-slate-500 shrink-0">
               <span className="cursor-grab active:cursor-grabbing p-1 hover:text-white" title="Arraste para reordenar">
@@ -1097,33 +1098,31 @@ function ComicRow({
 
             <button
               onClick={onStartEdit}
-              className="text-left font-bold text-sm text-white hover:text-amber-400 transition truncate flex items-center gap-1.5"
+              className="text-left font-bold text-sm text-white hover:text-amber-400 transition truncate flex items-center gap-1.5 min-w-0"
               title="Clique para editar nome ou excluir"
             >
-              <span>{comic.name}</span>
+              <span className="truncate">{comic.name}</span>
               <Edit3 className="w-3 h-3 text-slate-500 shrink-0" />
             </button>
-
-            {/* Badges clicáveis de Tipo e Editora */}
-            <div className="flex items-center gap-1">
-              <button
-                onClick={onCycleType}
-                className={`text-[10px] font-semibold px-2 py-0.5 rounded border transition active:scale-95 ${getTypeBadgeStyle(comicType)}`}
-                title="Clique para alternar o Tipo"
-              >
-                {comicType}
-              </button>
-              <button
-                onClick={onCyclePublisher}
-                className={`text-[10px] px-2 py-0.5 rounded transition active:scale-95 ${getPublisherBadgeStyle(comicPublisher)}`}
-                title="Clique para alternar a Editora"
-              >
-                {comicPublisher}
-              </button>
-            </div>
           </div>
 
+          {/* Lado Direito: Tipo + Editora + Botão Concluída (Alinhamento Fixo) */}
           <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={onCycleType}
+              className={`text-[10px] font-semibold px-2 py-0.5 rounded border transition active:scale-95 ${getTypeBadgeStyle(comicType)}`}
+              title="Clique para alternar o Tipo"
+            >
+              {comicType}
+            </button>
+            <button
+              onClick={onCyclePublisher}
+              className={`text-[10px] px-2 py-0.5 rounded transition active:scale-95 ${getPublisherBadgeStyle(comicPublisher)}`}
+              title="Clique para alternar a Editora"
+            >
+              {comicPublisher}
+            </button>
+
             <button
               onClick={onToggleComplete}
               className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition font-semibold"
@@ -1217,9 +1216,10 @@ function ComicRow({
 
   return (
     <div className={`border rounded-2xl p-3.5 shadow-md transition ${getCardThemeClasses(comicType)}`}>
-      {/* CABEÇALHO DO CARD: ALÇA DE ARRASTO + NOME + TIPO + EDITORA + BOTÃO ENCERRAR */}
+      {/* CABEÇALHO DO CARD: ALÇA DE ARRASTO + NOME + (TIPO + EDITORA + BOTÃO ENCERRAR ALINHADOS À DIREITA) */}
       <div className="flex items-center justify-between mb-2.5 gap-2">
-        <div className="flex items-center gap-2 overflow-hidden flex-wrap flex-1">
+        {/* Lado Esquerdo: Alça + Nome da HQ */}
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
           {/* Alça de Arrasto e Botões de Subir/Descer */}
           <div className="flex items-center gap-0.5 text-slate-500 shrink-0">
             <span className="cursor-grab active:cursor-grabbing p-1 hover:text-white" title="Arraste para reordenar">
@@ -1245,33 +1245,31 @@ function ComicRow({
 
           <button
             onClick={onStartEdit}
-            className="text-left font-bold text-sm text-white hover:text-amber-400 transition truncate flex items-center gap-1.5"
+            className="text-left font-bold text-sm text-white hover:text-amber-400 transition truncate flex items-center gap-1.5 min-w-0"
             title="Clique para editar o nome ou excluir"
           >
-            <span>{comic.name}</span>
+            <span className="truncate">{comic.name}</span>
             <Edit3 className="w-3 h-3 text-slate-500 shrink-0" />
           </button>
-
-          {/* Badges de Tipo e Editora clicáveis */}
-          <div className="flex items-center gap-1">
-            <button
-              onClick={onCycleType}
-              className={`text-[10px] font-semibold px-2 py-0.5 rounded border transition active:scale-95 ${getTypeBadgeStyle(comicType)}`}
-              title="Clique para alternar o Tipo"
-            >
-              {comicType}
-            </button>
-            <button
-              onClick={onCyclePublisher}
-              className={`text-[10px] px-2 py-0.5 rounded transition active:scale-95 ${getPublisherBadgeStyle(comicPublisher)}`}
-              title="Clique para alternar a Editora"
-            >
-              {comicPublisher}
-            </button>
-          </div>
         </div>
 
+        {/* Lado Direito: Tipo + Editora + Botão Encerrar (Alinhamento Fixo) */}
         <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={onCycleType}
+            className={`text-[10px] font-semibold px-2 py-0.5 rounded border transition active:scale-95 ${getTypeBadgeStyle(comicType)}`}
+            title="Clique para alternar o Tipo"
+          >
+            {comicType}
+          </button>
+          <button
+            onClick={onCyclePublisher}
+            className={`text-[10px] px-2 py-0.5 rounded transition active:scale-95 ${getPublisherBadgeStyle(comicPublisher)}`}
+            title="Clique para alternar a Editora"
+          >
+            {comicPublisher}
+          </button>
+
           <button
             onClick={onToggleComplete}
             className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-slate-700/80 hover:text-amber-300 transition font-medium"

@@ -90,3 +90,8 @@ Resposta do Usuário: (Recommended) Exibir um pequeno indicador visual na bolinh
 Pergunta: Como você prefere acionar o arrastar e soltar (Drag and Drop) dos cards no mobile e desktop?
 Resposta do Usuário: (Recommended) Incluir um ícone de alça de arrasto (':::') no card, permitindo arrastar suavemente tanto no celular quanto no desktop sem conflitar com o scroll da tela
 ```
+
+### Prompt 5
+```text
+/agente-orquestrador /grill-me /goal quero os botões de tipo e editora sempre com um mesmo alinhamento (proximos ao encerrar) e não proximos ao titulo
+```
