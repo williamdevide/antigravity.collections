@@ -95,3 +95,14 @@ Resposta do Usuário: (Recommended) Incluir um ícone de alça de arrasto (':::'
 ```text
 /agente-orquestrador /grill-me /goal quero os botões de tipo e editora sempre com um mesmo alinhamento (proximos ao encerrar) e não proximos ao titulo
 ```
+
+### Prompt 6
+```text
+/agente-orquestrador /grill-me /goal tenho outra situação especifica, mas quero sugestões de como resolver, existem hqs mensais que não comecei pela edição 01, mas bem mais para frente (por exemplo edição 32), não quero ficar exibindo as dezenas anteriores pois não pretendo compra-las
+```
+
+### Resposta Grill-Me / Interação 12
+```text
+Pergunta: Qual abordagem você prefere para lidar com coleções que começam em edições avançadas (ex: edição 32)?
+Resposta do Usuário: (Recommended) Campo 'Começar no nº' (no cadastro e na edição): se você definir ex: 32, o card abre direto no bloco 31..40 e oculta as dezenas anteriores (com um chip discreto '01..30 Ocultas' caso um dia queira ver)
+```

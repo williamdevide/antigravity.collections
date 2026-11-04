@@ -137,6 +137,8 @@ export async function saveComic(comic) {
         name: comic.name,
         type: comic.type || 'Mensal',
         publisher: comic.publisher || 'Marvel',
+        startFrom: typeof comic.startFrom === 'number' ? comic.startFrom : 1,
+        showHiddenChunks: Boolean(comic.showHiddenChunks),
         ownedNumbers: comic.ownedNumbers || [],
         issueTitles: comic.issueTitles || {},
         position: typeof comic.position === 'number' ? comic.position : 0,

@@ -18,6 +18,7 @@ import {
   Building2,
   ListFilter,
   Eye,
+  EyeOff,
   SlidersHorizontal,
   GripVertical,
   ArrowDownAZ,
@@ -41,6 +42,7 @@ export default function App() {
   const [newComicName, setNewComicName] = useState('');
   const [newComicType, setNewComicType] = useState('Mensal');
   const [newComicPublisher, setNewComicPublisher] = useState('Marvel');
+  const [newComicStartFrom, setNewComicStartFrom] = useState('');
   
   // Ordenação
   const [sortOrder, setSortOrder] = useState('A-Z'); // 'A-Z' | 'Z-A' | 'personal'
@@ -56,11 +58,12 @@ export default function App() {
   // Status de Conexão
   const [connectionStatus, setConnectionStatus] = useState({ status: 'connecting', message: 'Conectando...' });
   
-  // Modal de Edição de Nome, Tipo e Editora
+  // Modal de Edição de Nome, Tipo, Editora e Ponto de Partida
   const [editingComic, setEditingComic] = useState(null);
   const [editNameInput, setEditNameInput] = useState('');
   const [editTypeInput, setEditTypeInput] = useState('Mensal');
   const [editPublisherInput, setEditPublisherInput] = useState('Marvel');
+  const [editStartFromInput, setEditStartFromInput] = useState('1');
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   // Modal de Título de Edição Específica (Minissérie e Coleção)
@@ -111,11 +114,16 @@ export default function App() {
       ? Math.max(...comics.map(c => typeof c.position === 'number' ? c.position : 0)) + 1 
       : 0;
 
+    const parsedStart = parseInt(newComicStartFrom, 10);
+    const startFrom = !isNaN(parsedStart) && parsedStart > 1 ? parsedStart : 1;
+
     const newComic = {
       id: 'comic_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
       name: trimmed,
       type: newComicType,
       publisher: newComicPublisher,
+      startFrom,
+      showHiddenChunks: false,
       ownedNumbers: [],
       issueTitles: {},
       position: nextPosition,
@@ -128,6 +136,7 @@ export default function App() {
     const updated = await saveComic(newComic);
     setComics(updated);
     setNewComicName('');
+    setNewComicStartFrom('');
     inputRef.current?.focus();
   };
 
@@ -145,6 +154,16 @@ export default function App() {
     const currentIndex = PUBLISHERS.indexOf(comic.publisher || 'Marvel');
     const nextIndex = (currentIndex + 1) % PUBLISHERS.length;
     const updatedComic = { ...comic, publisher: PUBLISHERS[nextIndex] };
+    const updated = await saveComic(updatedComic);
+    setComics(updated);
+  };
+
+  // Alternar visualização de dezenas ocultas anteriores
+  const handleToggleHiddenChunks = async (comic) => {
+    const updatedComic = {
+      ...comic,
+      showHiddenChunks: !comic.showHiddenChunks
+    };
     const updated = await saveComic(updatedComic);
     setComics(updated);
   };
@@ -184,7 +203,7 @@ export default function App() {
     setComics(updated);
   };
 
-  // Encerrar item / Minissérie (conclui e resume até o maior número marcado)
+  // Encerrar item / Minissérie (conclui e resume até o maior número marcado respeitando o ponto de partida)
   const handleToggleCompleteSeries = async (comic) => {
     if (comic.isCompleted) {
       // Reabrir série
@@ -198,12 +217,15 @@ export default function App() {
       return;
     }
 
-    // Encerrar no maior número marcado ou 1
+    const startFrom = typeof comic.startFrom === 'number' && comic.startFrom > 1 ? comic.startFrom : 1;
+
+    // Encerrar no maior número marcado ou no startFrom
     const maxNum = comic.ownedNumbers && comic.ownedNumbers.length > 0 
       ? Math.max(...comic.ownedNumbers) 
-      : 1;
+      : startFrom;
 
-    const completeRange = Array.from({ length: maxNum }, (_, i) => i + 1);
+    const count = Math.max(1, maxNum - startFrom + 1);
+    const completeRange = Array.from({ length: count }, (_, i) => startFrom + i);
 
     const updatedComic = {
       ...comic,
@@ -223,6 +245,7 @@ export default function App() {
     setEditNameInput(comic.name);
     setEditTypeInput(comic.type || 'Mensal');
     setEditPublisherInput(comic.publisher || 'Marvel');
+    setEditStartFromInput(String(comic.startFrom || 1));
   };
 
   // Salvar alteração no modal
@@ -230,12 +253,15 @@ export default function App() {
     if (!editingComic) return;
     const trimmed = editNameInput.trim();
     if (!trimmed) return;
+    const parsedStart = parseInt(editStartFromInput, 10);
+    const startFrom = !isNaN(parsedStart) && parsedStart > 1 ? parsedStart : 1;
 
     const updatedComic = {
       ...editingComic,
       name: trimmed,
       type: editTypeInput,
-      publisher: editPublisherInput
+      publisher: editPublisherInput,
+      startFrom
     };
 
     const updated = await saveComic(updatedComic);
@@ -321,23 +347,19 @@ export default function App() {
       return;
     }
 
-    // Clonar lista atual filtrada/ordenada
     const updatedList = [...sortedAndFilteredComics];
     const [movedItem] = updatedList.splice(draggedIndex, 1);
     updatedList.splice(targetIndex, 0, movedItem);
 
-    // Atualizar índices de posição e mudar ordenação para 'personal'
     setSortOrder('personal');
     setDraggedIndex(null);
     setDragOverIndex(null);
 
-    // Mapear posições atualizadas
     const reindexedList = updatedList.map((item, idx) => ({
       ...item,
       position: idx
     }));
 
-    // Mesclar com a lista completa caso haja itens filtrados
     const fullComicsMap = new Map(comics.map(c => [c.id, c]));
     reindexedList.forEach(item => fullComicsMap.set(item.id, item));
     const fullList = Array.from(fullComicsMap.values());
@@ -379,7 +401,6 @@ export default function App() {
   const sortedAndFilteredComics = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
 
-    // 1. Filtragem
     const filtered = comics.filter((comic) => {
       if (query && !comic.name.toLowerCase().includes(query)) {
         return false;
@@ -399,7 +420,6 @@ export default function App() {
       return true;
     });
 
-    // 2. Ordenação
     return filtered.sort((a, b) => {
       if (sortOrder === 'A-Z') {
         return a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' });
@@ -407,7 +427,6 @@ export default function App() {
       if (sortOrder === 'Z-A') {
         return b.name.localeCompare(a.name, 'pt-BR', { sensitivity: 'base' });
       }
-      // 'personal' (Ordem Pessoal manual)
       const posA = typeof a.position === 'number' ? a.position : 0;
       const posB = typeof b.position === 'number' ? b.position : 0;
       return posA - posB;
@@ -498,7 +517,7 @@ export default function App() {
       {/* CONTEÚDO PRINCIPAL - TELA ÚNICA */}
       <main className="flex-1 max-w-xl w-full mx-auto p-3.5 sm:p-4 space-y-3.5">
         
-        {/* BARRA DE ADICIONAR NOVO TÍTULO COM TIPO E EDITORA */}
+        {/* BARRA DE ADICIONAR NOVO TÍTULO COM TIPO, EDITORA E INÍCIO */}
         <section className="bg-[#12192B] p-3 rounded-2xl border border-slate-700/70 shadow-xl space-y-2.5">
           <form onSubmit={handleAddComic} className="space-y-2">
             <div className="flex gap-1.5">
@@ -507,7 +526,7 @@ export default function App() {
                 type="text"
                 value={newComicName}
                 onChange={(e) => setNewComicName(e.target.value)}
-                placeholder="Nome da HQ (ex: Sandman, Batman, Watchmen)..."
+                placeholder="Nome da HQ (ex: Batman, Homem-Aranha)..."
                 className="flex-1 bg-slate-900/90 text-white placeholder-slate-500 px-3.5 py-2.5 rounded-xl border border-slate-700/80 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-sm transition"
               />
               <button
@@ -521,14 +540,14 @@ export default function App() {
               </button>
             </div>
 
-            {/* BOTÕES DE ALTERNÂNCIA: TIPO E EDITORA */}
-            <div className="flex items-center justify-between text-xs pt-0.5">
+            {/* BOTÕES DE ALTERNÂNCIA: TIPO, EDITORA E CAMPO DE INÍCIO */}
+            <div className="flex items-center justify-between text-xs pt-0.5 flex-wrap gap-2">
               <div className="flex items-center gap-1.5 flex-wrap">
                 {/* Botão Tipo */}
                 <button
                   type="button"
                   onClick={handleCycleNewType}
-                  className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 ${getTypeBadgeStyle(newComicType)}`}
+                  className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 ${getTypeBadgeStyle(newComicType)}`}
                   title="Clique para alternar o Tipo (Mensal / Especial / Minissérie / Coleção)"
                 >
                   <Layers className="w-3 h-3 opacity-70" />
@@ -539,16 +558,30 @@ export default function App() {
                 <button
                   type="button"
                   onClick={handleCycleNewPublisher}
-                  className={`px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition active:scale-95 shadow-sm ${getPublisherBadgeStyle(newComicPublisher)}`}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition active:scale-95 shadow-sm ${getPublisherBadgeStyle(newComicPublisher)}`}
                   title="Clique para alternar a Editora (Marvel / DC / Vertigo / Outras)"
                 >
                   <Building2 className="w-3 h-3 opacity-80" />
                   <span>{newComicPublisher}</span>
                 </button>
+
+                {/* Campo de Início da Coleção */}
+                <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-700/80 rounded-lg px-2 py-1 text-xs">
+                  <span className="text-slate-400 text-[11px]">Início nº:</span>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="1"
+                    value={newComicStartFrom}
+                    onChange={(e) => setNewComicStartFrom(e.target.value)}
+                    className="w-10 bg-transparent text-amber-300 font-bold text-center focus:outline-none text-xs"
+                    title="Defina o número inicial se começou adiante (ex: 32)"
+                  />
+                </div>
               </div>
 
               <span className="text-[10px] text-slate-500 hidden sm:inline">
-                Toque para alternar
+                Toque nos botões para alternar
               </span>
             </div>
           </form>
@@ -803,6 +836,7 @@ export default function App() {
                   viewMode={viewMode}
                   onToggleNumber={(num) => handleToggleNumber(comic, num)}
                   onToggleChunkExpand={(chunkStart) => handleToggleChunkExpand(comic, chunkStart)}
+                  onToggleHiddenChunks={() => handleToggleHiddenChunks(comic)}
                   onToggleComplete={() => handleToggleCompleteSeries(comic)}
                   onCycleType={() => handleCycleComicType(comic)}
                   onCyclePublisher={() => handleCycleComicPublisher(comic)}
@@ -911,6 +945,22 @@ export default function App() {
                 />
               </div>
 
+              {/* Ponto de Início da Coleção */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                  <span>Começar no nº</span>
+                  <span className="text-[10px] text-amber-400 font-normal">Oculta dezenas anteriores</span>
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={editStartFromInput}
+                  onChange={(e) => setEditStartFromInput(e.target.value)}
+                  className="w-full bg-slate-900 text-white px-3.5 py-2 rounded-xl border border-slate-700 text-sm focus:outline-none focus:border-amber-500"
+                  placeholder="1"
+                />
+              </div>
+
               {/* Tipo */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-slate-300">Tipo de Publicação</label>
@@ -1014,7 +1064,7 @@ export default function App() {
 }
 
 /**
- * Componente de Linha de Quadrinho com Chunking Estrito, Drag Handle e Título de Edição
+ * Componente de Linha de Quadrinho com Suporte a Início Customizado e Alinhamento Preciso
  */
 function ComicRow({ 
   comic, 
@@ -1023,6 +1073,7 @@ function ComicRow({
   viewMode,
   onToggleNumber, 
   onToggleChunkExpand, 
+  onToggleHiddenChunks,
   onToggleComplete, 
   onCycleType,
   onCyclePublisher,
@@ -1040,14 +1091,15 @@ function ComicRow({
   const comicPublisher = comic.publisher || 'Marvel';
   const issueTitles = comic.issueTitles || {};
 
+  // Ponto inicial customizado da coleção
+  const startFrom = typeof comic.startFrom === 'number' && comic.startFrom > 1 ? comic.startFrom : 1;
+  const initialChunkStart = Math.floor((startFrom - 1) / 10) * 10 + 1;
+  const hasHiddenPriorChunks = initialChunkStart > 1;
+
   // Pode ter títulos de edição específicos se for Minissérie ou Coleção
   const supportsIssueTitles = comicType === 'Minissérie' || comicType === 'Coleção';
 
   // Cores do Card por Tipo
-  // - Mensal: Azul escuro
-  // - Especial: Vermelho escuro
-  // - Minissérie: Verde escuro
-  // - Coleção: Roxo escuro / Violeta
   const getCardThemeClasses = (type) => {
     switch (type) {
       case 'Especial':
@@ -1066,6 +1118,10 @@ function ComicRow({
   if (comic.isCompleted && comic.completedUntil) {
     const endNum = comic.completedUntil;
     const isExpanded = expandedChunksSet.has('completed');
+    const countIssues = Math.max(1, endNum - startFrom + 1);
+    const summaryLabel = startFrom > 1 
+      ? `${format2(startFrom)}..${format2(endNum)}` 
+      : `01..${format2(endNum)}`;
 
     return (
       <div className={`border rounded-2xl p-3.5 shadow-md transition ${getCardThemeClasses(comicType)}`}>
@@ -1073,7 +1129,6 @@ function ComicRow({
         <div className="flex items-center justify-between mb-2 gap-2">
           {/* Lado Esquerdo: Alça + Nome da HQ */}
           <div className="flex items-center gap-1.5 min-w-0 flex-1">
-            {/* Alça de Arrasto e Botões de Subir/Descer */}
             <div className="flex items-center gap-0.5 text-slate-500 shrink-0">
               <span className="cursor-grab active:cursor-grabbing p-1 hover:text-white" title="Arraste para reordenar">
                 <GripVertical className="w-4 h-4" />
@@ -1141,8 +1196,8 @@ function ComicRow({
             className="flex items-center gap-1.5 bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-600/50 text-emerald-200 text-xs font-bold px-3 py-1.5 rounded-xl transition shadow-sm"
             title="Clique para expandir/recolher os números individuais"
           >
-            <span>01..{format2(endNum)}</span>
-            <span className="text-[10px] text-emerald-400/80 font-normal">({endNum} edições)</span>
+            <span>{summaryLabel}</span>
+            <span className="text-[10px] text-emerald-400/80 font-normal">({countIssues} edições)</span>
             {isExpanded ? <ChevronDown className="w-3 h-3 ml-1" /> : <ChevronRight className="w-3 h-3 ml-1" />}
           </button>
         </div>
@@ -1156,7 +1211,7 @@ function ComicRow({
               </p>
             )}
             <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
-              {Array.from({ length: endNum }, (_, i) => i + 1).map((n) => {
+              {Array.from({ length: countIssues }, (_, i) => startFrom + i).map((n) => {
                 const isChecked = ownedSet.has(n);
                 if (viewMode === 'owned' && !isChecked) return null;
                 if (viewMode === 'missing' && isChecked) return null;
@@ -1192,27 +1247,125 @@ function ComicRow({
     );
   }
 
-  // CÁLCULO ESTRITO E DINÂMICO DOS BLOCOS DE 10 EM 10:
-  // Se não tem números marcados: limite = 10 (apenas 1..10)
-  // Se tem números marcados:
-  //   - Se o maior marcado for múltiplo de 10 (ex: 10, 20, 30), abre a próxima dezena (+10).
-  //   - Se for qualquer outro número (ex: 9, 14), o limite é somente a dezena correspondente!
-  // Dessa forma, se desmarcar o 10 e ficar com 9 ou menos, o bloco 11..20 NÃO é exibido.
+  // CÁLCULO ESTRITO E DINÂMICO DOS BLOCOS ABERTOS:
+  // Considera o ponto de partida (initialChunkStart):
   const ownedNumbers = comic.ownedNumbers || [];
-  let currentChunkLimit = 10;
+  let currentChunkLimit = initialChunkStart + 9;
   if (ownedNumbers.length > 0) {
     const highestOwned = Math.max(...ownedNumbers);
     if (highestOwned % 10 === 0) {
-      currentChunkLimit = highestOwned + 10;
+      currentChunkLimit = Math.max(currentChunkLimit, highestOwned + 10);
     } else {
-      currentChunkLimit = Math.ceil(highestOwned / 10) * 10;
+      currentChunkLimit = Math.max(currentChunkLimit, Math.ceil(highestOwned / 10) * 10);
     }
   }
 
-  const chunkStarts = [];
-  for (let start = 1; start <= currentChunkLimit; start += 10) {
-    chunkStarts.push(start);
+  // Blocos normais da visualização ativa (a partir de initialChunkStart)
+  const normalChunkStarts = [];
+  for (let start = initialChunkStart; start <= currentChunkLimit; start += 10) {
+    normalChunkStarts.push(start);
   }
+
+  // Blocos anteriores caso o usuário tenha clicado para expandir dezenas anteriores
+  const priorChunkStarts = [];
+  if (hasHiddenPriorChunks) {
+    for (let start = 1; start < initialChunkStart; start += 10) {
+      priorChunkStarts.push(start);
+    }
+  }
+
+  // Função auxiliar para renderizar um bloco de 10
+  const renderChunkBlock = (chunkStart) => {
+    const chunkEnd = chunkStart + 9;
+    const chunkNumbers = Array.from({ length: 10 }, (_, i) => chunkStart + i);
+    
+    const ownedCountInChunk = chunkNumbers.filter(n => ownedSet.has(n)).length;
+    const isChunkComplete = ownedCountInChunk === 10;
+    const isManuallyExpanded = expandedChunksSet.has(chunkStart);
+
+    // Se estiver 100% completo e não foi expandido: resume como 01..10
+    if (isChunkComplete && !isManuallyExpanded) {
+      return (
+        <div key={chunkStart} className="inline-block mr-2 mb-1">
+          <button
+            onClick={() => onToggleChunkExpand(chunkStart)}
+            className="flex items-center gap-1.5 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 text-xs font-bold px-3 py-1.5 rounded-xl transition shadow-sm active:scale-95"
+            title="Clique para expandir e alterar números"
+          >
+            <Check className="w-3.5 h-3.5 stroke-[3] text-amber-400" />
+            <span>{format2(chunkStart)}..{format2(chunkEnd)}</span>
+            <ChevronRight className="w-3 h-3 text-amber-400/60" />
+          </button>
+        </div>
+      );
+    }
+
+    // Filtro visual das bolinhas
+    const visibleNumbers = chunkNumbers.filter((n) => {
+      const isChecked = ownedSet.has(n);
+      if (viewMode === 'owned') return isChecked;
+      if (viewMode === 'missing') return !isChecked;
+      return true;
+    });
+
+    return (
+      <div key={chunkStart} className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-2.5 space-y-1.5">
+        <div className="flex items-center justify-between text-[11px] text-slate-400 px-1 font-medium">
+          <span>Edições {format2(chunkStart)} a {format2(chunkEnd)}</span>
+          <span className="text-amber-400 text-[10px]">
+            {ownedCountInChunk > 0 ? `${ownedCountInChunk}/10 adquiridas` : 'Disponíveis'}
+          </span>
+        </div>
+
+        {supportsIssueTitles && (
+          <p className="text-[10px] text-purple-300/80 italic px-1">
+            * Dê duplo clique em uma edição para nomeá-la.
+          </p>
+        )}
+
+        {visibleNumbers.length === 0 ? (
+          <div className="py-1 text-center text-[11px] text-slate-500 italic">
+            {viewMode === 'owned' ? 'Nenhuma edição adquirida neste bloco' : 'Todas as edições deste bloco já foram adquiridas! 🎉'}
+          </div>
+        ) : (
+          <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
+            {visibleNumbers.map((num) => {
+              const isChecked = ownedSet.has(num);
+              const specificTitle = issueTitles[num];
+
+              return (
+                <button
+                  key={num}
+                  onClick={() => onToggleNumber(num)}
+                  onDoubleClick={() => onOpenIssueTitleModal(num)}
+                  className={`relative h-9 rounded-full text-xs font-bold flex items-center justify-center transition-all active:scale-90 ${
+                    isChecked
+                      ? 'bg-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/30'
+                      : viewMode === 'missing'
+                        ? 'bg-red-950/40 text-red-300 border border-red-500/50 hover:border-red-400 hover:text-white'
+                        : 'bg-slate-900/90 text-slate-300 border border-slate-700/80 hover:border-slate-500 hover:text-white'
+                  }`}
+                  title={
+                    specificTitle 
+                      ? `Edição #${format2(num)}: ${specificTitle} ${isChecked ? '(Adquirida)' : '(Faltante)'}` 
+                      : `Edição #${format2(num)} ${isChecked ? '(Adquirida)' : '(Faltante)'}`
+                  }
+                >
+                  {format2(num)}
+                  {specificTitle && (
+                    <span 
+                      className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-purple-400 border border-slate-950 shadow-sm" 
+                      title={`Título: ${specificTitle}`}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className={`border rounded-2xl p-3.5 shadow-md transition ${getCardThemeClasses(comicType)}`}>
@@ -1220,7 +1373,6 @@ function ComicRow({
       <div className="flex items-center justify-between mb-2.5 gap-2">
         {/* Lado Esquerdo: Alça + Nome da HQ */}
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          {/* Alça de Arrasto e Botões de Subir/Descer */}
           <div className="flex items-center gap-0.5 text-slate-500 shrink-0">
             <span className="cursor-grab active:cursor-grabbing p-1 hover:text-white" title="Arraste para reordenar">
               <GripVertical className="w-4 h-4" />
@@ -1281,101 +1433,44 @@ function ComicRow({
         </div>
       </div>
 
-      {/* ÁREA DE INTERVALOS DE 10 EM 10 */}
+      {/* ÁREA DE INTERVALOS DE 10 EM 10 (COM SUPORTE A DEZENAS OCULTAS ANTERIORES) */}
       <div className="space-y-2.5">
-        {chunkStarts.map((chunkStart) => {
-          const chunkEnd = chunkStart + 9;
-          const chunkNumbers = Array.from({ length: 10 }, (_, i) => chunkStart + i);
-          
-          const ownedCountInChunk = chunkNumbers.filter(n => ownedSet.has(n)).length;
-          const isChunkComplete = ownedCountInChunk === 10;
-          const isManuallyExpanded = expandedChunksSet.has(chunkStart);
-
-          // Se estiver 100% completo e não foi expandido: resume como 01..10
-          if (isChunkComplete && !isManuallyExpanded) {
-            return (
-              <div key={chunkStart} className="inline-block mr-2 mb-1">
-                <button
-                  onClick={() => onToggleChunkExpand(chunkStart)}
-                  className="flex items-center gap-1.5 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 text-xs font-bold px-3 py-1.5 rounded-xl transition shadow-sm active:scale-95"
-                  title="Clique para expandir e alterar números"
-                >
-                  <Check className="w-3.5 h-3.5 stroke-[3] text-amber-400" />
-                  <span>{format2(chunkStart)}..{format2(chunkEnd)}</span>
-                  <ChevronRight className="w-3 h-3 text-amber-400/60" />
-                </button>
-              </div>
-            );
-          }
-
-          // Filtro visual das bolinhas
-          const visibleNumbers = chunkNumbers.filter((n) => {
-            const isChecked = ownedSet.has(n);
-            if (viewMode === 'owned') return isChecked;
-            if (viewMode === 'missing') return !isChecked;
-            return true;
-          });
-
-          return (
-            <div key={chunkStart} className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-2.5 space-y-1.5">
-              <div className="flex items-center justify-between text-[11px] text-slate-400 px-1 font-medium">
-                <span>Edições {format2(chunkStart)} a {format2(chunkEnd)}</span>
-                <span className="text-amber-400 text-[10px]">
-                  {ownedCountInChunk > 0 ? `${ownedCountInChunk}/10 adquiridas` : 'Disponíveis'}
+        {/* Chip para dezenas anteriores à edição inicial (ex: 01..30 se começou na 32) */}
+        {hasHiddenPriorChunks && (
+          <div>
+            {!comic.showHiddenChunks ? (
+              <button
+                onClick={onToggleHiddenChunks}
+                className="w-full flex items-center justify-between px-3 py-1.5 rounded-xl bg-slate-950/70 hover:bg-slate-900 border border-slate-800/80 text-slate-400 hover:text-slate-200 text-xs font-medium transition shadow-sm"
+                title="Clique para exibir edições anteriores a esta faixa inicial"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Eye className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Edições 01..{format2(initialChunkStart - 1)}</span>
                 </span>
+                <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-md font-normal">
+                  Ocultas (Início nº {startFrom}) • Toque para ver
+                </span>
+              </button>
+            ) : (
+              <div className="space-y-2 p-2 rounded-xl bg-slate-950/50 border border-dashed border-slate-700/80">
+                <div className="flex items-center justify-between text-[11px] text-amber-400 font-medium px-1">
+                  <span>Edições Anteriores (01 a {format2(initialChunkStart - 1)})</span>
+                  <button
+                    onClick={onToggleHiddenChunks}
+                    className="text-[10px] text-slate-400 hover:text-white flex items-center gap-1 underline"
+                  >
+                    <EyeOff className="w-3 h-3" /> Recolher anteriores
+                  </button>
+                </div>
+                {priorChunkStarts.map((chunkStart) => renderChunkBlock(chunkStart))}
               </div>
+            )}
+          </div>
+        )}
 
-              {supportsIssueTitles && (
-                <p className="text-[10px] text-purple-300/80 italic px-1">
-                  * Dê duplo clique em uma edição para nomeá-la.
-                </p>
-              )}
-
-              {/* As bolinhas numéricas com suporte a duplo clique para nomear */}
-              {visibleNumbers.length === 0 ? (
-                <div className="py-1 text-center text-[11px] text-slate-500 italic">
-                  {viewMode === 'owned' ? 'Nenhuma edição adquirida neste bloco' : 'Todas as edições deste bloco já foram adquiridas! 🎉'}
-                </div>
-              ) : (
-                <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
-                  {visibleNumbers.map((num) => {
-                    const isChecked = ownedSet.has(num);
-                    const specificTitle = issueTitles[num];
-
-                    return (
-                      <button
-                        key={num}
-                        onClick={() => onToggleNumber(num)}
-                        onDoubleClick={() => onOpenIssueTitleModal(num)}
-                        className={`relative h-9 rounded-full text-xs font-bold flex items-center justify-center transition-all active:scale-90 ${
-                          isChecked
-                            ? 'bg-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/30'
-                            : viewMode === 'missing'
-                              ? 'bg-red-950/40 text-red-300 border border-red-500/50 hover:border-red-400 hover:text-white'
-                              : 'bg-slate-900/90 text-slate-300 border border-slate-700/80 hover:border-slate-500 hover:text-white'
-                        }`}
-                        title={
-                          specificTitle 
-                            ? `Edição #${format2(num)}: ${specificTitle} ${isChecked ? '(Adquirida)' : '(Faltante)'}` 
-                            : `Edição #${format2(num)} ${isChecked ? '(Adquirida)' : '(Faltante)'}`
-                        }
-                      >
-                        {format2(num)}
-                        {/* Indicador de título personalizado para Minissérie ou Coleção */}
-                        {specificTitle && (
-                          <span 
-                            className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-purple-400 border border-slate-950 shadow-sm" 
-                            title={`Título: ${specificTitle}`}
-                          />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {/* Dezenas normais a partir do ponto inicial */}
+        {normalChunkStarts.map((chunkStart) => renderChunkBlock(chunkStart))}
       </div>
     </div>
   );

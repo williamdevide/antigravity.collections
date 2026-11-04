@@ -1,7 +1,7 @@
 # 🏛️ Arquitetura do Sistema: HQ Tracker
 
 ## 1. Visão Geral
-O **HQ Tracker** é um sistema projetado para colecionadores de quadrinhos com foco em extrema agilidade no ambiente mobile ("Mobile First"). A aplicação opera em **tela única**, minimizando cliques, eliminando navegações desnecessárias, agrupando edições em blocos táteis de 10 em 10, categorizando coleções por Tipo e Editora, e permitindo ordenação personalizada com **Drag & Drop** e títulos específicos por edição para Minisséries e Coleções.
+O **HQ Tracker** é um sistema projetado para colecionadores de quadrinhos com foco em extrema agilidade no ambiente mobile ("Mobile First"). A aplicação opera em **tela única**, minimizando cliques, eliminando navegações desnecessárias, agrupando edições em blocos táteis de 10 em 10, categorizando coleções por Tipo e Editora, permitindo ordenação personalizada com **Drag & Drop**, títulos específicos por fascículo e suporte a coleções que iniciam em edições avançadas (`startFrom`).
 
 ---
 
@@ -13,10 +13,14 @@ flowchart TD
 
     subgraph Frontend ["Camada de Interface (Frontend)"]
         UI --> Header["Cabeçalho Rápido + Status Cloud/Local"]
-        UI --> AddForm["Entrada Rápida de HQ (Nome + Tipo + Editora)"]
+        UI --> AddForm["Entrada Rápida de HQ (Nome + Tipo + Editora + Início nº)"]
         UI --> SortBar["Barra de Ordenação (A-Z, Z-A, Ordem Pessoal)"]
         UI --> FilterPanel["Painel de Filtros (Tipo, Editora, Status, Visão de Edições)"]
         UI --> ComicList["Lista de Coleções (Cards com Drag & Drop Nativo)"]
+        
+        ComicList --> StartFromLogic["Ponto de Partida Customizado (startFrom)"]
+        StartFromLogic --> HiddenChip["Chip de Dezenas Anteriores Ocultas (01..XX)"]
+        StartFromLogic --> ActiveChunks["Dezenas Ativas a partir da Faixa Inicial"]
         
         ComicList --> ChunkEngine["Mecanismo Estrito de Blocos de 10 (Chunking)"]
         ChunkEngine --> TactileCircles["Bolinhas Táteis (01 a 10, 11 a 20...)"]
@@ -25,9 +29,9 @@ flowchart TD
         ChunkEngine --> StrictCollapse["Fechamento Automático de Blocos sem Itens"]
         
         ComicList --> DragHandle["Alça de Arrasto (::: + Controles Subir/Descer)"]
-        ComicList --> Badges["Badges Clicáveis (Alternância de Tipo e Editora)"]
-        ComicList --> SeriesEnder["Botão Encerrar (Minissérie/Coleção ex: 01..06)"]
-        ComicList --> EditModal["Edição de Nome, Tipo, Editora & Exclusão com Confirmação"]
+        ComicList --> AlignedBadges["Badges Fixos à Direita [Tipo] [Editora] [Encerrar]"]
+        ComicList --> SeriesEnder["Botão Encerrar (Resumo respeitando startFrom)"]
+        ComicList --> EditModal["Edição de Nome, Tipo, Editora, Início & Exclusão"]
     end
 
     subgraph Theming ["Paleta Cromática dos Cards por Tipo"]
@@ -46,30 +50,15 @@ flowchart TD
 
 ---
 
-## 3. Lógica dos Modos de Ordenação
-
-1. **A-Z:** Ordenação alfabética crescente baseada no nome da HQ.
-2. **Z-A:** Ordenação alfabética decrescente baseada no nome da HQ.
-3. **Ordem Pessoal (Drag & Drop):**
-   * Cada card possui a propriedade `position: number`.
-   * Ao arrastar e soltar um card usando a alça `:::`, a aplicação comuta imediatamente para o modo `Ordem Pessoal`, atualiza as posições de todos os cards e sincroniza no Firestore e LocalStorage via `saveAllComicsOrder`.
-   * No mobile, além do arrasto tátil, há botões rápidos de subir (`↑`) e descer (`↓`) na alça.
-
----
-
-## 4. Regra Estrita de Blocos Abertos (10 em 10)
+## 3. Lógica do Ponto de Partida (`startFrom`)
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Bloco1_10: Inicial (ownedNumbers vazio)
-    Bloco1_10 --> Marcou10: Clica no número 10
-    Marcou10 --> Bloco11_20Aberto: Abre bloco 11 a 20
-    
-    Bloco11_20Aberto --> Desmarcou10SemNadaNoProximo: Desmarca o 10 (nenhum em 11..20)
-    Desmarcou10SemNadaNoProximo --> Bloco1_10: Bloco 11..20 fecha imediatamente!
-    
-    Bloco11_20Aberto --> MarcouAlgumEm11_20: Marcou (ex: 15)
-    MarcouAlgumEm11_20 --> Bloco11_20Permanece: Permanece aberto até esvaziar
+    [*] --> EntradaInicio: Usuário define ex: Início nº 32
+    EntradaInicio --> CalculaBloco: Determina bloco inicial (31..40)
+    CalculaBloco --> OcultaAnteriores: Oculta blocos 01..10, 11..20, 21..30
+    OcultaAnteriores --> ExibeChip: Mostra chip '01..30 (Ocultas - Toque para ver)'
+    ExibeChip --> ExibeAtivo: Abre direto bloco 31..40 com edição 32 disponível!
 ```
 
 ---
