@@ -1,8 +1,9 @@
 <div align="center">
 
-# 📚 HQ Tracker - Mobile First Collection Manager
+# 📚 HQs Collections `v1.0.1` - Mobile First Collection Manager
 ### *Gerenciador Ágil de Coleções de Quadrinhos e Minisséries*
 
+[![Version](https://img.shields.io/badge/version-1.0.1-amber?style=for-the-badge&logo=semver&logoColor=white)](#)
 [![Powered by Antigravity](https://img.shields.io/badge/Powered%20by-Google%20Antigravity-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://deepmind.google/technologies/antigravity/)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.x-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
@@ -21,7 +22,7 @@
 ## 🇺🇸 English
 
 ### 🎯 Overview
-**HQ Tracker** is an ultra-fast, mobile-first web application designed for comic book readers and collectors to track monthly publications, collections, and miniseries in a single streamlined screen. It features an intuitive chunking mechanism that displays issues in groups of 10 in a single continuous row, auto-collapsing completed intervals (e.g. `01..10`) and dynamically revealing subsequent issue blocks.
+**HQs Collections** (v1.0.1) is an ultra-fast, mobile-first web application designed for comic book readers and collectors to track monthly publications, collections, and miniseries in a single streamlined screen. It features an intuitive chunking mechanism that displays issues in groups of 10 in a single continuous row, auto-collapsing completed intervals (e.g. `01..10`) and dynamically revealing subsequent issue blocks.
 
 ### ✨ Key Features
 - **Dual Mode (Consultation vs. Edit):** Header toggle switch with visual icons. Consultation mode is default upon launch. Switching to Edit mode transitions the app background to an elevated lighter blue tone.
@@ -49,7 +50,7 @@ This application was architected and built using **Google Antigravity**, utilizi
 ## 🇧🇷 Versão em Português (Brasil)
 
 ### 🎯 Visão Geral
-O **HQ Tracker** é uma aplicação web mobile-first ultra-rápida criada sob medida para colecionadores de quadrinhos organizarem edições mensais, coleções e minisséries em apenas uma tela. O sistema emprega uma lógica inteligente de blocos de 10 edições sempre exibidas em linha única contínua, resumindo automaticamente sequências completas (ex: `01..10`) e abrindo novas dezenas dinamicamente conforme a coleção avança.
+O **HQs Collections** (v1.0.1) é uma aplicação web mobile-first ultra-rápida criada sob medida para colecionadores de quadrinhos organizarem edições mensais, coleções e minisséries em apenas uma tela. O sistema emprega uma lógica inteligente de blocos de 10 edições sempre exibidas em linha única contínua, resumindo automaticamente sequências completas (ex: `01..10`) e abrindo novas dezenas dinamicamente conforme a coleção avança.
 
 ### ✨ Principais Funcionalidades
 - **Alternância de Modos (Consulta vs. Edição):** Botão visual no cabeçalho com ícones distintos. O sistema sempre inicia no **Modo Consulta** por padrão. Ao entrar no **Modo Edição**, o fundo da aplicação transiciona suavemente para um tom azul mais claro e retorna à cor original ao voltar para Consulta.

@@ -122,19 +122,12 @@ Resposta do Usuário: (Recommended) Campo 'Começar no nº' (no cadastro e na ed
 - só consigo clicar  em um numero e adicionar aquele numero se estiver no modo edição.
 ```
 
-## Sessão: 04/11/2026
-
-### Prompt 7
+### Prompt 8
 ```text
-/agente-orquestrador /grill-me /goal construa os seguintes recursos:
-- no header deixe um botão de alternancia (modo consulta, modo edição), sempre o padrão ao abrir o sistema é modo consulta, utilize icones visuais para esses dois modos.
-- quando entro no modo edição a cor de fundo do sistema muda para um azul mais claro e retorna para a corr atual no modo consulta.
-- nos cards, deixe a linha do titulo só com o titulo, o restante dos botoes vão para uma segunda linha alinhados a direita. deixe primeiro a editora, depois o tipo e por ultimo o encerrar. quero os 3 botões com larguras iguais e fixas independente do conteudo.
-- as bolinhas de edições sempre devem exibir as 10 bolinhas eem uma unica linha.
-- ao incluir uma nova hq posso preencher somente os campos atuais direto na tela ou abrir inclusão detalhada onde tenho também campos para ano de inicio, editora de venda no brasil, herói/grupo principal
-- nos cards ao clicar no nome abre a tela de alterar com todos esses campos tambem.
-- no modo consulta quando eu clico no numero de uma edição abre uma tela com as informações detalhadas dessa hq só para consulta (no futuro vai exibir a capa, mas por enquanto não)
-- só consigo clicar  em um numero e adicionar aquele numero se estiver no modo edição.
+/agente-orquestrador /grill-me /goal a partir de agora estamos na versão 1.0.1 (esse número será exibido ao lado do nome do sistema. o nome do sistema deverá mudar para HQs Collections. o restante continua exibindo como está.
+a partir de agora sempre que for pedido alterações, mudanças, acescimos, correções ou verificações você controlará o numero da versão sozinho, alterando os 3 digitos de acordo com tipo de coisa que foi solicitado.
 ```
+
+
 
 

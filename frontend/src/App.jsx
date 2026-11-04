@@ -39,6 +39,7 @@ import {
   deleteComic,
   saveAllComicsOrder
 } from './firebase';
+import { APP_NAME, APP_VERSION } from './version';
 
 const COMIC_TYPES = ['Mensal', 'Especial', 'Minissérie', 'Coleção'];
 const PUBLISHERS = ['Marvel', 'DC', 'Vertigo', 'Outras'];
@@ -593,7 +594,10 @@ export default function App() {
             </div>
             <div className="truncate">
               <h1 className="text-base sm:text-lg font-black tracking-tight text-white leading-tight flex items-center gap-1.5 truncate">
-                HQ Tracker
+                {APP_NAME}
+                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-amber-400 border border-slate-700 shrink-0">
+                  v{APP_VERSION}
+                </span>
                 <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
                   Mobile
                 </span>

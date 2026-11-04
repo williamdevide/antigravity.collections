@@ -11,7 +11,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
 
-console.log('🏗️ [Build Global] Iniciando compilação do HQ Tracker...');
+console.log('🏗️ [Build Global] Iniciando compilação do HQs Collections...');
 
 try {
   console.log('⚡ 1. Compilando Frontend com Vite + Tailwind CSS...');
