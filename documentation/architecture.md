@@ -1,7 +1,7 @@
-# 🏛️ Arquitetura do Sistema: HQs Collections `v1.2.1`
+# 🏛️ Arquitetura do Sistema: HQs Collections `v1.3.0`
 
 ## 1. Visão Geral
-O **HQs Collections** é um sistema projetado para colecionadores de quadrinhos com foco em extrema agilidade no ambiente mobile ("Mobile First"). A aplicação opera em **tela única**, minimizando cliques, eliminando navegações desnecessárias, agrupando edições em blocos táteis de 10 em 10, categorizando coleções por Tipo e Editora, permitindo ordenação personalizada com **Drag & Drop**, títulos específicos por fascículo, suporte a início em edições avançadas (`startFrom`), **ciclo interativo de 4 estágios com destaque em neon**, **scraper com prioridade cronológica decrescente (lançamentos 2025/2026 e maiores volumes primeiro)**, **validador estrito de número de edição (`matchIssueNumber`)** e **fallback progressivo para edições mais antigas ao rejeitar uma capa**.
+O **HQs Collections** é um sistema projetado para colecionadores de quadrinhos com foco em extrema agilidade no ambiente mobile ("Mobile First"). A aplicação opera em **tela única**, minimizando cliques, eliminando navegações desnecessárias, agrupando edições em blocos táteis de 10 em 10, categorizando coleções por Tipo e Editora, permitindo ordenação personalizada com **Drag & Drop**, títulos específicos por fascículo, suporte a início em edições avançadas (`startFrom`), **ciclo interativo de 4 estágios com destaque em neon**, **scraper com prioridade cronológica decrescente (lançamentos 2025/2026 e maiores volumes primeiro)**, **validador estrito de número de edição (`matchIssueNumber`)**, **fallback progressivo para edições mais antigas ao rejeitar uma capa** e **ações em lote (Aceitar Todos / Rejeitar Todos) para curadoria ágil de capas pendentes**.
 
 ---
 
@@ -12,10 +12,18 @@ flowchart TD
     User["📱 Usuário (Colecionador no Mobile / Desktop)"] --> UI["🖥️ Interface Web Mobile First (Vite + React)"]
 
     subgraph HeaderSection ["Cabeçalho e Navegação"]
-        UI --> Brand["Logotipo + Versão v1.2.1 + Badge Mobile + Slogan"]
+        UI --> Brand["Logotipo + Versão v1.3.0 + Badge Mobile + Slogan"]
         UI --> CoverProgressBtn["Botão Tátil [🖼️ XX%] (Apenas Ícone e Porcentagem)"]
         UI --> ModeToggle["Alternador de Modo (Consulta 👁️ / Edição ✏️)"]
         UI --> ConnectionBadge["Status Conexão [☁️ Nuvem / 💾 Local] + Contadores [XX HQs • YY ed.]"]
+    end
+
+    subgraph CoverModalSection ["Modal de Status de Capas & Ações em Lote"]
+        CoverProgressBtn --> CoverModal["Modal de Monitoramento Panini & Web"]
+        CoverModal --> BatchActionsBar["Barra de Ações em Lote (Aceitar Todos / Rejeitar Todos)"]
+        BatchActionsBar --> BatchApprove["Aceitar Todos: Fixa todas as pendentes via saveComicsBatch"]
+        BatchActionsBar --> BatchReject["Rejeitar Todos: Rejeita pendentes e busca alternativas anteriores"]
+        CoverModal --> TabsFilter["Abas: Todas | Encontradas | Em Busca | Sem Capa"]
     end
 
     subgraph ScraperEngine ["Motor de Busca Cronológico & Validador de Edições"]

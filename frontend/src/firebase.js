@@ -207,5 +207,56 @@ export async function saveAllComicsOrder(comicsList) {
   return comicsList;
 }
 
+/**
+ * Salva múltiplas HQs de uma vez no LocalStorage e no Firestore
+ */
+export async function saveComicsBatch(comicsToUpdate) {
+  const current = loadFromLocalStorage();
+  const currentMap = new Map(current.map(c => [c.id, c]));
+
+  comicsToUpdate.forEach(comic => {
+    currentMap.set(comic.id, comic);
+  });
+
+  const updated = Array.from(currentMap.values());
+  saveToLocalStorage(updated);
+
+  if (db && isFirebaseInitialized) {
+    try {
+      const promises = comicsToUpdate.map(comic => {
+        const docRef = doc(db, 'comics', comic.id);
+        return setDoc(docRef, {
+          name: comic.name,
+          type: comic.type || 'Mensal',
+          publisher: comic.publisher || 'Marvel',
+          startFrom: typeof comic.startFrom === 'number' ? comic.startFrom : 1,
+          showHiddenChunks: Boolean(comic.showHiddenChunks),
+          ownedNumbers: comic.ownedNumbers || [],
+          issueStates: comic.issueStates || {},
+          issueCovers: comic.issueCovers || {},
+          pendingCovers: comic.pendingCovers || {},
+          rejectedCovers: comic.rejectedCovers || {},
+          searchedIssues: comic.searchedIssues || {},
+          issueTitles: comic.issueTitles || {},
+          position: typeof comic.position === 'number' ? comic.position : 0,
+          isCompleted: Boolean(comic.isCompleted),
+          completedUntil: comic.completedUntil || null,
+          highestOpenedChunk: comic.highestOpenedChunk || 10,
+          expandedChunks: comic.expandedChunks || [],
+          startYear: comic.startYear || '',
+          brazilPublisher: comic.brazilPublisher || '',
+          mainHero: comic.mainHero || '',
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      });
+      await Promise.all(promises);
+    } catch (e) {
+      console.warn('⚠️ Falha ao salvar lote no Firestore:', e.message);
+    }
+  }
+
+  return updated;
+}
+
 export { db };
 

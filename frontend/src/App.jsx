@@ -41,7 +41,9 @@ import {
   subscribeComics, 
   saveComic, 
   deleteComic, 
-  saveAllComicsOrder 
+  saveAllComicsOrder,
+  saveComicsBatch,
+  loadFromLocalStorage
 } from './firebase';
 import { APP_NAME, APP_VERSION } from './version';
 import { searchIssueCover } from './services/scraper';
@@ -108,6 +110,7 @@ export default function App() {
   const [showCoverSearchModal, setShowCoverSearchModal] = useState(false);
   const [coverModalTab, setCoverModalTab] = useState('all'); // 'all' | 'searching' | 'found' | 'missing'
   const [coverModalSearchText, setCoverModalSearchText] = useState('');
+  const [isProcessingBatch, setIsProcessingBatch] = useState(false);
 
   // Modal de Título de Edição Específica (Minissérie e Coleção no Modo Edição)
   const [issueTitleModal, setIssueTitleModal] = useState(null); // { comic, issueNum, currentTitle }
@@ -235,6 +238,17 @@ export default function App() {
     });
     return list;
   }, [comics]);
+
+  // Itens pendentes elegíveis para ações em lote no modal de status de capas
+  const targetPendingIssues = useMemo(() => {
+    if (coverModalSearchText && coverModalSearchText.trim()) {
+      const q = coverModalSearchText.toLowerCase();
+      return allTrackedIssues.filter(item => 
+        item.status === 'pending' && item.comicName.toLowerCase().includes(q)
+      );
+    }
+    return allTrackedIssues.filter(item => item.status === 'pending');
+  }, [allTrackedIssues, coverModalSearchText]);
 
   // Efeito do Scraper em Segundo Plano (Background Worker)
   useEffect(() => {
@@ -618,6 +632,173 @@ export default function App() {
 
     if (viewingIssueDetail && viewingIssueDetail.comic.id === comicId) {
       setViewingIssueDetail({ comic: updatedComic, issueNum });
+    }
+  };
+
+  // Aprovar Todas as Capas Pendentes (Ação em Lote)
+  // Exclusivo para edições com capas pendentes de aprovação (não altera edições já aprovadas)
+  const handleApproveAllPending = async () => {
+    if (targetPendingIssues.length === 0 || isProcessingBatch) return;
+
+    setIsProcessingBatch(true);
+    try {
+      const pendingByComic = new Map();
+      targetPendingIssues.forEach(item => {
+        if (!pendingByComic.has(item.comicId)) {
+          pendingByComic.set(item.comicId, []);
+        }
+        pendingByComic.get(item.comicId).push(item.issueNum);
+      });
+
+      const changedComics = [];
+      comics.forEach(comic => {
+        const issueNums = pendingByComic.get(comic.id);
+        if (!issueNums || issueNums.length === 0) return;
+
+        const updatedCovers = { ...(comic.issueCovers || {}) };
+        const updatedPending = { ...(comic.pendingCovers || {}) };
+
+        issueNums.forEach(num => {
+          const p = updatedPending[num];
+          if (p?.coverUrl) {
+            updatedCovers[num] = p.coverUrl;
+            delete updatedPending[num];
+          }
+        });
+
+        changedComics.push({
+          ...comic,
+          issueCovers: updatedCovers,
+          pendingCovers: updatedPending
+        });
+      });
+
+      if (changedComics.length > 0) {
+        const saved = await saveComicsBatch(changedComics);
+        setComics(saved);
+
+        if (viewingIssueDetail && pendingByComic.has(viewingIssueDetail.comic.id)) {
+          const fresh = saved.find(c => c.id === viewingIssueDetail.comic.id);
+          if (fresh) {
+            setViewingIssueDetail({ comic: fresh, issueNum: viewingIssueDetail.issueNum });
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao aprovar todas as capas pendentes:', err);
+    } finally {
+      setIsProcessingBatch(false);
+    }
+  };
+
+  // Rejeitar Todas as Capas Pendentes (Ação em Lote)
+  // Exclusivo para edições com capas pendentes de aprovação e dispara busca por capas anteriores
+  const handleRejectAllPending = async () => {
+    if (targetPendingIssues.length === 0 || isProcessingBatch) return;
+
+    setIsProcessingBatch(true);
+    try {
+      const pendingByComic = new Map();
+      targetPendingIssues.forEach(item => {
+        if (!pendingByComic.has(item.comicId)) {
+          pendingByComic.set(item.comicId, []);
+        }
+        pendingByComic.get(item.comicId).push(item.issueNum);
+      });
+
+      const changedComics = [];
+      const rejectedPairs = [];
+
+      comics.forEach(comic => {
+        const issueNums = pendingByComic.get(comic.id);
+        if (!issueNums || issueNums.length === 0) return;
+
+        const updatedPending = { ...(comic.pendingCovers || {}) };
+        const updatedRejected = { ...(comic.rejectedCovers || {}) };
+
+        issueNums.forEach(num => {
+          const p = updatedPending[num];
+          const rejectedUrl = p?.coverUrl;
+          delete updatedPending[num];
+
+          if (rejectedUrl) {
+            const prevList = updatedRejected[num] || [];
+            if (!prevList.includes(rejectedUrl)) {
+              updatedRejected[num] = [...prevList, rejectedUrl];
+            }
+          }
+
+          const queueKey = `${comic.id}_${num}`;
+          scrapingQueueRef.current.delete(queueKey);
+          rejectedPairs.push({ comicId: comic.id, issueNum: num });
+        });
+
+        changedComics.push({
+          ...comic,
+          pendingCovers: updatedPending,
+          rejectedCovers: updatedRejected
+        });
+      });
+
+      if (changedComics.length > 0) {
+        const saved = await saveComicsBatch(changedComics);
+        setComics(saved);
+
+        if (viewingIssueDetail && pendingByComic.has(viewingIssueDetail.comic.id)) {
+          const fresh = saved.find(c => c.id === viewingIssueDetail.comic.id);
+          if (fresh) {
+            setViewingIssueDetail({ comic: fresh, issueNum: viewingIssueDetail.issueNum });
+          }
+        }
+
+        // Buscar sequencialmente a próxima alternativa cronológica para cada edição rejeitada
+        setTimeout(async () => {
+          for (const pair of rejectedPairs) {
+            const currentList = loadFromLocalStorage();
+            const freshComic = currentList.find(c => c.id === pair.comicId);
+            if (!freshComic) continue;
+
+            const otherCoverUrls = Object.entries(freshComic.issueCovers || {})
+              .filter(([k]) => k !== String(pair.issueNum))
+              .map(([, url]) => url)
+              .concat(
+                Object.entries(freshComic.pendingCovers || {})
+                  .filter(([k]) => k !== String(pair.issueNum))
+                  .map(([, p]) => p?.coverUrl)
+                  .filter(Boolean)
+              );
+
+            const allExcluded = Array.from(new Set([...(freshComic.rejectedCovers?.[pair.issueNum] || []), ...otherCoverUrls]));
+
+            try {
+              const nextRes = await searchIssueCover(freshComic, pair.issueNum, allExcluded);
+              if (nextRes.found && nextRes.coverUrl && !allExcluded.includes(nextRes.coverUrl)) {
+                const freshPending = {
+                  ...(freshComic.pendingCovers || {}),
+                  [pair.issueNum]: {
+                    coverUrl: nextRes.coverUrl,
+                    source: nextRes.source,
+                    year: nextRes.year,
+                    title: nextRes.title
+                  }
+                };
+                const nextComic = {
+                  ...freshComic,
+                  pendingCovers: freshPending
+                };
+                const resaved = await saveComic(nextComic);
+                setComics(resaved);
+              }
+            } catch (e) {
+              console.warn('Erro ao buscar alternativa após rejeição em lote:', e);
+            }
+          }
+        }, 150);
+      }
+    } catch (err) {
+      console.error('Erro ao rejeitar todas as capas pendentes:', err);
+    } finally {
+      setIsProcessingBatch(false);
     }
   };
 
@@ -2158,6 +2339,59 @@ export default function App() {
                   onChange={(e) => setCoverModalSearchText(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                 />
+              </div>
+            </div>
+
+            {/* Barra de Ações em Lote (Aceitar Todos / Rejeitar Todos - exclusivo para pendentes) */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 bg-slate-950/90 border border-slate-800 rounded-xl p-2.5 shrink-0">
+              <div className="flex items-center justify-between sm:justify-start gap-2 text-xs">
+                <span className="font-semibold text-slate-300">Capas pendentes:</span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                  targetPendingIssues.length > 0 
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse' 
+                    : 'bg-slate-800 text-slate-500 border border-slate-700/50'
+                }`}>
+                  {targetPendingIssues.length}
+                </span>
+                {coverModalSearchText && (
+                  <span className="text-[10px] text-slate-400 italic">
+                    (filtradas por &ldquo;{coverModalSearchText}&rdquo;)
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleApproveAllPending}
+                  disabled={targetPendingIssues.length === 0 || isProcessingBatch}
+                  className={`flex-1 sm:flex-none justify-center px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-sm ${
+                    targetPendingIssues.length > 0 && !isProcessingBatch
+                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95 cursor-pointer shadow-emerald-950/40'
+                      : 'bg-slate-800/80 text-slate-500 border border-slate-800 cursor-not-allowed opacity-50'
+                  }`}
+                  title="Aprovar todas as capas pendentes selecionadas de uma vez"
+                >
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>Aceitar Todos</span>
+                  <span className="text-[11px] opacity-80">({targetPendingIssues.length})</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleRejectAllPending}
+                  disabled={targetPendingIssues.length === 0 || isProcessingBatch}
+                  className={`flex-1 sm:flex-none justify-center px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-sm ${
+                    targetPendingIssues.length > 0 && !isProcessingBatch
+                      ? 'bg-rose-600 hover:bg-rose-500 text-white active:scale-95 cursor-pointer shadow-rose-950/40'
+                      : 'bg-slate-800/80 text-slate-500 border border-slate-800 cursor-not-allowed opacity-50'
+                  }`}
+                  title="Rejeitar todas as capas pendentes e buscar edições alternativas"
+                >
+                  <X className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>Rejeitar Todos</span>
+                  <span className="text-[11px] opacity-80">({targetPendingIssues.length})</span>
+                </button>
               </div>
             </div>
 

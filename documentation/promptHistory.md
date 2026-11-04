@@ -177,4 +177,10 @@ Pergunta: Para coleções com muitos relançamentos (ex: Wolverine, Batman), qua
 Resposta do Usuário: (Recommended) Priorizar sempre o lançamento mais recente (2025/2026 / maior volume). Ao rejeitar, buscar progressivamente os volumes/anos anteriores
 ```
 
+### Prompt 14
+```text
+/agente-orquestrador na tela de status da busca de capas deixe um botão aceitar todos ou rejeitar todos, mas só para as que ainda não foram aprovadas.
+```
+
+
 

@@ -3,10 +3,10 @@
 ## 1. Visão Geral e Propósito
 Aplicação Web First Mobile para controle ágil de coleções de Histórias em Quadrinhos, Especiais, Minisséries e Coleções em tela única.
 * **Nome Oficial:** `HQs Collections`
-* **Versão:** `1.2.1`
+* **Versão:** `1.3.0`
 
 ## 2. Header & Navegação Mobile First
-* **Marca e Identidade:** Logotipo `BookOpen`, Título `HQs Collections`, versão SemVer (`v1.2.1`), badge `Mobile` e slogan `Controle Ágil de Coleções`.
+* **Marca e Identidade:** Logotipo `BookOpen`, Título `HQs Collections`, versão SemVer (`v1.3.0`), badge `Mobile` e slogan `Controle Ágil de Coleções`.
 * **Monitor de Capas no Header:** Objeto tátil composto estritamente pelo ícone e pela porcentagem (ex: `🖼️ 85%`), sem o texto "capas". Ao tocar nesse objeto, abre o **Modal Detalhado de Status da Busca de Capas**.
 * **Alternador de Modos:** Ícone único de alternância (Lápis para Edição / Olho para Consulta).
 * **Badge de Conexão e Estatísticas:** Status em tempo real (`Nuvem` / `Local`) e contagem total (`XX HQs • YY ed.`).
@@ -30,6 +30,10 @@ Aplicação Web First Mobile para controle ágil de coleções de Histórias em 
 * Métricas em tempo real: `% Progresso`, `Buscadas`, `Fixadas` e `Pendentes`.
 * Abas de navegação rápida: `Todas`, `Encontradas`, `Em Busca` e `Sem Capa / Rejeitadas`.
 * Ações diretas por edição sem texto: Aprovar (✓ verde), Rejeitar (✗ vermelho), Desvincular e Re-buscar.
+* **Ações em Lote (Aceitar Todos / Rejeitar Todos):**
+  - Botão **Aceitar Todos**: Aprova em lote todas as capas pendentes de aprovação na coleção (ou no filtro pesquisado), gravando-as como capas fixadas no Firestore/LocalStorage via `saveComicsBatch`.
+  - Botão **Rejeitar Todos**: Rejeita em lote todas as capas pendentes, adicionando-as aos arrays de rejeição e disparando buscas sequenciais pelas edições cronologicamente anteriores.
+  - **Proteção Estrita de Integridade:** As ações em lote operam *exclusivamente* sobre edições pendentes (`status === 'pending'`), nunca alterando ou desvinculando edições que já haviam sido aprovadas anteriormente.
 
 ## 6. Fluxo de Curadoria de Capa (Aprovar / Rejeitar sem texto)
 * Tanto no card de detalhes da edição quanto no modal de busca de capas, a capa encontrada pendente apresenta dois botões dedicados **SEM TEXTO**:
