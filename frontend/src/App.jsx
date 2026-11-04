@@ -25,7 +25,13 @@ import {
   ArrowDownZA,
   Tag,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Pencil,
+  Calendar,
+  Shield,
+  FileText,
+  Image as ImageIcon,
+  Sparkles
 } from 'lucide-react';
 import { 
   subscribeComics, 
@@ -39,11 +45,26 @@ const PUBLISHERS = ['Marvel', 'DC', 'Vertigo', 'Outras'];
 
 export default function App() {
   const [comics, setComics] = useState([]);
+  
+  // Modo de Operação: 'consulta' (padrão) | 'edicao'
+  const [appMode, setAppMode] = useState('consulta');
+
+  // Cadastro Rápido
   const [newComicName, setNewComicName] = useState('');
   const [newComicType, setNewComicType] = useState('Mensal');
   const [newComicPublisher, setNewComicPublisher] = useState('Marvel');
   const [newComicStartFrom, setNewComicStartFrom] = useState('');
   
+  // Modal de Inclusão Detalhada
+  const [showDetailedAddModal, setShowDetailedAddModal] = useState(false);
+  const [detailedName, setDetailedName] = useState('');
+  const [detailedType, setDetailedType] = useState('Mensal');
+  const [detailedPublisher, setDetailedPublisher] = useState('Marvel');
+  const [detailedStartFrom, setDetailedStartFrom] = useState('1');
+  const [detailedStartYear, setDetailedStartYear] = useState('');
+  const [detailedBrazilPublisher, setDetailedBrazilPublisher] = useState('');
+  const [detailedMainHero, setDetailedMainHero] = useState('');
+
   // Ordenação
   const [sortOrder, setSortOrder] = useState('A-Z'); // 'A-Z' | 'Z-A' | 'personal'
 
@@ -58,15 +79,21 @@ export default function App() {
   // Status de Conexão
   const [connectionStatus, setConnectionStatus] = useState({ status: 'connecting', message: 'Conectando...' });
   
-  // Modal de Edição de Nome, Tipo, Editora e Ponto de Partida
+  // Modal de Edição Completa da HQ
   const [editingComic, setEditingComic] = useState(null);
   const [editNameInput, setEditNameInput] = useState('');
   const [editTypeInput, setEditTypeInput] = useState('Mensal');
   const [editPublisherInput, setEditPublisherInput] = useState('Marvel');
   const [editStartFromInput, setEditStartFromInput] = useState('1');
+  const [editStartYearInput, setEditStartYearInput] = useState('');
+  const [editBrazilPublisherInput, setEditBrazilPublisherInput] = useState('');
+  const [editMainHeroInput, setEditMainHeroInput] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
-  // Modal de Título de Edição Específica (Minissérie e Coleção)
+  // Modal de Consulta de Detalhes da Edição (Modo Consulta)
+  const [viewingIssueDetail, setViewingIssueDetail] = useState(null); // { comic, issueNum }
+
+  // Modal de Título de Edição Específica (Minissérie e Coleção no Modo Edição)
   const [issueTitleModal, setIssueTitleModal] = useState(null); // { comic, issueNum, currentTitle }
   const [issueTitleInput, setIssueTitleInput] = useState('');
 
@@ -89,21 +116,21 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Alternar o tipo do novo título
+  // Alternar o tipo do novo título (Inclusão rápida)
   const handleCycleNewType = () => {
     const currentIndex = COMIC_TYPES.indexOf(newComicType);
     const nextIndex = (currentIndex + 1) % COMIC_TYPES.length;
     setNewComicType(COMIC_TYPES[nextIndex]);
   };
 
-  // Alternar a editora do novo título
+  // Alternar a editora do novo título (Inclusão rápida)
   const handleCycleNewPublisher = () => {
     const currentIndex = PUBLISHERS.indexOf(newComicPublisher);
     const nextIndex = (currentIndex + 1) % PUBLISHERS.length;
     setNewComicPublisher(PUBLISHERS[nextIndex]);
   };
 
-  // Adicionar nova HQ
+  // Adicionar nova HQ rápida
   const handleAddComic = async (e) => {
     e?.preventDefault();
     const trimmed = newComicName.trim();
@@ -123,6 +150,9 @@ export default function App() {
       type: newComicType,
       publisher: newComicPublisher,
       startFrom,
+      startYear: '',
+      brazilPublisher: '',
+      mainHero: '',
       showHiddenChunks: false,
       ownedNumbers: [],
       issueTitles: {},
@@ -140,8 +170,60 @@ export default function App() {
     inputRef.current?.focus();
   };
 
-  // Ciclar tipo diretamente no card
+  // Abrir Modal de Inclusão Detalhada
+  const handleOpenDetailedAdd = () => {
+    setDetailedName(newComicName.trim());
+    setDetailedType(newComicType);
+    setDetailedPublisher(newComicPublisher);
+    setDetailedStartFrom(newComicStartFrom || '1');
+    setDetailedStartYear('');
+    setDetailedBrazilPublisher('');
+    setDetailedMainHero('');
+    setShowDetailedAddModal(true);
+  };
+
+  // Salvar Inclusão Detalhada
+  const handleSaveDetailedAdd = async (e) => {
+    e?.preventDefault();
+    const trimmed = detailedName.trim();
+    if (!trimmed) return;
+
+    const parsedStart = parseInt(detailedStartFrom, 10);
+    const startFrom = !isNaN(parsedStart) && parsedStart > 1 ? parsedStart : 1;
+
+    const nextPosition = comics.length > 0 
+      ? Math.max(...comics.map(c => typeof c.position === 'number' ? c.position : 0)) + 1 
+      : 0;
+
+    const newComic = {
+      id: 'comic_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      name: trimmed,
+      type: detailedType,
+      publisher: detailedPublisher,
+      startFrom,
+      startYear: detailedStartYear.trim(),
+      brazilPublisher: detailedBrazilPublisher.trim(),
+      mainHero: detailedMainHero.trim(),
+      showHiddenChunks: false,
+      ownedNumbers: [],
+      issueTitles: {},
+      position: nextPosition,
+      isCompleted: false,
+      completedUntil: null,
+      expandedChunks: [],
+      createdAt: new Date().toISOString()
+    };
+
+    const updated = await saveComic(newComic);
+    setComics(updated);
+    setShowDetailedAddModal(false);
+    setNewComicName('');
+    setNewComicStartFrom('');
+  };
+
+  // Ciclar tipo diretamente no card (no modo edição)
   const handleCycleComicType = async (comic) => {
+    if (appMode !== 'edicao') return;
     const currentIndex = COMIC_TYPES.indexOf(comic.type || 'Mensal');
     const nextIndex = (currentIndex + 1) % COMIC_TYPES.length;
     const updatedComic = { ...comic, type: COMIC_TYPES[nextIndex] };
@@ -149,8 +231,9 @@ export default function App() {
     setComics(updated);
   };
 
-  // Ciclar editora diretamente no card
+  // Ciclar editora diretamente no card (no modo edição)
   const handleCycleComicPublisher = async (comic) => {
+    if (appMode !== 'edicao') return;
     const currentIndex = PUBLISHERS.indexOf(comic.publisher || 'Marvel');
     const nextIndex = (currentIndex + 1) % PUBLISHERS.length;
     const updatedComic = { ...comic, publisher: PUBLISHERS[nextIndex] };
@@ -168,8 +251,9 @@ export default function App() {
     setComics(updated);
   };
 
-  // Alternar seleção de um número específico (com recálculo dinâmico estrito de blocos)
+  // Alternar seleção de um número específico (somente no Modo Edição)
   const handleToggleNumber = async (comic, num) => {
+    if (appMode !== 'edicao') return;
     const isOwned = comic.ownedNumbers?.includes(num);
     let newOwned = isOwned
       ? comic.ownedNumbers.filter(n => n !== num)
@@ -203,8 +287,9 @@ export default function App() {
     setComics(updated);
   };
 
-  // Encerrar item / Minissérie (conclui e resume até o maior número marcado respeitando o ponto de partida)
+  // Encerrar item / Minissérie
   const handleToggleCompleteSeries = async (comic) => {
+    if (appMode !== 'edicao') return;
     if (comic.isCompleted) {
       // Reabrir série
       const updatedComic = {
@@ -239,16 +324,19 @@ export default function App() {
     setComics(updated);
   };
 
-  // Iniciar modo de edição
+  // Iniciar modo de edição da HQ (abre modal de alteração completo)
   const handleStartEdit = (comic) => {
     setEditingComic(comic);
     setEditNameInput(comic.name);
     setEditTypeInput(comic.type || 'Mensal');
     setEditPublisherInput(comic.publisher || 'Marvel');
     setEditStartFromInput(String(comic.startFrom || 1));
+    setEditStartYearInput(comic.startYear || '');
+    setEditBrazilPublisherInput(comic.brazilPublisher || '');
+    setEditMainHeroInput(comic.mainHero || '');
   };
 
-  // Salvar alteração no modal
+  // Salvar alteração no modal completo
   const handleSaveEdit = async () => {
     if (!editingComic) return;
     const trimmed = editNameInput.trim();
@@ -261,7 +349,10 @@ export default function App() {
       name: trimmed,
       type: editTypeInput,
       publisher: editPublisherInput,
-      startFrom
+      startFrom,
+      startYear: editStartYearInput.trim(),
+      brazilPublisher: editBrazilPublisherInput.trim(),
+      mainHero: editMainHeroInput.trim()
     };
 
     const updated = await saveComic(updatedComic);
@@ -277,8 +368,9 @@ export default function App() {
     setEditingComic(null);
   };
 
-  // Abertura do Modal de Título de Edição Específica
+  // Abertura do Modal de Título de Edição Específica (somente em modo edição)
   const handleOpenIssueTitleModal = (comic, issueNum) => {
+    if (appMode !== 'edicao') return;
     if (comic.type !== 'Minissérie' && comic.type !== 'Coleção') return;
     const currentTitle = comic.issueTitles?.[issueNum] || '';
     setIssueTitleModal({ comic, issueNum, currentTitle });
@@ -325,14 +417,16 @@ export default function App() {
     setIssueTitleModal(null);
   };
 
-  // Drag and Drop Handlers
+  // Drag and Drop Handlers (somente no Modo Edição)
   const handleDragStart = (e, index) => {
+    if (appMode !== 'edicao') return;
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', index);
   };
 
   const handleDragOver = (e, index) => {
+    if (appMode !== 'edicao') return;
     e.preventDefault();
     if (dragOverIndex !== index) {
       setDragOverIndex(index);
@@ -340,6 +434,7 @@ export default function App() {
   };
 
   const handleDrop = async (e, targetIndex) => {
+    if (appMode !== 'edicao') return;
     e.preventDefault();
     if (draggedIndex === null || draggedIndex === targetIndex) {
       setDraggedIndex(null);
@@ -373,8 +468,9 @@ export default function App() {
     setDragOverIndex(null);
   };
 
-  // Mover card para cima/baixo manualmente (acessibilidade e mobile)
+  // Mover card para cima/baixo manualmente
   const handleMoveCard = async (index, direction) => {
+    if (appMode !== 'edicao') return;
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= sortedAndFilteredComics.length) return;
 
@@ -402,8 +498,13 @@ export default function App() {
     const query = searchQuery.toLowerCase().trim();
 
     const filtered = comics.filter((comic) => {
-      if (query && !comic.name.toLowerCase().includes(query)) {
-        return false;
+      if (query) {
+        const matchesName = comic.name.toLowerCase().includes(query);
+        const matchesHero = comic.mainHero && comic.mainHero.toLowerCase().includes(query);
+        const matchesBrazilPub = comic.brazilPublisher && comic.brazilPublisher.toLowerCase().includes(query);
+        if (!matchesName && !matchesHero && !matchesBrazilPub) {
+          return false;
+        }
       }
       if (filterType !== 'Todos' && (comic.type || 'Mensal') !== filterType) {
         return false;
@@ -474,41 +575,77 @@ export default function App() {
 
   const hasActiveFilters = filterType !== 'Todos' || filterPublisher !== 'Todas' || filterStatus !== 'Todos' || viewMode !== 'all';
 
+  const isEditMode = appMode === 'edicao';
+
   return (
-    <div className="min-h-screen bg-[#070B14] text-slate-100 flex flex-col font-sans">
+    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 ${
+      isEditMode ? 'bg-[#0E2038] text-slate-100' : 'bg-[#070B14] text-slate-100'
+    }`}>
       {/* HEADER MOBILE-FIRST */}
-      <header className="sticky top-0 z-30 bg-[#0A0F1D]/95 backdrop-blur-md border-b border-slate-800/80 px-4 py-3 shadow-md">
-        <div className="max-w-xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center text-slate-950 font-bold shadow-lg shadow-amber-500/20">
+      <header className={`sticky top-0 z-30 backdrop-blur-md px-4 py-3 shadow-md border-b transition-colors duration-300 ${
+        isEditMode ? 'bg-[#142B4C]/95 border-blue-500/30' : 'bg-[#0A0F1D]/95 border-slate-800/80'
+      }`}>
+        <div className="max-w-xl mx-auto flex items-center justify-between gap-2">
+          {/* Logo & Marca */}
+          <div className="flex items-center space-x-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center text-slate-950 font-bold shadow-lg shadow-amber-500/20 shrink-0">
               <BookOpen className="w-5 h-5 text-slate-950" />
             </div>
-            <div>
-              <h1 className="text-lg font-black tracking-tight text-white leading-tight flex items-center gap-1.5">
+            <div className="truncate">
+              <h1 className="text-base sm:text-lg font-black tracking-tight text-white leading-tight flex items-center gap-1.5 truncate">
                 HQ Tracker
-                <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 shrink-0">
                   Mobile
                 </span>
               </h1>
-              <p className="text-[11px] text-slate-400">Controle Ágil de Coleções</p>
+              <p className="text-[11px] text-slate-400 truncate">
+                {isEditMode ? 'Modo Edição Ativo' : 'Modo Consulta Ativo'}
+              </p>
             </div>
           </div>
 
-          {/* BADGE DE CONEXÃO & STATS */}
-          <div className="flex flex-col items-end text-right">
-            <div className="flex items-center gap-1 text-[11px]">
-              {connectionStatus.status === 'connected' ? (
-                <span className="flex items-center gap-1 text-emerald-400 font-medium">
-                  <Cloud className="w-3.5 h-3.5" /> Nuvem
-                </span>
+          {/* ÁREA DIREITA: BOTÃO DE ALTERNÂNCIA (CONSULTA / EDIÇÃO) + STATUS */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* BOTÃO DE ALTERNÂNCIA DE MODO (PADRÃO: MODO CONSULTA) */}
+            <button
+              type="button"
+              onClick={() => setAppMode(isEditMode ? 'consulta' : 'edicao')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 border ${
+                isEditMode
+                  ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-300 shadow-amber-500/30'
+                  : 'bg-slate-800/90 hover:bg-slate-700/90 text-cyan-300 border-cyan-500/40 hover:border-cyan-400 shadow-cyan-950/40'
+              }`}
+              title={isEditMode ? "Clique para alternar para o Modo Consulta" : "Clique para alternar para o Modo Edição"}
+            >
+              {isEditMode ? (
+                <>
+                  <Pencil className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Modo Edição</span>
+                </>
               ) : (
-                <span className="flex items-center gap-1 text-amber-400 font-medium" title={connectionStatus.message}>
-                  <HardDrive className="w-3.5 h-3.5" /> Local
-                </span>
+                <>
+                  <Eye className="w-3.5 h-3.5 text-cyan-400 stroke-[2.5]" />
+                  <span>Modo Consulta</span>
+                </>
               )}
-            </div>
-            <div className="text-[10px] text-slate-400">
-              <span className="text-white font-semibold">{totalComics}</span> títulos • <span className="text-amber-400 font-semibold">{totalIssuesOwned}</span> edições
+            </button>
+
+            {/* BADGE DE CONEXÃO & STATS */}
+            <div className="hidden sm:flex flex-col items-end text-right border-l border-slate-700/60 pl-2">
+              <div className="flex items-center gap-1 text-[11px]">
+                {connectionStatus.status === 'connected' ? (
+                  <span className="flex items-center gap-1 text-emerald-400 font-medium">
+                    <Cloud className="w-3 h-3" /> Nuvem
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-amber-400 font-medium" title={connectionStatus.message}>
+                    <HardDrive className="w-3 h-3" /> Local
+                  </span>
+                )}
+              </div>
+              <div className="text-[10px] text-slate-400">
+                <span className="text-white font-semibold">{totalComics}</span> HQs • <span className="text-amber-400 font-semibold">{totalIssuesOwned}</span> ed.
+              </div>
             </div>
           </div>
         </div>
@@ -517,8 +654,12 @@ export default function App() {
       {/* CONTEÚDO PRINCIPAL - TELA ÚNICA */}
       <main className="flex-1 max-w-xl w-full mx-auto p-3.5 sm:p-4 space-y-3.5">
         
-        {/* BARRA DE ADICIONAR NOVO TÍTULO COM TIPO, EDITORA E INÍCIO */}
-        <section className="bg-[#12192B] p-3 rounded-2xl border border-slate-700/70 shadow-xl space-y-2.5">
+        {/* BARRA DE ADICIONAR NOVO TÍTULO COM OPÇÃO DIRETA E INCLUSÃO DETALHADA */}
+        <section className={`p-3 rounded-2xl border shadow-xl space-y-2.5 transition-colors duration-300 ${
+          isEditMode 
+            ? 'bg-[#152B49] border-blue-500/40 shadow-blue-950/30' 
+            : 'bg-[#12192B] border-slate-700/70'
+        }`}>
           <form onSubmit={handleAddComic} className="space-y-2">
             <div className="flex gap-1.5">
               <input
@@ -533,14 +674,14 @@ export default function App() {
                 type="submit"
                 disabled={!newComicName.trim()}
                 className="bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:hover:bg-amber-500 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-1 transition shadow-md shadow-amber-500/20 active:scale-95 shrink-0"
-                title="Adicionar HQ"
+                title="Adicionar HQ direta com valores rápidos"
               >
                 <Plus className="w-4 h-4 stroke-[3]" />
                 <span className="hidden sm:inline">Adicionar</span>
               </button>
             </div>
 
-            {/* BOTÕES DE ALTERNÂNCIA: TIPO, EDITORA E CAMPO DE INÍCIO */}
+            {/* BOTÕES DE ALTERNÂNCIA: TIPO, EDITORA, INÍCIO E BOTÃO DE INCLUSÃO DETALHADA */}
             <div className="flex items-center justify-between text-xs pt-0.5 flex-wrap gap-2">
               <div className="flex items-center gap-1.5 flex-wrap">
                 {/* Botão Tipo */}
@@ -580,9 +721,16 @@ export default function App() {
                 </div>
               </div>
 
-              <span className="text-[10px] text-slate-500 hidden sm:inline">
-                Toque nos botões para alternar
-              </span>
+              {/* Botão de Inclusão Detalhada */}
+              <button
+                type="button"
+                onClick={handleOpenDetailedAdd}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/50 transition active:scale-95 shadow-sm ml-auto"
+                title="Cadastrar com campos extras: Ano de Início, Editora Brasil, Herói/Grupo"
+              >
+                <FileText className="w-3.5 h-3.5 text-indigo-300" />
+                <span>Inclusão Detalhada</span>
+              </button>
             </div>
           </form>
         </section>
@@ -590,7 +738,9 @@ export default function App() {
         {/* CONTROLES: ORDENAÇÃO + BUSCA + FILTROS */}
         <section className="space-y-2">
           {/* BARRA DE ORDENAÇÃO (A-Z / Z-A / ORDEM PESSOAL) */}
-          <div className="flex items-center justify-between bg-[#0F1626] p-1.5 rounded-xl border border-slate-800 text-xs">
+          <div className={`flex items-center justify-between p-1.5 rounded-xl border text-xs transition-colors duration-300 ${
+            isEditMode ? 'bg-[#11233B] border-blue-500/30' : 'bg-[#0F1626] border-slate-800'
+          }`}>
             <span className="text-[11px] font-semibold text-slate-400 pl-2">Ordenar por:</span>
             <div className="flex gap-1">
               <button
@@ -626,7 +776,7 @@ export default function App() {
                     ? 'bg-amber-500 text-slate-950 shadow-sm'
                     : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
                 }`}
-                title="Ordem Pessoal (Arrastar e Soltar)"
+                title="Ordem Pessoal (Arrastar e Soltar no Modo Edição)"
               >
                 <GripVertical className="w-3.5 h-3.5" />
                 <span>Pessoal</span>
@@ -642,8 +792,10 @@ export default function App() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar por título na coleção..."
-                className="w-full bg-[#0F1626] text-white placeholder-slate-500 pl-10 pr-8 py-2.5 rounded-xl border border-slate-800 text-xs focus:outline-none focus:border-slate-600 transition"
+                placeholder="Buscar por título, herói ou editora..."
+                className={`w-full text-white placeholder-slate-500 pl-10 pr-8 py-2.5 rounded-xl border text-xs focus:outline-none transition ${
+                  isEditMode ? 'bg-[#11233B] border-blue-500/30 focus:border-amber-500' : 'bg-[#0F1626] border-slate-800 focus:border-slate-600'
+                }`}
               />
               {searchQuery && (
                 <button 
@@ -661,7 +813,9 @@ export default function App() {
               className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition shrink-0 ${
                 showFilters || hasActiveFilters
                   ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20'
-                  : 'bg-[#0F1626] text-slate-300 border-slate-800 hover:border-slate-700'
+                  : isEditMode
+                    ? 'bg-[#11233B] text-slate-300 border-blue-500/30 hover:border-blue-400'
+                    : 'bg-[#0F1626] text-slate-300 border-slate-800 hover:border-slate-700'
               }`}
               title="Filtros e Modo de Visualização"
             >
@@ -675,7 +829,9 @@ export default function App() {
 
           {/* PAINEL DE FILTROS AVANÇADOS (EXPANSÍVEL) */}
           {showFilters && (
-            <div className="bg-[#12192B] border border-slate-800 rounded-2xl p-3.5 space-y-3 animate-fadeIn shadow-lg">
+            <div className={`border rounded-2xl p-3.5 space-y-3 animate-fadeIn shadow-lg ${
+              isEditMode ? 'bg-[#152B49] border-blue-500/40' : 'bg-[#12192B] border-slate-800'
+            }`}>
               {/* Filtro por Tipo */}
               <div className="space-y-1">
                 <label className="text-[11px] font-semibold text-slate-400 flex items-center gap-1">
@@ -805,7 +961,9 @@ export default function App() {
         {/* LISTAGEM DE QUADRINHOS COM DRAG & DROP NATIVO */}
         <section className="space-y-3 pb-8">
           {sortedAndFilteredComics.length === 0 ? (
-            <div className="bg-[#101726]/80 rounded-2xl border border-dashed border-slate-800 p-8 text-center space-y-2">
+            <div className={`rounded-2xl border border-dashed p-8 text-center space-y-2 ${
+              isEditMode ? 'bg-[#11233B]/80 border-blue-500/30' : 'bg-[#101726]/80 border-slate-800'
+            }`}>
               <BookOpen className="w-10 h-10 text-slate-600 mx-auto" />
               <p className="text-sm font-semibold text-slate-300">
                 {comics.length === 0 ? 'Nenhuma coleção cadastrada ainda' : 'Nenhuma HQ encontrada com os filtros selecionados'}
@@ -820,7 +978,7 @@ export default function App() {
             sortedAndFilteredComics.map((comic, index) => (
               <div
                 key={comic.id}
-                draggable
+                draggable={isEditMode}
                 onDragStart={(e) => handleDragStart(e, index)}
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDrop={(e) => handleDrop(e, index)}
@@ -834,6 +992,7 @@ export default function App() {
                   index={index}
                   totalItems={sortedAndFilteredComics.length}
                   viewMode={viewMode}
+                  appMode={appMode}
                   onToggleNumber={(num) => handleToggleNumber(comic, num)}
                   onToggleChunkExpand={(chunkStart) => handleToggleChunkExpand(comic, chunkStart)}
                   onToggleHiddenChunks={() => handleToggleHiddenChunks(comic)}
@@ -842,6 +1001,7 @@ export default function App() {
                   onCyclePublisher={() => handleCycleComicPublisher(comic)}
                   onStartEdit={() => handleStartEdit(comic)}
                   onOpenIssueTitleModal={(num) => handleOpenIssueTitleModal(comic, num)}
+                  onViewIssueDetail={(comicData, num) => setViewingIssueDetail({ comic: comicData, issueNum: num })}
                   onMoveCard={(dir) => handleMoveCard(index, dir)}
                   getTypeBadgeStyle={getTypeBadgeStyle}
                   getPublisherBadgeStyle={getPublisherBadgeStyle}
@@ -853,7 +1013,268 @@ export default function App() {
         </section>
       </main>
 
-      {/* MODAL DE EDIÇÃO DE TÍTULO DA EDIÇÃO (MINISSÉRIE E COLEÇÃO) */}
+      {/* MODAL DE INCLUSÃO DETALHADA DE HQ */}
+      {showDetailedAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-[#12192B] border border-indigo-500/50 w-full max-w-md rounded-2xl p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-700/80 pb-3">
+              <h3 className="font-bold text-base text-white flex items-center gap-2">
+                <FileText className="w-4 h-4 text-indigo-400" /> Inclusão Detalhada de HQ
+              </h3>
+              <button 
+                onClick={() => setShowDetailedAddModal(false)}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveDetailedAdd} className="space-y-3">
+              {/* Nome */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300">Nome da HQ *</label>
+                <input
+                  type="text"
+                  required
+                  value={detailedName}
+                  onChange={(e) => setDetailedName(e.target.value)}
+                  placeholder="Ex: Demolidor: O Homem Sem Medo"
+                  className="w-full bg-slate-900 text-white px-3.5 py-2.5 rounded-xl border border-slate-700 text-sm focus:outline-none focus:border-indigo-500"
+                  autoFocus
+                />
+              </div>
+
+              {/* Tipo de Publicação */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300">Tipo de Publicação</label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {COMIC_TYPES.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setDetailedType(t)}
+                      className={`py-1.5 px-2 rounded-xl text-xs font-semibold transition border ${
+                        detailedType === t
+                          ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300'
+                          : 'border-slate-800 bg-slate-900 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Editora Original */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300">Editora Original</label>
+                <div className="grid grid-cols-4 gap-1">
+                  {PUBLISHERS.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setDetailedPublisher(p)}
+                      className={`py-1.5 px-1 rounded-xl text-[11px] font-semibold transition border text-center ${
+                        detailedPublisher === p
+                          ? 'border-indigo-500 bg-indigo-500/20 text-indigo-300'
+                          : 'border-slate-800 bg-slate-900 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Início nº */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                  <span>Começar no nº</span>
+                  <span className="text-[10px] text-slate-400">Padrão: 1</span>
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={detailedStartFrom}
+                  onChange={(e) => setDetailedStartFrom(e.target.value)}
+                  placeholder="1"
+                  className="w-full bg-slate-900 text-white px-3.5 py-2 rounded-xl border border-slate-700 text-sm focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              {/* Ano de Início */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-indigo-400" /> Ano de Início
+                </label>
+                <input
+                  type="text"
+                  value={detailedStartYear}
+                  onChange={(e) => setDetailedStartYear(e.target.value)}
+                  placeholder="Ex: 1986, 2002, 2024"
+                  className="w-full bg-slate-900 text-white px-3.5 py-2 rounded-xl border border-slate-700 text-sm focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              {/* Editora de Venda no Brasil */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-indigo-400" /> Editora de Venda no Brasil
+                </label>
+                <input
+                  type="text"
+                  value={detailedBrazilPublisher}
+                  onChange={(e) => setDetailedBrazilPublisher(e.target.value)}
+                  placeholder="Ex: Panini Comics, Editora Abril, Mythos, Devir..."
+                  className="w-full bg-slate-900 text-white px-3.5 py-2 rounded-xl border border-slate-700 text-sm focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              {/* Herói / Grupo Principal */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-indigo-400" /> Herói / Grupo Principal
+                </label>
+                <input
+                  type="text"
+                  value={detailedMainHero}
+                  onChange={(e) => setDetailedMainHero(e.target.value)}
+                  placeholder="Ex: Demolidor, Batman, X-Men, Vingadores..."
+                  className="w-full bg-slate-900 text-white px-3.5 py-2 rounded-xl border border-slate-700 text-sm focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              {/* Botões do Formulário Detalhado */}
+              <div className="flex gap-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowDetailedAddModal(false)}
+                  className="flex-1 px-3 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={!detailedName.trim()}
+                  className="flex-1 px-3 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-bold transition shadow-md shadow-indigo-600/30"
+                >
+                  Cadastrar HQ
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONSULTA DE DETALHES DA EDIÇÃO (MODO CONSULTA) */}
+      {viewingIssueDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-[#12192B] border border-cyan-500/40 w-full max-w-sm rounded-2xl p-5 shadow-2xl space-y-4">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-700/80 pb-3">
+              <h3 className="font-bold text-base text-white flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-cyan-400" />
+                <span>Edição #{format2(viewingIssueDetail.issueNum)}</span>
+              </h3>
+              <button 
+                onClick={() => setViewingIssueDetail(null)}
+                className="text-slate-400 hover:text-white p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Nome da HQ e Status */}
+            <div className="space-y-1.5">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h4 className="text-base font-black text-white leading-tight">
+                    {viewingIssueDetail.comic.name}
+                  </h4>
+                  <p className="text-[11px] text-slate-400">
+                    {viewingIssueDetail.comic.type || 'Mensal'} • {viewingIssueDetail.comic.publisher || 'Marvel'}
+                  </p>
+                </div>
+
+                {viewingIssueDetail.comic.ownedNumbers?.includes(viewingIssueDetail.issueNum) ? (
+                  <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 shrink-0">
+                    <Check className="w-3 h-3 stroke-[3]" /> Tenho
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1 shrink-0">
+                    Faltante
+                  </span>
+                )}
+              </div>
+
+              {viewingIssueDetail.comic.issueTitles?.[viewingIssueDetail.issueNum] && (
+                <div className="p-2 rounded-lg bg-purple-950/40 border border-purple-800/60 text-xs text-purple-200 flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                  <span>Título: <strong>"{viewingIssueDetail.comic.issueTitles[viewingIssueDetail.issueNum]}"</strong></span>
+                </div>
+              )}
+            </div>
+
+            {/* Espaço reservado para capa da edição (futuro) */}
+            <div className="bg-slate-900/80 border border-dashed border-slate-700/80 rounded-xl p-4 text-center space-y-1.5">
+              <div className="w-12 h-16 mx-auto rounded-lg bg-slate-800/90 border border-slate-700 flex flex-col items-center justify-center text-slate-500 shadow-inner">
+                <ImageIcon className="w-6 h-6 text-slate-400 mb-0.5" />
+                <span className="text-[8px] uppercase tracking-wider font-bold text-slate-500">Capa</span>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-300">Capa da Edição #{format2(viewingIssueDetail.issueNum)}</p>
+                <p className="text-[10px] text-slate-500">Espaço reservado para visualização da capa oficial no futuro.</p>
+              </div>
+            </div>
+
+            {/* Detalhes Complementares da HQ */}
+            <div className="bg-slate-900/60 rounded-xl p-3 border border-slate-800/80 space-y-1.5 text-xs">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <span className="text-slate-500 block text-[10px]">Editora no Brasil:</span>
+                  <span className="font-semibold text-slate-200">
+                    {viewingIssueDetail.comic.brazilPublisher || 'Não informada'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[10px]">Ano de Início:</span>
+                  <span className="font-semibold text-slate-200">
+                    {viewingIssueDetail.comic.startYear || 'Não informado'}
+                  </span>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-slate-500 block text-[10px]">Herói / Grupo Principal:</span>
+                  <span className="font-semibold text-slate-200">
+                    {viewingIssueDetail.comic.mainHero || 'Não informado'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Botões do Modal de Consulta */}
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setViewingIssueDetail(null)}
+                className="flex-1 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700 transition"
+              >
+                Fechar
+              </button>
+              <button
+                onClick={() => {
+                  setAppMode('edicao');
+                  setViewingIssueDetail(null);
+                }}
+                className="flex-1 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition flex items-center justify-center gap-1 shadow-md shadow-amber-500/20"
+                title="Alternar para o Modo Edição para marcar esta edição"
+              >
+                <Pencil className="w-3.5 h-3.5" /> Modo Edição
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE EDIÇÃO DE TÍTULO DA EDIÇÃO (MINISSÉRIE E COLEÇÃO NO MODO EDIÇÃO) */}
       {issueTitleModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
           <div className="bg-[#12192B] border border-purple-800/80 w-full max-w-sm rounded-2xl p-5 shadow-2xl space-y-4">
@@ -916,13 +1337,13 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL DE EDIÇÃO E EXCLUSÃO DO TÍTULO */}
+      {/* MODAL DE EDIÇÃO COMPLETA DA HQ (ABERTO AO CLICAR NO NOME NO CARD) */}
       {editingComic && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-[#12192B] border border-slate-700 w-full max-w-sm rounded-2xl p-5 shadow-2xl space-y-4">
+          <div className="bg-[#12192B] border border-slate-700 w-full max-w-md rounded-2xl p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-700/80 pb-3">
               <h3 className="font-bold text-base text-white flex items-center gap-2">
-                <Edit3 className="w-4 h-4 text-amber-400" /> Editar Título
+                <Edit3 className="w-4 h-4 text-amber-400" /> Alterar Dados da HQ
               </h3>
               <button 
                 onClick={() => { setEditingComic(null); setConfirmDeleteId(null); }}
@@ -934,8 +1355,8 @@ export default function App() {
 
             <div className="space-y-3">
               {/* Nome */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">Nome da HQ</label>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300">Nome da HQ *</label>
                 <input
                   type="text"
                   value={editNameInput}
@@ -946,7 +1367,7 @@ export default function App() {
               </div>
 
               {/* Ponto de Início da Coleção */}
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
                   <span>Começar no nº</span>
                   <span className="text-[10px] text-amber-400 font-normal">Oculta dezenas anteriores</span>
@@ -962,7 +1383,7 @@ export default function App() {
               </div>
 
               {/* Tipo */}
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-300">Tipo de Publicação</label>
                 <div className="grid grid-cols-2 gap-1.5">
                   {COMIC_TYPES.map((t) => (
@@ -982,9 +1403,9 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Editora */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-300">Editora</label>
+              {/* Editora Original */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300">Editora Original</label>
                 <div className="grid grid-cols-4 gap-1">
                   {PUBLISHERS.map((p) => (
                     <button
@@ -1002,6 +1423,48 @@ export default function App() {
                   ))}
                 </div>
               </div>
+
+              {/* Ano de Início */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-amber-400" /> Ano de Início
+                </label>
+                <input
+                  type="text"
+                  value={editStartYearInput}
+                  onChange={(e) => setEditStartYearInput(e.target.value)}
+                  placeholder="Ex: 1986, 2002, 2024"
+                  className="w-full bg-slate-900 text-white px-3.5 py-2 rounded-xl border border-slate-700 text-sm focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              {/* Editora de Venda no Brasil */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-amber-400" /> Editora de Venda no Brasil
+                </label>
+                <input
+                  type="text"
+                  value={editBrazilPublisherInput}
+                  onChange={(e) => setEditBrazilPublisherInput(e.target.value)}
+                  placeholder="Ex: Panini Comics, Editora Abril, Mythos, Devir..."
+                  className="w-full bg-slate-900 text-white px-3.5 py-2 rounded-xl border border-slate-700 text-sm focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              {/* Herói / Grupo Principal */}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-amber-400" /> Herói / Grupo Principal
+                </label>
+                <input
+                  type="text"
+                  value={editMainHeroInput}
+                  onChange={(e) => setEditMainHeroInput(e.target.value)}
+                  placeholder="Ex: Batman, Homem-Aranha, X-Men, Liga da Justiça..."
+                  className="w-full bg-slate-900 text-white px-3.5 py-2 rounded-xl border border-slate-700 text-sm focus:outline-none focus:border-amber-500"
+                />
+              </div>
             </div>
 
             {/* BOTÕES DE AÇÃO DO MODAL */}
@@ -1018,7 +1481,7 @@ export default function App() {
                   disabled={!editNameInput.trim()}
                   className="flex-1 px-3 py-2 rounded-xl bg-amber-500 text-slate-950 text-xs font-bold hover:bg-amber-400 disabled:opacity-40 transition"
                 >
-                  Salvar
+                  Salvar Alterações
                 </button>
               </div>
 
@@ -1071,14 +1534,16 @@ function ComicRow({
   index,
   totalItems,
   viewMode,
+  appMode,
   onToggleNumber, 
   onToggleChunkExpand, 
-  onToggleHiddenChunks,
+  onToggleHiddenChunks, 
   onToggleComplete, 
-  onCycleType,
-  onCyclePublisher,
+  onCycleType, 
+  onCyclePublisher, 
   onStartEdit, 
   onOpenIssueTitleModal,
+  onViewIssueDetail,
   onMoveCard,
   getTypeBadgeStyle,
   getPublisherBadgeStyle,
@@ -1125,68 +1590,73 @@ function ComicRow({
 
     return (
       <div className={`border rounded-2xl p-3.5 shadow-md transition ${getCardThemeClasses(comicType)}`}>
-        {/* TOPO DO CARD: ALÇA DE ARRASTO + NOME + (TIPO + EDITORA + STATUS ALINHADOS À DIREITA) */}
+        {/* LINHA 1 DO CARD: SOMENTE O TÍTULO */}
         <div className="flex items-center justify-between mb-2 gap-2">
-          {/* Lado Esquerdo: Alça + Nome da HQ */}
           <div className="flex items-center gap-1.5 min-w-0 flex-1">
-            <div className="flex items-center gap-0.5 text-slate-500 shrink-0">
-              <span className="cursor-grab active:cursor-grabbing p-1 hover:text-white" title="Arraste para reordenar">
-                <GripVertical className="w-4 h-4" />
-              </span>
-              <button 
-                onClick={() => onMoveCard('up')} 
-                disabled={index === 0} 
-                className="disabled:opacity-20 hover:text-white p-0.5"
-                title="Mover para cima"
-              >
-                <ArrowUp className="w-3 h-3" />
-              </button>
-              <button 
-                onClick={() => onMoveCard('down')} 
-                disabled={index === totalItems - 1} 
-                className="disabled:opacity-20 hover:text-white p-0.5"
-                title="Mover para baixo"
-              >
-                <ArrowDown className="w-3 h-3" />
-              </button>
-            </div>
+            {appMode === 'edicao' && (
+              <div className="flex items-center gap-0.5 text-slate-500 shrink-0">
+                <span className="cursor-grab active:cursor-grabbing p-1 hover:text-white" title="Arraste para reordenar">
+                  <GripVertical className="w-4 h-4" />
+                </span>
+                <button 
+                  onClick={() => onMoveCard('up')} 
+                  disabled={index === 0} 
+                  className="disabled:opacity-20 hover:text-white p-0.5"
+                  title="Mover para cima"
+                >
+                  <ArrowUp className="w-3 h-3" />
+                </button>
+                <button 
+                  onClick={() => onMoveCard('down')} 
+                  disabled={index === totalItems - 1} 
+                  className="disabled:opacity-20 hover:text-white p-0.5"
+                  title="Mover para baixo"
+                >
+                  <ArrowDown className="w-3 h-3" />
+                </button>
+              </div>
+            )}
 
             <button
               onClick={onStartEdit}
-              className="text-left font-bold text-sm text-white hover:text-amber-400 transition truncate flex items-center gap-1.5 min-w-0"
-              title="Clique para editar nome ou excluir"
+              className="text-left font-bold text-sm sm:text-base text-white hover:text-amber-400 transition truncate flex items-center gap-1.5 min-w-0"
+              title="Clique para alterar dados da HQ"
             >
               <span className="truncate">{comic.name}</span>
-              <Edit3 className="w-3 h-3 text-slate-500 shrink-0" />
+              <Edit3 className="w-3.5 h-3.5 text-slate-500 hover:text-amber-400 shrink-0" />
             </button>
           </div>
+        </div>
 
-          {/* Lado Direito: Tipo + Editora + Botão Concluída (Alinhamento Fixo) */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              onClick={onCycleType}
-              className={`text-[10px] font-semibold px-2 py-0.5 rounded border transition active:scale-95 ${getTypeBadgeStyle(comicType)}`}
-              title="Clique para alternar o Tipo"
-            >
-              {comicType}
-            </button>
-            <button
-              onClick={onCyclePublisher}
-              className={`text-[10px] px-2 py-0.5 rounded transition active:scale-95 ${getPublisherBadgeStyle(comicPublisher)}`}
-              title="Clique para alternar a Editora"
-            >
-              {comicPublisher}
-            </button>
+        {/* LINHA 2 DO CARD: BOTÕES ALINHADOS À DIREITA (1º EDITORA, 2º TIPO, 3º ENCERRAR) COM LARGURAS IGUAIS E FIXAS */}
+        <div className="flex items-center justify-end gap-2 mb-2.5">
+          {/* 1º Editora */}
+          <button
+            onClick={appMode === 'edicao' ? onCyclePublisher : undefined}
+            className={`w-24 h-7 text-[11px] font-bold rounded-lg border transition active:scale-95 flex items-center justify-center truncate px-1 shadow-sm ${getPublisherBadgeStyle(comicPublisher)} ${appMode !== 'edicao' ? 'cursor-default' : 'hover:opacity-90'}`}
+            title={appMode === 'edicao' ? "Clique para alternar a Editora" : `Editora: ${comicPublisher}`}
+          >
+            <span className="truncate">{comicPublisher}</span>
+          </button>
 
-            <button
-              onClick={onToggleComplete}
-              className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 transition font-semibold"
-              title="Coleção Encerrada. Clique para reabrir."
-            >
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Concluída</span>
-            </button>
-          </div>
+          {/* 2º Tipo */}
+          <button
+            onClick={appMode === 'edicao' ? onCycleType : undefined}
+            className={`w-24 h-7 text-[11px] font-semibold rounded-lg border transition active:scale-95 flex items-center justify-center truncate px-1 ${getTypeBadgeStyle(comicType)} ${appMode !== 'edicao' ? 'cursor-default' : 'hover:opacity-90'}`}
+            title={appMode === 'edicao' ? "Clique para alternar o Tipo" : `Tipo: ${comicType}`}
+          >
+            <span className="truncate">{comicType}</span>
+          </button>
+
+          {/* 3º Encerrar / Concluída */}
+          <button
+            onClick={appMode === 'edicao' ? onToggleComplete : undefined}
+            className={`w-24 h-7 text-[11px] font-semibold rounded-lg border transition active:scale-95 flex items-center justify-center gap-1 truncate px-1 bg-emerald-500/20 text-emerald-300 border-emerald-500/30 ${appMode !== 'edicao' ? 'cursor-default' : 'hover:bg-emerald-500/30'}`}
+            title={appMode === 'edicao' ? "Coleção Encerrada. Clique para reabrir." : "Status: Concluída"}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <span className="truncate">Concluída</span>
+          </button>
         </div>
 
         {/* Resumo da Minissérie/Coleção */}
@@ -1202,15 +1672,15 @@ function ComicRow({
           </button>
         </div>
 
-        {/* Números expandidos se solicitado */}
+        {/* Números expandidos se solicitado - SEMPRE 10 EM UMA ÚNICA LINHA */}
         {isExpanded && (
           <div className="mt-3 pt-3 border-t border-slate-800/80 space-y-2">
-            {supportsIssueTitles && (
+            {supportsIssueTitles && appMode === 'edicao' && (
               <p className="text-[10px] text-purple-300/80 italic">
                 * Dê duplo clique em uma edição para adicionar ou editar o título do fascículo.
               </p>
             )}
-            <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
+            <div className="grid grid-cols-10 gap-1 w-full">
               {Array.from({ length: countIssues }, (_, i) => startFrom + i).map((n) => {
                 const isChecked = ownedSet.has(n);
                 if (viewMode === 'owned' && !isChecked) return null;
@@ -1221,19 +1691,33 @@ function ComicRow({
                 return (
                   <button
                     key={n}
-                    onClick={() => onToggleNumber(n)}
-                    onDoubleClick={() => onOpenIssueTitleModal(n)}
-                    className={`relative h-9 rounded-full text-xs font-bold flex items-center justify-center transition-all active:scale-90 shadow-sm ${
+                    onClick={() => {
+                      if (appMode === 'edicao') {
+                        onToggleNumber(n);
+                      } else {
+                        onViewIssueDetail(comic, n);
+                      }
+                    }}
+                    onDoubleClick={() => {
+                      if (appMode === 'edicao') {
+                        onOpenIssueTitleModal(n);
+                      }
+                    }}
+                    className={`relative h-7 sm:h-8 w-full rounded-full text-[10px] sm:text-xs font-bold flex items-center justify-center transition-all active:scale-90 p-0 shadow-sm ${
                       isChecked
                         ? 'bg-emerald-500 text-slate-950 font-black shadow-emerald-500/20'
                         : 'bg-slate-900/90 text-slate-400 border border-slate-700 hover:border-slate-500'
                     }`}
-                    title={specificTitle ? `Edição #${format2(n)}: ${specificTitle}` : `Edição #${format2(n)}`}
+                    title={
+                      appMode === 'edicao'
+                        ? (specificTitle ? `Edição #${format2(n)}: ${specificTitle} (Clique para marcar/desmarcar)` : `Edição #${format2(n)} (Clique para marcar/desmarcar)`)
+                        : (specificTitle ? `Edição #${format2(n)}: ${specificTitle} (Clique para ver detalhes)` : `Edição #${format2(n)} (Clique para ver detalhes)`)
+                    }
                   >
                     {format2(n)}
                     {specificTitle && (
                       <span 
-                        className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-purple-400 border border-slate-950 shadow-sm" 
+                        className="absolute top-0 right-0 w-2 h-2 rounded-full bg-purple-400 border border-slate-950 shadow-sm" 
                         title={`Título: ${specificTitle}`}
                       />
                     )}
@@ -1248,7 +1732,6 @@ function ComicRow({
   }
 
   // CÁLCULO ESTRITO E DINÂMICO DOS BLOCOS ABERTOS:
-  // Considera o ponto de partida (initialChunkStart):
   const ownedNumbers = comic.ownedNumbers || [];
   let currentChunkLimit = initialChunkStart + 9;
   if (ownedNumbers.length > 0) {
@@ -1274,7 +1757,7 @@ function ComicRow({
     }
   }
 
-  // Função auxiliar para renderizar um bloco de 10
+  // Função auxiliar para renderizar um bloco de 10 bolinhas em UMA ÚNICA LINHA
   const renderChunkBlock = (chunkStart) => {
     const chunkEnd = chunkStart + 9;
     const chunkNumbers = Array.from({ length: 10 }, (_, i) => chunkStart + i);
@@ -1317,7 +1800,7 @@ function ComicRow({
           </span>
         </div>
 
-        {supportsIssueTitles && (
+        {supportsIssueTitles && appMode === 'edicao' && (
           <p className="text-[10px] text-purple-300/80 italic px-1">
             * Dê duplo clique em uma edição para nomeá-la.
           </p>
@@ -1328,7 +1811,8 @@ function ComicRow({
             {viewMode === 'owned' ? 'Nenhuma edição adquirida neste bloco' : 'Todas as edições deste bloco já foram adquiridas! 🎉'}
           </div>
         ) : (
-          <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
+          /* SEMPRE EXIBIR AS 10 BOLINHAS EM UMA ÚNICA LINHA */
+          <div className="grid grid-cols-10 gap-1 w-full">
             {visibleNumbers.map((num) => {
               const isChecked = ownedSet.has(num);
               const specificTitle = issueTitles[num];
@@ -1336,9 +1820,19 @@ function ComicRow({
               return (
                 <button
                   key={num}
-                  onClick={() => onToggleNumber(num)}
-                  onDoubleClick={() => onOpenIssueTitleModal(num)}
-                  className={`relative h-9 rounded-full text-xs font-bold flex items-center justify-center transition-all active:scale-90 ${
+                  onClick={() => {
+                    if (appMode === 'edicao') {
+                      onToggleNumber(num);
+                    } else {
+                      onViewIssueDetail(comic, num);
+                    }
+                  }}
+                  onDoubleClick={() => {
+                    if (appMode === 'edicao') {
+                      onOpenIssueTitleModal(num);
+                    }
+                  }}
+                  className={`relative h-7 sm:h-8 w-full rounded-full text-[10px] sm:text-xs font-bold flex items-center justify-center transition-all active:scale-90 p-0 ${
                     isChecked
                       ? 'bg-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/30'
                       : viewMode === 'missing'
@@ -1346,15 +1840,19 @@ function ComicRow({
                         : 'bg-slate-900/90 text-slate-300 border border-slate-700/80 hover:border-slate-500 hover:text-white'
                   }`}
                   title={
-                    specificTitle 
-                      ? `Edição #${format2(num)}: ${specificTitle} ${isChecked ? '(Adquirida)' : '(Faltante)'}` 
-                      : `Edição #${format2(num)} ${isChecked ? '(Adquirida)' : '(Faltante)'}`
+                    appMode === 'edicao'
+                      ? (specificTitle 
+                          ? `Edição #${format2(num)}: ${specificTitle} ${isChecked ? '(Adquirida)' : '(Faltante)'} (Clique para alternar / Duplo clique para nomear)` 
+                          : `Edição #${format2(num)} ${isChecked ? '(Adquirida)' : '(Faltante)'} (Clique para marcar/desmarcar)`)
+                      : (specificTitle 
+                          ? `Edição #${format2(num)}: ${specificTitle} ${isChecked ? '(Adquirida)' : '(Faltante)'} (Clique para ver detalhes)` 
+                          : `Edição #${format2(num)} ${isChecked ? '(Adquirida)' : '(Faltante)'} (Clique para ver detalhes)`)
                   }
                 >
                   {format2(num)}
                   {specificTitle && (
                     <span 
-                      className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-purple-400 border border-slate-950 shadow-sm" 
+                      className="absolute top-0 right-0 w-2 h-2 rounded-full bg-purple-400 border border-slate-950 shadow-sm" 
                       title={`Título: ${specificTitle}`}
                     />
                   )}
@@ -1369,68 +1867,73 @@ function ComicRow({
 
   return (
     <div className={`border rounded-2xl p-3.5 shadow-md transition ${getCardThemeClasses(comicType)}`}>
-      {/* CABEÇALHO DO CARD: ALÇA DE ARRASTO + NOME + (TIPO + EDITORA + BOTÃO ENCERRAR ALINHADOS À DIREITA) */}
-      <div className="flex items-center justify-between mb-2.5 gap-2">
-        {/* Lado Esquerdo: Alça + Nome da HQ */}
+      {/* LINHA 1 DO CARD: SOMENTE O TÍTULO */}
+      <div className="flex items-center justify-between mb-2 gap-2">
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          <div className="flex items-center gap-0.5 text-slate-500 shrink-0">
-            <span className="cursor-grab active:cursor-grabbing p-1 hover:text-white" title="Arraste para reordenar">
-              <GripVertical className="w-4 h-4" />
-            </span>
-            <button 
-              onClick={() => onMoveCard('up')} 
-              disabled={index === 0} 
-              className="disabled:opacity-20 hover:text-white p-0.5"
-              title="Mover para cima"
-            >
-              <ArrowUp className="w-3 h-3" />
-            </button>
-            <button 
-              onClick={() => onMoveCard('down')} 
-              disabled={index === totalItems - 1} 
-              className="disabled:opacity-20 hover:text-white p-0.5"
-              title="Mover para baixo"
-            >
-              <ArrowDown className="w-3 h-3" />
-            </button>
-          </div>
+          {appMode === 'edicao' && (
+            <div className="flex items-center gap-0.5 text-slate-500 shrink-0">
+              <span className="cursor-grab active:cursor-grabbing p-1 hover:text-white" title="Arraste para reordenar">
+                <GripVertical className="w-4 h-4" />
+              </span>
+              <button 
+                onClick={() => onMoveCard('up')} 
+                disabled={index === 0} 
+                className="disabled:opacity-20 hover:text-white p-0.5"
+                title="Mover para cima"
+              >
+                <ArrowUp className="w-3 h-3" />
+              </button>
+              <button 
+                onClick={() => onMoveCard('down')} 
+                disabled={index === totalItems - 1} 
+                className="disabled:opacity-20 hover:text-white p-0.5"
+                title="Mover para baixo"
+              >
+                <ArrowDown className="w-3 h-3" />
+              </button>
+            </div>
+          )}
 
           <button
             onClick={onStartEdit}
-            className="text-left font-bold text-sm text-white hover:text-amber-400 transition truncate flex items-center gap-1.5 min-w-0"
-            title="Clique para editar o nome ou excluir"
+            className="text-left font-bold text-sm sm:text-base text-white hover:text-amber-400 transition truncate flex items-center gap-1.5 min-w-0"
+            title="Clique para alterar dados da HQ"
           >
             <span className="truncate">{comic.name}</span>
-            <Edit3 className="w-3 h-3 text-slate-500 shrink-0" />
+            <Edit3 className="w-3.5 h-3.5 text-slate-500 hover:text-amber-400 shrink-0" />
           </button>
         </div>
+      </div>
 
-        {/* Lado Direito: Tipo + Editora + Botão Encerrar (Alinhamento Fixo) */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            onClick={onCycleType}
-            className={`text-[10px] font-semibold px-2 py-0.5 rounded border transition active:scale-95 ${getTypeBadgeStyle(comicType)}`}
-            title="Clique para alternar o Tipo"
-          >
-            {comicType}
-          </button>
-          <button
-            onClick={onCyclePublisher}
-            className={`text-[10px] px-2 py-0.5 rounded transition active:scale-95 ${getPublisherBadgeStyle(comicPublisher)}`}
-            title="Clique para alternar a Editora"
-          >
-            {comicPublisher}
-          </button>
+      {/* LINHA 2 DO CARD: BOTÕES ALINHADOS À DIREITA (1º EDITORA, 2º TIPO, 3º ENCERRAR) COM LARGURAS IGUAIS E FIXAS */}
+      <div className="flex items-center justify-end gap-2 mb-2.5">
+        {/* 1º Editora */}
+        <button
+          onClick={appMode === 'edicao' ? onCyclePublisher : undefined}
+          className={`w-24 h-7 text-[11px] font-bold rounded-lg border transition active:scale-95 flex items-center justify-center truncate px-1 shadow-sm ${getPublisherBadgeStyle(comicPublisher)} ${appMode !== 'edicao' ? 'cursor-default' : 'hover:opacity-90'}`}
+          title={appMode === 'edicao' ? "Clique para alternar a Editora" : `Editora: ${comicPublisher}`}
+        >
+          <span className="truncate">{comicPublisher}</span>
+        </button>
 
-          <button
-            onClick={onToggleComplete}
-            className="flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-slate-700/80 hover:text-amber-300 transition font-medium"
-            title="Encerrar minissérie/coleção no número atual"
-          >
-            <Flag className="w-3 h-3 text-amber-400" />
-            <span>Encerrar</span>
-          </button>
-        </div>
+        {/* 2º Tipo */}
+        <button
+          onClick={appMode === 'edicao' ? onCycleType : undefined}
+          className={`w-24 h-7 text-[11px] font-semibold rounded-lg border transition active:scale-95 flex items-center justify-center truncate px-1 ${getTypeBadgeStyle(comicType)} ${appMode !== 'edicao' ? 'cursor-default' : 'hover:opacity-90'}`}
+          title={appMode === 'edicao' ? "Clique para alternar o Tipo" : `Tipo: ${comicType}`}
+        >
+          <span className="truncate">{comicType}</span>
+        </button>
+
+        {/* 3º Encerrar */}
+        <button
+          onClick={appMode === 'edicao' ? onToggleComplete : undefined}
+          className={`w-24 h-7 text-[11px] font-semibold rounded-lg border transition active:scale-95 flex items-center justify-center gap-1 truncate px-1 bg-slate-900/80 text-slate-300 border-slate-700/80 hover:text-amber-300 ${appMode !== 'edicao' ? 'cursor-default' : 'hover:bg-slate-800'}`}
+          title={appMode === 'edicao' ? "Clique para encerrar no número atual" : "Status: Em Andamento"}
+        >
+          <Flag className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+          <span className="truncate">Encerrar</span>
+        </button>
       </div>
 
       {/* ÁREA DE INTERVALOS DE 10 EM 10 (COM SUPORTE A DEZENAS OCULTAS ANTERIORES) */}
@@ -1469,7 +1972,7 @@ function ComicRow({
           </div>
         )}
 
-        {/* Dezenas normais a partir do ponto inicial */}
+        {/* Dezenas normais a partir do ponto inicial - Sempre 10 em uma única linha */}
         {normalChunkStarts.map((chunkStart) => renderChunkBlock(chunkStart))}
       </div>
     </div>

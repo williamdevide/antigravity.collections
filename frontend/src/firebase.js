@@ -146,6 +146,9 @@ export async function saveComic(comic) {
         completedUntil: comic.completedUntil || null,
         highestOpenedChunk: comic.highestOpenedChunk || 10,
         expandedChunks: comic.expandedChunks || [],
+        startYear: comic.startYear || '',
+        brazilPublisher: comic.brazilPublisher || '',
+        mainHero: comic.mainHero || '',
         updatedAt: new Date().toISOString()
       }, { merge: true });
     } catch (e) {
