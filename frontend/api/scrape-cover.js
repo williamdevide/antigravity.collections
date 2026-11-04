@@ -65,7 +65,7 @@ function getEnglishTitle(title) {
  * Utiliza o binário curl para ultrapassar firewalls/Fastly e extrair capas originais
  * Prioriza estritamente os anos mais recentes (2026 > 2025 > 2024...) e filtra URLs rejeitadas
  */
-function searchPaniniBrasil(title, issueNum, rejectedUrls = []) {
+function searchPaniniBrasil(title, issueNum, rejectedUrls = [], returnAll = false) {
   return new Promise((resolve) => {
     const issueStr = String(issueNum || '1').trim();
     const issuePad = issueStr.padStart(2, '0');
@@ -77,10 +77,16 @@ function searchPaniniBrasil(title, issueNum, rejectedUrls = []) {
     ];
 
     let currentIdx = 0;
+    const allFound = [];
+    const seenUrls = new Set();
 
     function tryNextQuery() {
       if (currentIdx >= queries.length) {
-        return resolve(null);
+        if (allFound.length > 0) {
+          allFound.sort((a, b) => b.year - a.year);
+          return resolve(returnAll ? allFound : allFound[0]);
+        }
+        return resolve(returnAll ? [] : null);
       }
 
       const q = queries[currentIdx++];
@@ -100,7 +106,6 @@ function searchPaniniBrasil(title, issueNum, rejectedUrls = []) {
             return tryNextQuery();
           }
 
-          const candidates = [];
           for (const item of items) {
             const content = item[1];
             const titleMatch = content.match(/class=["'][^"']*product-item-link[^"']*["'][^>]*>\s*([\s\S]*?)\s*<\/a>/i);
@@ -123,16 +128,17 @@ function searchPaniniBrasil(title, issueNum, rejectedUrls = []) {
                 imgUrl = imgUrl.split('?')[0];
               }
 
-              // Pular capas já rejeitadas
-              if (rejectedUrls.includes(imgUrl)) {
+              // Pular capas já rejeitadas ou já registradas
+              if (rejectedUrls.includes(imgUrl) || seenUrls.has(imgUrl)) {
                 continue;
               }
+              seenUrls.add(imgUrl);
 
               // Detectar ano de publicação
               const yearMatch = prodTitle.match(/\b(20[0-2][0-9]|19[5-9][0-9])\b/);
               const parsedYear = yearMatch ? parseInt(yearMatch[1], 10) : 2020;
 
-              candidates.push({
+              allFound.push({
                 title: prodTitle,
                 coverUrl: imgUrl,
                 source: 'Panini Brasil (panini.com.br)',
@@ -141,10 +147,9 @@ function searchPaniniBrasil(title, issueNum, rejectedUrls = []) {
             }
           }
 
-          if (candidates.length > 0) {
-            // Ordenar estritamente do ano mais recente para trás (2026 > 2025 > 2024...)
-            candidates.sort((a, b) => b.year - a.year);
-            return resolve(candidates[0]);
+          if (allFound.length > 0 && !returnAll) {
+            allFound.sort((a, b) => b.year - a.year);
+            return resolve(allFound[0]);
           }
 
           tryNextQuery();
@@ -234,11 +239,11 @@ function searchFandom(title, issueNum, publisher, rejectedUrls = []) {
       }).on('error', () => resDirect([]));
     });
 
-    if (directCandidates.length > 0) {
+    if (directCandidates.length > 0 && !returnAll) {
       return resolve(directCandidates[0]);
     }
 
-    // Passo B: Fallback para busca genérica do Fandom com limite expandido (gsrlimit=30)
+    // Passo B: Fallback ou complemento para busca genérica do Fandom com limite expandido (gsrlimit=30)
     const searchQuery = `${engTitle} ${issueStr}`;
     const fandomPath = `/api.php?action=query&format=json&generator=search&gsrsearch=${encodeURIComponent(searchQuery)}&gsrlimit=30&prop=pageimages|extracts|info&piprop=original|thumbnail&pithumbsize=600&origin=*`;
 
@@ -252,14 +257,13 @@ function searchFandom(title, issueNum, publisher, rejectedUrls = []) {
       resp.on('end', () => {
         try {
           const parsed = JSON.parse(body);
-          if (!parsed.query || !parsed.query.pages) return resolve(null);
-
-          const pages = Object.values(parsed.query.pages);
-          const candidates = [];
+          const pages = parsed.query?.pages ? Object.values(parsed.query.pages) : [];
+          const candidates = [...directCandidates];
+          const seenUrls = new Set(candidates.map(c => c.coverUrl));
 
           for (const p of pages) {
             const url = p.original?.source || p.thumbnail?.source;
-            if (!url || rejectedUrls.includes(url)) continue;
+            if (!url || rejectedUrls.includes(url) || seenUrls.has(url)) continue;
 
             if (!matchIssueNumber(p.title, issueNum)) continue;
 
@@ -270,10 +274,11 @@ function searchFandom(title, issueNum, publisher, rejectedUrls = []) {
             const textYearMatch = (p.title + ' ' + (p.extract || '')).match(/\b(20[0-2][0-9]|19[5-9][0-9])\b/);
             const yr = cbYearMatch ? parseInt(cbYearMatch[1], 10) : (textYearMatch ? parseInt(textYearMatch[1], 10) : 1990);
 
+            seenUrls.add(url);
             candidates.push({
               title: p.title,
               coverUrl: url,
-              source: `${wiki.toUpperCase()} Fandom`,
+              source: `${wiki.toUpperCase()} Fandom (Vol ${vol})`,
               volume: vol,
               year: yr,
               rank: (vol * 10000) + yr
@@ -282,14 +287,14 @@ function searchFandom(title, issueNum, publisher, rejectedUrls = []) {
 
           candidates.sort((a, b) => b.rank - a.rank);
           if (candidates.length > 0) {
-            return resolve(candidates[0]);
+            return resolve(returnAll ? candidates : candidates[0]);
           }
-          resolve(null);
+          resolve(returnAll ? [] : null);
         } catch {
-          resolve(null);
+          resolve(returnAll ? directCandidates : (directCandidates[0] || null));
         }
       });
-    }).on('error', () => resolve(null));
+    }).on('error', () => resolve(returnAll ? directCandidates : (directCandidates[0] || null)));
   });
 }
 
@@ -310,32 +315,70 @@ export default async function handler(req, res) {
 
   const issueNum = issue || '1';
   const cleanTitle = String(title).trim();
+  const returnAll = req.query.all === 'true' || req.query.all === '1';
+
   const rejectedUrls = rejected 
     ? String(rejected).split(',').map(u => decodeURIComponent(u.trim())).filter(Boolean)
     : [];
 
   try {
+    if (returnAll) {
+      // Coleta todas as ocorrências encontradas em todas as fontes
+      const [paniniList, fandomList] = await Promise.all([
+        searchPaniniBrasil(cleanTitle, issueNum, rejectedUrls, true),
+        searchFandom(cleanTitle, issueNum, publisher, rejectedUrls, true)
+      ]);
+
+      const seenUrls = new Set();
+      const combined = [];
+
+      for (const item of [...(paniniList || []), ...(fandomList || [])]) {
+        if (item && item.coverUrl && !seenUrls.has(item.coverUrl) && !rejectedUrls.includes(item.coverUrl)) {
+          seenUrls.add(item.coverUrl);
+          combined.push(item);
+        }
+      }
+
+      // Ordenar por relevância (Panini mais recentes e Fandom maiores volumes/anos)
+      combined.sort((a, b) => {
+        const scoreA = (a.volume ? a.volume * 10000 : (a.source?.includes('Panini') ? 90000 : 0)) + (a.year || 1990);
+        const scoreB = (b.volume ? b.volume * 10000 : (b.source?.includes('Panini') ? 90000 : 0)) + (b.year || 1990);
+        return scoreB - scoreA;
+      });
+
+      return res.status(200).json({
+        found: combined.length > 0,
+        coverUrl: combined[0]?.coverUrl || null,
+        source: combined[0]?.source || null,
+        year: combined[0]?.year || null,
+        title: combined[0]?.title || null,
+        candidates: combined
+      });
+    }
+
     // 1. Forçar a busca na Panini Brasil
-    const paniniResult = await searchPaniniBrasil(cleanTitle, issueNum, rejectedUrls);
+    const paniniResult = await searchPaniniBrasil(cleanTitle, issueNum, rejectedUrls, false);
     if (paniniResult) {
       return res.status(200).json({
         found: true,
         coverUrl: paniniResult.coverUrl,
         source: paniniResult.source,
         year: paniniResult.year,
-        title: paniniResult.title
+        title: paniniResult.title,
+        candidates: [paniniResult]
       });
     }
 
     // 2. Fandom MediaWiki (maior volume / mais recente primeiro)
-    const fandomResult = await searchFandom(cleanTitle, issueNum, publisher, rejectedUrls);
+    const fandomResult = await searchFandom(cleanTitle, issueNum, publisher, rejectedUrls, false);
     if (fandomResult) {
       return res.status(200).json({
         found: true,
         coverUrl: fandomResult.coverUrl,
         source: fandomResult.source,
         year: fandomResult.year,
-        title: fandomResult.title
+        title: fandomResult.title,
+        candidates: [fandomResult]
       });
     }
 
@@ -356,12 +399,12 @@ export default async function handler(req, res) {
               const withCovers = parsed.docs
                 .filter(d => d.cover_i)
                 .map(d => ({
-                  url: `https://covers.openlibrary.org/b/id/${d.cover_i}-L.jpg`,
+                  coverUrl: `https://covers.openlibrary.org/b/id/${d.cover_i}-L.jpg`,
                   title: d.title,
                   year: d.first_publish_year || 1995,
                   source: 'Open Library'
                 }))
-                .filter(c => matchIssueNumber(c.title, issueNum) && !rejectedUrls.includes(c.url));
+                .filter(c => matchIssueNumber(c.title, issueNum) && !rejectedUrls.includes(c.coverUrl));
 
               withCovers.sort((a, b) => b.year - a.year);
               if (withCovers.length > 0) {
@@ -379,14 +422,15 @@ export default async function handler(req, res) {
     if (olResult) {
       return res.status(200).json({
         found: true,
-        coverUrl: olResult.url,
+        coverUrl: olResult.coverUrl,
         source: olResult.source,
         year: olResult.year,
-        title: olResult.title
+        title: olResult.title,
+        candidates: [olResult]
       });
     }
 
-    return res.status(200).json({ found: false, message: 'Nenhuma capa encontrada.' });
+    return res.status(200).json({ found: false, message: 'Nenhuma capa encontrada.', candidates: [] });
   } catch (err) {
     return res.status(500).json({ found: false, error: err.message });
   }

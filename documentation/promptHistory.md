@@ -182,5 +182,32 @@ Resposta do Usuário: (Recommended) Priorizar sempre o lançamento mais recente 
 /agente-orquestrador na tela de status da busca de capas deixe um botão aceitar todos ou rejeitar todos, mas só para as que ainda não foram aprovadas.
 ```
 
+### Prompt 15
+```text
+/agente-orquestrador /grill-me /goal ao rejeitar uma foto na tela de status de busca de capas, busca por todas as ocorrencias que encontrar dessa hq e numero e dai o uusuário clica na qual deseja
+```
+
+### Resposta Grill-Me / Interação 16
+```text
+Pergunta: Ao rejeitar uma foto na tela de status, como você prefere visualizar e escolher entre todas as capas encontradas?
+Resposta do Usuário: Expansão na própria linha da tela de status: A linha da edição se expande abrindo um carrossel horizontal com as opções de capas disponíveis para selecionar
+```
+
+### Resposta Grill-Me / Interação 17
+```text
+Pergunta: Ao clicar em uma das capas alternativas no carrossel expandido, qual ação deve ocorrer?
+Resposta do Usuário: Definir como nova candidata pendente: Ao clicar na capa do carrossel, ela substitui a sugestão atual e exibe o botão (✓) para você confirmar se gostou antes de fixar
+```
+
+### Resposta Grill-Me / Interação 18
+```text
+Pergunta: Você gostaria de poder abrir esse carrossel de opções a qualquer momento, ou apenas ao rejeitar?
+Resposta do Usuário: (Recommended) Sim, além de abrir automaticamente ao rejeitar, incluir também um pequeno botão com ícone de galeria para abrir o carrossel a qualquer momento
+```
+
+
+
+
+
 
 

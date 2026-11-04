@@ -31,6 +31,7 @@ import {
   Shield, 
   Sparkles, 
   Image as ImageIcon,
+  Images,
   RotateCw,
   Bookmark,
   CheckCircle,
@@ -46,7 +47,7 @@ import {
   loadFromLocalStorage
 } from './firebase';
 import { APP_NAME, APP_VERSION } from './version';
-import { searchIssueCover } from './services/scraper';
+import { searchIssueCover, searchAllIssueCovers } from './services/scraper';
 
 const COMIC_TYPES = ['Mensal', 'Especial', 'Minissérie', 'Coleção'];
 const PUBLISHERS = ['Marvel', 'DC', 'Vertigo', 'Outras'];
@@ -111,6 +112,8 @@ export default function App() {
   const [coverModalTab, setCoverModalTab] = useState('all'); // 'all' | 'searching' | 'found' | 'missing'
   const [coverModalSearchText, setCoverModalSearchText] = useState('');
   const [isProcessingBatch, setIsProcessingBatch] = useState(false);
+  const [expandedAlternativesKey, setExpandedAlternativesKey] = useState(null); // `${comicId}_${issueNum}`
+  const [alternativesMap, setAlternativesMap] = useState({}); // { [key]: { loading: boolean, candidates: [] } }
 
   // Modal de Título de Edição Específica (Minissérie e Coleção no Modo Edição)
   const [issueTitleModal, setIssueTitleModal] = useState(null); // { comic, issueNum, currentTitle }
@@ -536,7 +539,7 @@ export default function App() {
   };
 
   // Rejeitar Capa Pendente (Botão com X vermelho sem texto)
-  // Ao rejeitar, busca progressivamente edições mais antigas e impede repetição de capas
+  // Ao rejeitar, busca por todas as ocorrências disponíveis dessa HQ e número e abre o carrossel na linha
   const handleRejectCover = async (comicId, issueNum) => {
     const comic = comics.find(c => c.id === comicId);
     if (!comic) return;
@@ -555,7 +558,7 @@ export default function App() {
       }
     }
 
-    // Libera a fila para permitir buscar a próxima (mais antiga)
+    // Libera a fila
     const queueKey = `${comicId}_${issueNum}`;
     scrapingQueueRef.current.delete(queueKey);
 
@@ -572,46 +575,83 @@ export default function App() {
       setViewingIssueDetail({ comic: updatedComic, issueNum });
     }
 
-    // Buscar imediatamente o próximo candidato mais antigo disponível
-    setTimeout(async () => {
-      const otherCoverUrls = Object.entries(updatedComic.issueCovers || {})
+    // Abre imediatamente o carrossel na própria linha buscando todas as ocorrências encontradas
+    handleOpenAlternatives(updatedComic, issueNum, rejectedUrl ? [rejectedUrl] : []);
+  };
+
+  // Abrir ou alternar o carrossel de todas as ocorrências de capas para uma edição
+  const handleOpenAlternatives = async (comic, issueNum, customExcluded = []) => {
+    const key = `${comic.id}_${issueNum}`;
+    
+    // Se já estiver aberto para esta chave e não for uma rejeição forçada, permite alternar/fechar
+    if (expandedAlternativesKey === key && customExcluded.length === 0) {
+      setExpandedAlternativesKey(null);
+      return;
+    }
+
+    setExpandedAlternativesKey(key);
+    setAlternativesMap(prev => ({
+      ...prev,
+      [key]: { loading: true, candidates: prev[key]?.candidates || [] }
+    }));
+
+    try {
+      const otherCoverUrls = Object.entries(comic.issueCovers || {})
         .filter(([k]) => k !== String(issueNum))
         .map(([, url]) => url)
         .concat(
-          Object.entries(updatedComic.pendingCovers || {})
+          Object.entries(comic.pendingCovers || {})
             .filter(([k]) => k !== String(issueNum))
             .map(([, p]) => p?.coverUrl)
             .filter(Boolean)
         );
 
-      const allExcluded = Array.from(new Set([...(updatedRejected[issueNum] || []), ...otherCoverUrls]));
+      const allExcluded = Array.from(new Set([
+        ...(comic.rejectedCovers?.[issueNum] || []),
+        ...otherCoverUrls,
+        ...customExcluded
+      ]));
 
-      try {
-        const nextRes = await searchIssueCover(updatedComic, issueNum, allExcluded);
-        if (nextRes.found && nextRes.coverUrl && !allExcluded.includes(nextRes.coverUrl)) {
-          const freshPending = {
-            ...(updatedComic.pendingCovers || {}),
-            [issueNum]: {
-              coverUrl: nextRes.coverUrl,
-              source: nextRes.source,
-              year: nextRes.year,
-              title: nextRes.title
-            }
-          };
-          const nextComic = {
-            ...updatedComic,
-            pendingCovers: freshPending
-          };
-          const saved = await saveComic(nextComic);
-          setComics(saved);
-          if (viewingIssueDetail && viewingIssueDetail.comic.id === comicId) {
-            setViewingIssueDetail({ comic: nextComic, issueNum });
-          }
-        }
-      } catch (err) {
-        console.warn('Erro ao buscar alternativa mais antiga:', err);
+      const result = await searchAllIssueCovers(comic, issueNum, allExcluded);
+      setAlternativesMap(prev => ({
+        ...prev,
+        [key]: { loading: false, candidates: result.candidates || [] }
+      }));
+    } catch (err) {
+      console.warn('Erro ao carregar todas as alternativas de capa:', err);
+      setAlternativesMap(prev => ({
+        ...prev,
+        [key]: { loading: false, candidates: [] }
+      }));
+    }
+  };
+
+  // Selecionar uma capa alternativa do carrossel para ser a nova candidata pendente
+  const handleSelectAlternative = async (comicId, issueNum, candidate) => {
+    const comic = comics.find(c => c.id === comicId);
+    if (!comic) return;
+
+    const freshPending = {
+      ...(comic.pendingCovers || {}),
+      [issueNum]: {
+        coverUrl: candidate.coverUrl,
+        source: candidate.source,
+        year: candidate.year,
+        title: candidate.title
       }
-    }, 150);
+    };
+
+    const nextComic = {
+      ...comic,
+      pendingCovers: freshPending
+    };
+
+    const saved = await saveComic(nextComic);
+    setComics(saved);
+
+    if (viewingIssueDetail && viewingIssueDetail.comic.id === comicId) {
+      setViewingIssueDetail({ comic: nextComic, issueNum });
+    }
   };
 
   // Desvincular / Remover Capa Fixada
@@ -2417,131 +2457,239 @@ export default function App() {
                 }
 
                 return filtered.map((item) => {
+                  const itemKey = `${item.comicId}_${item.issueNum}`;
+                  const isExpanded = expandedAlternativesKey === itemKey;
+                  const altState = alternativesMap[itemKey];
+
                   return (
                     <div 
-                      key={`${item.comicId}_${item.issueNum}`}
-                      className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-slate-700 transition flex items-center justify-between gap-3"
+                      key={itemKey}
+                      className={`p-2.5 rounded-xl bg-slate-950/70 border transition flex flex-col ${
+                        isExpanded ? 'border-amber-500/60 ring-1 ring-amber-500/30' : 'border-slate-800 hover:border-slate-700'
+                      }`}
                     >
-                      {/* Miniatura ou Placeholder */}
-                      <div className="w-10 h-14 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden shrink-0 flex items-center justify-center relative">
-                        {item.coverUrl ? (
-                          <img 
-                            src={item.coverUrl} 
-                            alt={`${item.comicName} #${item.issueNum}`} 
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <ImageIcon className="w-4 h-4 text-slate-600" />
-                        )}
-                        {item.status === 'fixed' && (
-                          <div className="absolute top-0.5 right-0.5 bg-emerald-600 text-white rounded p-0.5 shadow">
-                            <Check className="w-2.5 h-2.5 stroke-[3]" />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Informações da Edição */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <h4 className="font-bold text-xs text-white truncate">
-                            {item.comicName}
-                          </h4>
-                          <span className="font-mono text-xs font-black text-amber-400 shrink-0">
-                            #{format2(item.issueNum)}
-                          </span>
+                      {/* Linha Principal da Edição */}
+                      <div className="flex items-center justify-between gap-3 w-full">
+                        {/* Miniatura ou Placeholder */}
+                        <div className="w-10 h-14 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden shrink-0 flex items-center justify-center relative">
+                          {item.coverUrl ? (
+                            <img 
+                              src={item.coverUrl} 
+                              alt={`${item.comicName} #${item.issueNum}`} 
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <ImageIcon className="w-4 h-4 text-slate-600" />
+                          )}
+                          {item.status === 'fixed' && (
+                            <div className="absolute top-0.5 right-0.5 bg-emerald-600 text-white rounded p-0.5 shadow">
+                              <Check className="w-2.5 h-2.5 stroke-[3]" />
+                            </div>
+                          )}
                         </div>
-                        <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-slate-400">
-                          <span className={`px-1.5 py-0.2 rounded border ${getTypeBadgeStyle(item.comicType)}`}>
-                            {item.comicType}
-                          </span>
-                          <span>•</span>
-                          <span>{item.comicPublisher}</span>
-                          {item.source && (
+
+                        {/* Informações da Edição */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <h4 className="font-bold text-xs text-white truncate">
+                              {item.comicName}
+                            </h4>
+                            <span className="font-mono text-xs font-black text-amber-400 shrink-0">
+                              #{format2(item.issueNum)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-slate-400">
+                            <span className={`px-1.5 py-0.2 rounded border ${getTypeBadgeStyle(item.comicType)}`}>
+                              {item.comicType}
+                            </span>
+                            <span>•</span>
+                            <span>{item.comicPublisher}</span>
+                            {item.source && (
+                              <>
+                                <span>•</span>
+                                <span className="text-amber-400/80 truncate max-w-[120px]">{item.source}</span>
+                              </>
+                            )}
+                          </div>
+                          <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                            {item.status === 'fixed' && (
+                              <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-950/50 border border-emerald-800/60 px-1.5 py-0.5 rounded">
+                                ✓ Capa Fixada
+                              </span>
+                            )}
+                            {item.status === 'pending' && (
+                              <span className="text-[10px] font-semibold text-amber-300 bg-amber-950/50 border border-amber-800/60 px-1.5 py-0.5 rounded animate-pulse">
+                                ⏳ Pendente de Aprovação
+                              </span>
+                            )}
+                            {item.status === 'searching' && (
+                              <span className="text-[10px] font-semibold text-blue-300 bg-blue-950/50 border border-blue-800/60 px-1.5 py-0.5 rounded flex items-center gap-1 w-max">
+                                <RefreshCw className="w-2.5 h-2.5 animate-spin" /> Na Fila / Buscando
+                              </span>
+                            )}
+                            {item.status === 'missing' && (
+                              <span className="text-[10px] text-slate-400 bg-slate-900 border border-slate-800 px-1.5 py-0.5 rounded">
+                                Sem Capa Localizada
+                              </span>
+                            )}
+                            {item.status === 'rejected' && (
+                              <span className="text-[10px] text-rose-300 bg-rose-950/50 border border-rose-800/60 px-1.5 py-0.5 rounded">
+                                ✗ Capa Rejeitada
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Botões Rápidos de Ação (Aprovar / Rejeitar / Galeria de Opções / Re-buscar) */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {/* Botão de Galeria de Alternativas (disponível a qualquer momento) */}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenAlternatives(item.comic, item.issueNum)}
+                            className={`p-2 rounded-xl border active:scale-95 transition ${
+                              isExpanded
+                                ? 'bg-amber-500 text-slate-950 border-amber-400 font-bold shadow'
+                                : 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700/80'
+                            }`}
+                            title="Explorar todas as capas disponíveis desta edição"
+                            aria-label="Explorar todas as capas disponíveis"
+                          >
+                            <Images className="w-4 h-4" />
+                          </button>
+
+                          {item.status === 'pending' && (
                             <>
-                              <span>•</span>
-                              <span className="text-amber-400/80 truncate max-w-[120px]">{item.source}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleApproveCover(item.comicId, item.issueNum)}
+                                className="p-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm active:scale-95 transition"
+                                title="Aprovar capa"
+                                aria-label="Aprovar capa"
+                              >
+                                <Check className="w-4 h-4 stroke-[3]" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRejectCover(item.comicId, item.issueNum)}
+                                className="p-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white shadow-sm active:scale-95 transition"
+                                title="Rejeitar capa e ver opções"
+                                aria-label="Rejeitar capa e ver opções"
+                              >
+                                <X className="w-4 h-4 stroke-[3]" />
+                              </button>
                             </>
                           )}
-                        </div>
-                        <div className="mt-1">
+
                           {item.status === 'fixed' && (
-                            <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-950/50 border border-emerald-800/60 px-1.5 py-0.5 rounded">
-                              ✓ Capa Fixada
-                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveFixedCover(item.comicId, item.issueNum)}
+                              className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950/80 text-slate-400 hover:text-rose-300 border border-slate-700/80 active:scale-95 transition"
+                              title="Desvincular capa"
+                              aria-label="Desvincular capa"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
                           )}
-                          {item.status === 'pending' && (
-                            <span className="text-[10px] font-semibold text-amber-300 bg-amber-950/50 border border-amber-800/60 px-1.5 py-0.5 rounded animate-pulse">
-                              ⏳ Pendente de Aprovação
-                            </span>
-                          )}
-                          {item.status === 'searching' && (
-                            <span className="text-[10px] font-semibold text-blue-300 bg-blue-950/50 border border-blue-800/60 px-1.5 py-0.5 rounded flex items-center gap-1 w-max">
-                              <RefreshCw className="w-2.5 h-2.5 animate-spin" /> Na Fila / Buscando
-                            </span>
-                          )}
-                          {item.status === 'missing' && (
-                            <span className="text-[10px] text-slate-400 bg-slate-900 border border-slate-800 px-1.5 py-0.5 rounded">
-                              Sem Capa Localizada
-                            </span>
-                          )}
-                          {item.status === 'rejected' && (
-                            <span className="text-[10px] text-rose-300 bg-rose-950/50 border border-rose-800/60 px-1.5 py-0.5 rounded">
-                              ✗ Capa Rejeitada
-                            </span>
+
+                          {(item.status === 'missing' || item.status === 'rejected' || item.status === 'searching') && (
+                            <button
+                              type="button"
+                              onClick={() => handleManualSearchCover(item.comic, item.issueNum)}
+                              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 active:scale-95 transition"
+                              title="Buscar na Panini Brasil"
+                              aria-label="Buscar na Panini Brasil"
+                            >
+                              <RefreshCw className="w-4 h-4" />
+                            </button>
                           )}
                         </div>
                       </div>
 
-                      {/* Botões Rápidos de Ação (Aprovar / Rejeitar / Re-buscar) SEM TEXTO */}
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {item.status === 'pending' && (
-                          <>
+                      {/* Expansão com Carrossel de Alternativas Encontradas */}
+                      {isExpanded && (
+                        <div className="mt-3 pt-3 border-t border-slate-800 w-full animate-fadeIn">
+                          {/* Cabeçalho da Expansão */}
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-1.5 text-xs">
+                              <Images className="w-3.5 h-3.5 text-amber-400" />
+                              <span className="font-bold text-white">Todas as opções encontradas:</span>
+                              {altState?.candidates && (
+                                <span className="text-[10px] bg-slate-800 text-amber-300 px-1.5 py-0.5 rounded font-mono font-bold">
+                                  {altState.candidates.length} {altState.candidates.length === 1 ? 'capa' : 'capas'}
+                                </span>
+                              )}
+                            </div>
                             <button
                               type="button"
-                              onClick={() => handleApproveCover(item.comicId, item.issueNum)}
-                              className="p-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm active:scale-95 transition"
-                              title="Aprovar capa"
-                              aria-label="Aprovar capa"
+                              onClick={() => setExpandedAlternativesKey(null)}
+                              className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition text-[11px] flex items-center gap-1"
+                              title="Fechar opções"
                             >
-                              <Check className="w-4 h-4 stroke-[3]" />
+                              <X className="w-3.5 h-3.5" />
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => handleRejectCover(item.comicId, item.issueNum)}
-                              className="p-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white shadow-sm active:scale-95 transition"
-                              title="Rejeitar capa"
-                              aria-label="Rejeitar capa"
-                            >
-                              <X className="w-4 h-4 stroke-[3]" />
-                            </button>
-                          </>
-                        )}
+                          </div>
 
-                        {item.status === 'fixed' && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveFixedCover(item.comicId, item.issueNum)}
-                            className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950/80 text-slate-400 hover:text-rose-300 border border-slate-700/80 active:scale-95 transition"
-                            title="Desvincular capa"
-                            aria-label="Desvincular capa"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        )}
-
-                        {(item.status === 'missing' || item.status === 'rejected' || item.status === 'searching') && (
-                          <button
-                            type="button"
-                            onClick={() => handleManualSearchCover(item.comic, item.issueNum)}
-                            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 active:scale-95 transition"
-                            title="Buscar na Panini Brasil"
-                            aria-label="Buscar na Panini Brasil"
-                          >
-                            <RefreshCw className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
+                          {/* Conteúdo: Carregando / Carrossel Horizontal / Mensagem Vazia */}
+                          {altState?.loading ? (
+                            <div className="py-6 flex flex-col items-center justify-center gap-2 text-slate-400 text-xs bg-slate-950/60 rounded-xl border border-slate-800/60">
+                              <RefreshCw className="w-4 h-4 animate-spin text-amber-400" />
+                              <span>Buscando todas as edições na Panini Brasil e Web...</span>
+                            </div>
+                          ) : (altState?.candidates || []).length > 0 ? (
+                            <div className="flex gap-2.5 overflow-x-auto pb-2 pt-1 px-0.5 scrollbar-thin">
+                              {altState.candidates.map((cand, cIdx) => {
+                                const isCurrentSelected = item.coverUrl === cand.coverUrl;
+                                return (
+                                  <button
+                                    key={`${cand.coverUrl}_${cIdx}`}
+                                    type="button"
+                                    onClick={() => handleSelectAlternative(item.comicId, item.issueNum, cand)}
+                                    className={`flex-shrink-0 w-24 sm:w-28 text-left rounded-xl p-1.5 transition border flex flex-col gap-1.5 relative group ${
+                                      isCurrentSelected
+                                        ? 'bg-amber-950/40 border-amber-400 ring-2 ring-amber-400/40 shadow-lg'
+                                        : 'bg-slate-900/90 border-slate-800 hover:border-amber-400/60 hover:bg-slate-850'
+                                    }`}
+                                    title="Clique para definir esta capa como sugestão pendente"
+                                  >
+                                    <div className="w-full aspect-[2/3] rounded-lg overflow-hidden bg-slate-950 relative border border-slate-800/80">
+                                      <img
+                                        src={cand.coverUrl}
+                                        alt={cand.title || `Opção ${cIdx + 1}`}
+                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                        loading="lazy"
+                                      />
+                                      {isCurrentSelected && (
+                                        <div className="absolute top-1 right-1 bg-amber-500 text-slate-950 rounded p-0.5 shadow">
+                                          <Check className="w-3 h-3 stroke-[3]" />
+                                        </div>
+                                      )}
+                                      {cand.year && (
+                                        <div className="absolute bottom-1 left-1 bg-black/85 backdrop-blur-sm px-1.5 py-0.2 rounded text-[9px] font-mono font-bold text-amber-300 border border-white/10">
+                                          {cand.year}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="w-full text-[10px] leading-tight">
+                                      <div className="font-semibold text-slate-200 truncate" title={cand.title}>
+                                        {cand.title || `Opção #${cIdx + 1}`}
+                                      </div>
+                                      <div className="text-[9px] text-slate-400 truncate mt-0.5" title={cand.source}>
+                                        {cand.source || 'Web'}
+                                      </div>
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="py-4 text-center text-slate-500 text-xs bg-slate-950/40 rounded-xl border border-slate-800/60">
+                              Nenhuma outra ocorrência de capa encontrada para esta edição.
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 });

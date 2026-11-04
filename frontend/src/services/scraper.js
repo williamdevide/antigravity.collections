@@ -85,7 +85,8 @@ export async function searchIssueCover(comic, issueNum, rejectedUrls = []) {
           coverUrl: data.coverUrl,
           source: data.source || 'Panini Brasil (panini.com.br)',
           year: data.year || 2025,
-          title: data.title || `${title} #${issue}`
+          title: data.title || `${title} #${issue}`,
+          candidates: data.candidates || []
         };
       }
     }
@@ -110,7 +111,8 @@ export async function searchIssueCover(comic, issueNum, rejectedUrls = []) {
           coverUrl: data.coverUrl,
           source: data.source || 'Panini Brasil (panini.com.br)',
           year: data.year || 2025,
-          title: data.title || `${title} #${issue}`
+          title: data.title || `${title} #${issue}`,
+          candidates: data.candidates || []
         };
       }
     }
@@ -259,4 +261,117 @@ export async function searchIssueCover(comic, issueNum, rejectedUrls = []) {
   }
 
   return { found: false, message: 'Nenhuma capa encontrada.' };
+}
+
+/**
+ * Busca todas as ocorrências de capas disponíveis para uma HQ e número de edição
+ * Retorna uma lista completa de alternativas com ano, volume, fonte e imagem
+ */
+export async function searchAllIssueCovers(comic, issueNum, rejectedUrls = []) {
+  const title = comic.name;
+  const publisher = comic.publisher || 'Marvel';
+  const issue = String(issueNum);
+  const rejectedParam = rejectedUrls.length > 0 ? `&rejected=${encodeURIComponent(rejectedUrls.join(','))}` : '';
+
+  // 1. Tentar endpoint com all=true
+  try {
+    const url = `/api/scrape-cover?title=${encodeURIComponent(title)}&issue=${encodeURIComponent(issue)}&publisher=${encodeURIComponent(publisher)}&all=true${rejectedParam}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const resp = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data && data.candidates && data.candidates.length > 0) {
+        return {
+          found: true,
+          candidates: data.candidates,
+          coverUrl: data.coverUrl || data.candidates[0].coverUrl
+        };
+      }
+    }
+  } catch {
+    // Prosseguir para fallback
+  }
+
+  // 2. Tentar backend local porta 3001
+  try {
+    const backendUrl = `http://localhost:3001/api/scrape-cover?title=${encodeURIComponent(title)}&issue=${encodeURIComponent(issue)}&publisher=${encodeURIComponent(publisher)}&all=true${rejectedParam}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const resp = await fetch(backendUrl, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data && data.candidates && data.candidates.length > 0) {
+        return {
+          found: true,
+          candidates: data.candidates,
+          coverUrl: data.coverUrl || data.candidates[0].coverUrl
+        };
+      }
+    }
+  } catch {
+    // Prosseguir para fallback no cliente
+  }
+
+  // 3. Fallback no cliente via Fandom (buscar todos os volumes de 10 a 1)
+  try {
+    const wiki = publisher.toLowerCase().includes('dc') || publisher.toLowerCase().includes('vertigo') ? 'dc' : 'marvel';
+    const engTitle = getEnglishTitle(title);
+    const directTitles = [];
+    for (let v = 10; v >= 1; v--) {
+      directTitles.push(`${engTitle.replace(/\s+/g, '_')}_Vol_${v}_${issue}`);
+    }
+    if (engTitle !== title) {
+      for (let v = 10; v >= 1; v--) {
+        directTitles.push(`${title.replace(/\s+/g, '_')}_Vol_${v}_${issue}`);
+      }
+    }
+
+    const titlesUrl = `https://${wiki}.fandom.com/api.php?action=query&format=json&titles=${encodeURIComponent(directTitles.join('|'))}&prop=pageimages|info&piprop=original|thumbnail&pithumbsize=600&origin=*`;
+    const titlesResp = await fetch(titlesUrl);
+    if (titlesResp.ok) {
+      const titlesData = await titlesResp.json();
+      if (titlesData.query && titlesData.query.pages) {
+        const pages = Object.values(titlesData.query.pages).filter(p => !p.missing);
+        const candidates = [];
+
+        for (const p of pages) {
+          const url = p.original?.source || p.thumbnail?.source;
+          if (!url || rejectedUrls.includes(url)) continue;
+          if (!matchIssueNumber(p.title, issueNum)) continue;
+
+          const volMatch = p.title.match(/\bVol(?:ume|\.)?\s*(\d+)\b/i);
+          const vol = volMatch ? parseInt(volMatch[1], 10) : 1;
+          const cbYearMatch = url.match(/[?&]cb=(20[0-2][0-9]|19[5-9][0-9])/);
+          const yr = cbYearMatch ? parseInt(cbYearMatch[1], 10) : 2020;
+
+          candidates.push({
+            coverUrl: url,
+            title: p.title,
+            year: yr,
+            volume: vol,
+            rank: (vol * 10000) + yr,
+            source: `${wiki.toUpperCase()} Fandom (Vol ${vol})`
+          });
+        }
+
+        candidates.sort((a, b) => b.rank - a.rank);
+        if (candidates.length > 0) {
+          return {
+            found: true,
+            candidates,
+            coverUrl: candidates[0].coverUrl
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Client fallback search error:', err);
+  }
+
+  return { found: false, candidates: [] };
 }
