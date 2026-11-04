@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Permite leitura e escrita na coleção de quadrinhos (comics)
+    match /comics/{comicId} {
+      allow read, write: if true;
+    }
+  }
+}
+

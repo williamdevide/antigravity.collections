@@ -1,0 +1,35 @@
+{
+  "name": "antigravity-collections-root",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "HQ Tracker - Aplicação Web First Mobile para Controle Rápido de Coleções de HQs",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "build:frontend": "npm --prefix frontend run build",
+    "build": "npm --prefix frontend run build",
+    "test:firebase": "node execution/test_firebase.js",
+    "deploy:github": "node execution/deploy_github.js",
+    "deploy:vercel": "node execution/deploy_vercel.js"
+  },
+  "keywords": [
+    "antigravity",
+    "comics",
+    "hqs",
+    "mobile-first",
+    "firebase",
+    "react",
+    "tailwind"
+  ],
+  "author": "Agente Antigravity - SENAI Ourinhos Edition",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^18.0.9",
+    "firebase": "^13.2.0"
+  }
+}
