@@ -223,4 +223,22 @@ Pergunta: Na tela de detalhes, o carrossel de variantes deve ser carregado autom
 Resposta do Usuário: (Recommended) Carregar automaticamente em segundo plano ao abrir o modal de detalhes, exibindo o carrossel assim que estiver pronto
 ```
 
+### Prompt 17
+```text
+/agente-orquestrador /grill-me /goal depois que eu fixo uma imagem na edição pode fechar o carrossel de imagens e só volta a aparecer se eu clicar em Desvincular capa dessa edição. Inclusive o desvincular capa deve pedir confirmação
+```
+
+### Resposta Grill-Me / Interação 21
+```text
+Pergunta: Como você prefere que seja apresentada a solicitação de confirmação ao clicar em 'Desvincular capa'?
+Resposta do Usuário: Modal de alerta customizado: Abre uma pequena caixa de diálogo centralizada na tela solicitando a confirmação com botão de aviso em vermelho
+```
+
+### Resposta Grill-Me / Interação 22
+```text
+Pergunta: Ao confirmar a desvinculação da capa, como o sistema deve se comportar no modal de detalhes?
+Resposta do Usuário: (Recommended) Remover a capa fixada e reabrir imediatamente o carrossel de alternativas para escolher uma nova capa na hora
+```
+
+
 

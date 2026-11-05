@@ -1,6 +1,8 @@
 /**
  * Versão e Nome do Sistema
  * Gerenciado automaticamente pelo Agente Orquestrador sob o padrão SemVer (MAJOR.MINOR.PATCH)
+ * v1.6.0: Fechamento automático do carrossel ao fixar capa oficial na edição, modal de alerta customizado
+ *         com confirmação para desvincular capas e reabertura imediata do carrossel de sugestões ao desvincular.
  * v1.5.0: Carrossel integrado de alternativas e sugestões de capas na tela de detalhes da edição
  *         com carregamento automático em segundo plano e seleção imediata para aprovação.
  *         Super-otimização do scraper Panini Brasil: validação estrita do nome da HQ, suporte a
@@ -14,4 +16,4 @@
  *         fallback progressivo para edições mais antigas ao rejeitar uma capa.
  */
 export const APP_NAME = 'HQs Collections';
-export const APP_VERSION = '1.5.0';
+export const APP_VERSION = '1.6.0';

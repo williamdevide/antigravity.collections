@@ -1,7 +1,7 @@
-# 🏛️ Arquitetura do Sistema: HQs Collections `v1.5.0`
+# 🏛️ Arquitetura do Sistema: HQs Collections `v1.6.0`
 
 ## 1. Visão Geral
-O **HQs Collections** é um sistema projetado para colecionadores de quadrinhos com foco em extrema agilidade no ambiente mobile ("Mobile First"). A aplicação opera em **tela única**, minimizando cliques, eliminando navegações desnecessárias, agrupando edições em blocos táteis de 10 em 10, categorizando coleções por Tipo e Editora, permitindo ordenação personalizada com **Drag & Drop**, títulos específicos por fascículo, suporte a início em edições avançadas (`startFrom`), **ciclo interativo de 4 estágios com destaque em neon**, **scraper da Panini Brasil de alta precisão com suporte a Vol. N e resolução S300**, **carrossel de sugestões e alternativas integrado no modal de detalhes da edição e na tela de status** e **ações em lote (Aceitar Todos / Rejeitar Todos) para curadoria rápida**.
+O **HQs Collections** é um sistema projetado para colecionadores de quadrinhos com foco em extrema agilidade no ambiente mobile ("Mobile First"). A aplicação opera em **tela única**, minimizando cliques, eliminando navegações desnecessárias, agrupando edições em blocos táteis de 10 em 10, categorizando coleções por Tipo e Editora, permitindo ordenação personalizada com **Drag & Drop**, títulos específicos por fascículo, suporte a início em edições avançadas (`startFrom`), **ciclo interativo de 4 estágios com destaque em neon**, **scraper da Panini Brasil de alta precisão com suporte a Vol. N e resolução S300**, **carrossel condicional de sugestões de capas fechado após fixação**, **modal de alerta customizado de confirmação para desvinculação de capas** e **ações em lote (Aceitar Todos / Rejeitar Todos)**.
 
 ---
 
@@ -12,7 +12,7 @@ flowchart TD
     User["📱 Usuário (Colecionador no Mobile / Desktop)"] --> UI["🖥️ Interface Web Mobile First (Vite + React)"]
 
     subgraph HeaderSection ["Cabeçalho e Navegação"]
-        UI --> Brand["Logotipo + Versão v1.5.0 + Badge Mobile + Slogan"]
+        UI --> Brand["Logotipo + Versão v1.6.0 + Badge Mobile + Slogan"]
         UI --> CoverProgressBtn["Botão Tátil [🖼️ XX%] (Apenas Ícone e Porcentagem)"]
         UI --> ModeToggle["Alternador de Modo (Consulta 👁️ / Edição ✏️)"]
         UI --> ConnectionBadge["Status Conexão [☁️ Nuvem / 💾 Local] + Contadores [XX HQs • YY ed.]"]
@@ -53,9 +53,12 @@ flowchart TD
         
         ChunkEngine --> IssueDetailModal["Modal de Detalhes da Edição (Modo Consulta)"]
         IssueDetailModal --> CoverFrame["Moldura Estética de Capa Ampliada (2:3)"]
-        IssueDetailModal --> IntegratedCarousel["Carrossel Horizontal Integrado de Alternativas"]
+        IssueDetailModal --> IntegratedCarousel["Carrossel Horizontal Condicional (Fechado quando Fixado)"]
         IntegratedCarousel --> DetailSelect["Toque na Variante -> Pré-visualização Imediata"]
         IssueDetailModal --> TextFreeCurator["Curadoria Sem Texto: Aprovar [✓] e Rejeitar [✗]"]
+        IssueDetailModal --> UnlinkCoverPrompt["Botão Desvincular Capa"]
+        UnlinkCoverPrompt --> CustomConfirmModal["Modal Customizado de Confirmação (Alerta Vermelho)"]
+        CustomConfirmModal --> ReopenCarousel["Confirmação: Remove Capa Fixada e Reabre Carrossel"]
     end
 
     subgraph DataSync ["Motor de Sincronização Híbrida"]

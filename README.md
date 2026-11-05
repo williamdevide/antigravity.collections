@@ -1,9 +1,9 @@
 <div align="center">
 
-# 📚 HQs Collections `v1.5.0` - Mobile First Collection Manager
+# 📚 HQs Collections `v1.6.0` - Mobile First Collection Manager
 ### *Gerenciador Ágil de Coleções de Quadrinhos e Minisséries*
 
-[![Version](https://img.shields.io/badge/version-1.5.0-amber?style=for-the-badge&logo=semver&logoColor=white)](#)
+[![Version](https://img.shields.io/badge/version-1.6.0-amber?style=for-the-badge&logo=semver&logoColor=white)](#)
 [![Powered by Antigravity](https://img.shields.io/badge/Powered%20by-Google%20Antigravity-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://deepmind.google/technologies/antigravity/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
@@ -22,19 +22,16 @@
 ## 🇺🇸 English
 
 ### 🎯 Overview
-**HQs Collections** (v1.5.0) is an ultra-fast, mobile-first web application designed for comic book readers and collectors to track monthly publications, collections, and miniseries in a single streamlined screen. It features an integrated cover alternatives carousel in the Issue Detail Modal, an inline expandable carousel on the cover status screen, a high-precision Panini Brasil scraper with issue number/comic title matching and stable CDN resolution, batch curatorship controls ("Accept All" / "Reject All"), chronological volume ranking prioritizing newest releases (2025/2026), and zero-repetition cover matching.
+**HQs Collections** (v1.6.0) is an ultra-fast, mobile-first web application designed for comic book readers and collectors to track monthly publications, collections, and miniseries in a single streamlined screen. It features conditional cover suggestions carousel lifecycle (automatically hidden once a cover is officially fixed), a custom dark-mode confirmation alert dialog for unlinking covers, instant carousel reopening upon unlinking, high-precision Panini Brasil scraper with issue number/comic title matching, batch curatorship controls ("Accept All" / "Reject All"), and chronological volume ranking.
 
-### ✨ Key Features in `v1.5.0`
-- **Issue Detail Modal Integrated Carousel:** When opening the enlarged issue detail modal in view mode, a horizontal carousel automatically loads all available cover candidates in the background right below the main cover frame.
-- **Instant Variant Preview & Approval:** Tapping any alternative instantly displays it as the active candidate in the main preview with the green checkmark (`✓`) button ready to fix as the official cover.
-- **Panini Brasil Scraper Super-Optimization:**
-  - Strict comic title verification preventing unrelated comic search results (e.g. Deadpool) from being matched.
-  - Native support for Brazilian publication naming conventions (such as `Wolverine (2022) Vol. 16` being recognized as issue #16).
-  - High-resolution image CDN normalization using `-S300-` (eliminating Cloudfront HTTP 302 redirects).
-  - Vite dev server reverse proxy for seamless local scraping via `/api`.
-- **Inline Multi-Cover Carousel on Rejection:** Rejecting a cover on the status screen automatically expands the issue row and queries for all matching occurrences across Panini and Web sources.
+### ✨ Key Features in `v1.6.0`
+- **Conditional Carousel Lifecycle:** Once an official cover is approved and fixed to an issue, the suggestions carousel is cleanly hidden to keep the interface uncluttered.
+- **Custom Unlink Confirmation Alert:** Clicking "Desvincular capa desta edição" (or unlinking from the status dashboard) presents a dedicated dark-themed alert modal with warning badge, issue preview, and confirmation prompt.
+- **Instant Carousel Reopening on Unlink:** Confirming unlinking removes the fixed cover and immediately re-queries and displays the alternatives carousel for swift selection of a new image.
+- **Issue Detail Modal Integrated Carousel:** When opening the enlarged issue detail modal for unapproved editions, a horizontal carousel automatically loads all available candidates in the background.
+- **Panini Brasil Scraper Super-Optimization:** Strict comic title verification, native support for Brazilian publication naming conventions (`Vol. 16` = #16), and high-resolution image CDN normalization (`-S300-FWEBP`).
+- **Inline Multi-Cover Carousel on Rejection:** Rejecting a cover on the status screen automatically expands the issue row and queries for all matching occurrences.
 - **Batch Cover Actions ("Accept All" / "Reject All"):** Directly in the Cover Search Dashboard, collectors can approve or reject all pending covers at once with a single tap.
-- **Strict Integrity Guarantee:** Batch actions operate exclusively on covers pending approval (`status === 'pending'`), never modifying or unlinking already approved/fixed artwork.
 
 ### 🤖 Powered by Google Antigravity
 This application was architected and built using **Google Antigravity**, utilizing the 3-Layer Agentic Architecture:
@@ -47,18 +44,15 @@ This application was architected and built using **Google Antigravity**, utilizi
 ## 🇧🇷 Versão em Português (Brasil)
 
 ### 🎯 Visão Geral
-O **HQs Collections** (v1.5.0) é uma aplicação web mobile-first ultra-rápida criada sob medida para colecionadores de quadrinhos organizarem edições mensais, coleções e minisséries em apenas uma tela. O sistema emprega uma lógica inteligente de blocos de 10 edições sempre exibidas em linha única contínua, carrossel integrado de sugestões de capas na tela de detalhes da edição, motor de busca Panini Brasil hiper-otimizado com suporte a Vol. N e resolução S300, carrossel tátil expansível na tela de status de capas, ações de curadoria em lote ("Aceitar Todos" e "Rejeitar Todos") e validação estrita de número e título de HQ.
+O **HQs Collections** (v1.6.0) é uma aplicação web mobile-first ultra-rápida criada sob medida para colecionadores de quadrinhos organizarem edições mensais, coleções e minisséries em apenas uma tela. O sistema emprega uma lógica inteligente de blocos de 10 edições sempre exibidas em linha única contínua, ciclo condicional de fechamento do carrossel ao fixar capa, modal de alerta customizado com confirmação para desvinculação, motor de busca Panini Brasil hiper-otimizado com suporte a Vol. N e resolução S300, e ações em lote de curadoria ("Aceitar Todos" e "Rejeitar Todos").
 
-### ✨ Novidades da Versão `1.5.0`
-- **Carrossel Integrado de Sugestões na Tela de Detalhes:** Ao clicar em qualquer edição no Modo Consulta, o modal de detalhes ampliado carrega automaticamente em segundo plano um carrossel horizontal de capas alternativas logo abaixo da imagem principal.
-- **Pré-visualização e Aprovação Imediata:** Ao tocar em qualquer miniatura do carrossel, ela assume o quadro principal de visualização como capa pendente, acompanhada do botão verde (`✓`) para aprovação e fixação com um clique.
-- **Super-Otimização do Scraper Panini Brasil:**
-  - Validação estrita do nome da HQ, impedindo que títulos alheios (como Deadpool) interfiram na busca de Wolverine.
-  - Reconhecimento automático do formato editorial brasileiro da Panini (`Wolverine (2022) Vol. 16` é identificado com precisão como edição #16).
-  - Normalização estável de resolução de imagem no CDN Cloudfront utilizando `-S300-FWEBP` (eliminando erros de redirecionamento 302 temporário).
-  - Configuração de Proxy no servidor Vite dev para encaminhamento transparente de chamadas `/api` ao backend local na porta 3001.
-- **Carrossel Horizontal na Tela de Status:** Ao rejeitar uma capa (`✗`) ou tocar no botão de galeria (`Images`), a linha se expande exibindo todas as ocorrências encontradas para seleção tátil.
-- **Ações em Lote no Painel de Capas ("Aceitar Todos" / "Rejeitar Todos"):** Curadoria em lote que opera exclusivamente sobre as capas pendentes de aprovação, mantendo intactas as edições já aprovadas.
+### ✨ Novidades da Versão `1.6.0`
+- **Fechamento Automático do Carrossel ao Fixar:** Quando uma edição possui uma capa oficial fixada, o carrossel de sugestões é automaticamente ocultado, mantendo a visualização de detalhes limpa, elegante e sem distrações.
+- **Modal de Confirmação Customizado para Desvincular Capa:** Ao tocar em "Desvincular capa desta edição" (ou no botão de remoção do painel de capas), um modal de alerta estilizado em tema escuro com ícone de alerta vermelho solicita a confirmação explícita do colecionador com opções "Cancelar" e "Sim, Desvincular".
+- **Reabertura Imediata do Carrossel ao Desvincular:** Confirmada a desvinculação, a capa é removida e o carrossel de alternativas é **imediatamente recarregado e reaberto** para que o usuário escolha uma nova imagem sem etapas extras.
+- **Carrossel Integrado de Sugestões na Tela de Detalhes:** Para edições sem capa fixada, o modal de detalhes carrega automaticamente em segundo plano um carrossel horizontal de sugestões.
+- **Super-Otimização do Scraper Panini Brasil:** Validação estrita de título, tratamento de `Vol. 16` como edição Panini e resolução de imagem estável `-S300-FWEBP`.
+- **Ações em Lote no Painel de Capas ("Aceitar Todos" / "Rejeitar Todos"):** Curadoria em lote exclusiva para capas pendentes.
 
 ### 🤖 Desenvolvido com Google Antigravity
 Projeto concebido e executado através do ecossistema **Google Antigravity**, operando na Arquitetura de 3 Camadas:

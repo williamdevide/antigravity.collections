@@ -115,6 +115,9 @@ export default function App() {
   const [expandedAlternativesKey, setExpandedAlternativesKey] = useState(null); // `${comicId}_${issueNum}`
   const [alternativesMap, setAlternativesMap] = useState({}); // { [key]: { loading: boolean, candidates: [] } }
 
+  // Modal de Confirmação para Desvincular Capa
+  const [unlinkConfirmation, setUnlinkConfirmation] = useState(null); // { comicId, comicName, issueNum, coverUrl }
+
   // Modal de Título de Edição Específica (Minissérie e Coleção no Modo Edição)
   const [issueTitleModal, setIssueTitleModal] = useState(null); // { comic, issueNum, currentTitle }
   const [issueTitleInput, setIssueTitleInput] = useState('');
@@ -637,15 +640,19 @@ export default function App() {
     await loadAlternatives(comic, issueNum, customExcluded);
   };
 
-  // Carregamento automático de alternativas de capa quando o modal de detalhes da edição for aberto
+  // Carregamento automático de alternativas de capa quando o modal de detalhes da edição for aberto (apenas se a capa ainda não estiver fixada)
   useEffect(() => {
     if (!viewingIssueDetail) return;
     const { comic, issueNum } = viewingIssueDetail;
+    const hasFixedCover = Boolean(comic.issueCovers?.[issueNum]);
+    // Se a edição já tem capa fixada oficialmente, o carrossel fica fechado e não faz requisição
+    if (hasFixedCover) return;
+
     const key = `${comic.id}_${issueNum}`;
     if (!alternativesMap[key]) {
       loadAlternatives(comic, issueNum);
     }
-  }, [viewingIssueDetail?.comic?.id, viewingIssueDetail?.issueNum]);
+  }, [viewingIssueDetail?.comic?.id, viewingIssueDetail?.issueNum, viewingIssueDetail?.comic?.issueCovers]);
 
   // Selecionar uma capa alternativa do carrossel para ser a nova candidata pendente
   const handleSelectAlternative = async (comicId, issueNum, candidate) => {
@@ -675,11 +682,25 @@ export default function App() {
     }
   };
 
-  // Desvincular / Remover Capa Fixada
+  // Solicitar confirmação para desvincular capa fixada (abre modal de alerta customizado)
+  const requestUnlinkCover = (comicId, comicName, issueNum, coverUrl) => {
+    setUnlinkConfirmation({ comicId, comicName, issueNum, coverUrl });
+  };
+
+  // Confirmar desvinculação da capa e reabrir o carrossel de alternativas
+  const handleConfirmUnlinkCover = async () => {
+    if (!unlinkConfirmation) return;
+    const { comicId, issueNum } = unlinkConfirmation;
+    setUnlinkConfirmation(null);
+    await handleRemoveFixedCover(comicId, issueNum);
+  };
+
+  // Desvincular / Remover Capa Fixada e reabrir imediatamente o carrossel de alternativas
   const handleRemoveFixedCover = async (comicId, issueNum) => {
     const comic = comics.find(c => c.id === comicId);
     if (!comic) return;
 
+    const unlinkedCoverUrl = comic.issueCovers?.[issueNum];
     const updatedCovers = { ...(comic.issueCovers || {}) };
     delete updatedCovers[issueNum];
 
@@ -694,6 +715,9 @@ export default function App() {
     if (viewingIssueDetail && viewingIssueDetail.comic.id === comicId) {
       setViewingIssueDetail({ comic: updatedComic, issueNum });
     }
+
+    // Reabre imediatamente o carrossel de alternativas para escolher uma nova capa na hora
+    await loadAlternatives(updatedComic, issueNum, unlinkedCoverUrl ? [unlinkedCoverUrl] : []);
   };
 
   // Aprovar Todas as Capas Pendentes (Ação em Lote)
@@ -1919,8 +1943,14 @@ export default function App() {
                   </div>
 
                   <button
-                    onClick={() => handleRemoveFixedCover(viewingIssueDetail.comic.id, viewingIssueDetail.issueNum)}
-                    className="text-xs text-slate-400 hover:text-red-400 transition underline pt-1"
+                    type="button"
+                    onClick={() => requestUnlinkCover(
+                      viewingIssueDetail.comic.id, 
+                      viewingIssueDetail.comic.name, 
+                      viewingIssueDetail.issueNum, 
+                      viewingIssueDetail.comic.issueCovers[viewingIssueDetail.issueNum]
+                    )}
+                    className="text-xs text-slate-400 hover:text-rose-400 transition underline pt-1 cursor-pointer"
                   >
                     Desvincular capa desta edição
                   </button>
@@ -1998,6 +2028,10 @@ export default function App() {
 
             {/* CARROSSEL INTEGRADO DE SUGESTÕES DE CAPA DISPONÍVEIS */}
             {(() => {
+              const hasFixedCover = Boolean(viewingIssueDetail.comic.issueCovers?.[viewingIssueDetail.issueNum]);
+              // Se a capa já foi fixada na edição, fecha o carrossel e só reexibe ao clicar em desvincular
+              if (hasFixedCover) return null;
+
               const detailKey = `${viewingIssueDetail.comic.id}_${viewingIssueDetail.issueNum}`;
               const altState = alternativesMap[detailKey];
               const candidates = altState?.candidates || [];
@@ -2707,8 +2741,8 @@ export default function App() {
                           {item.status === 'fixed' && (
                             <button
                               type="button"
-                              onClick={() => handleRemoveFixedCover(item.comicId, item.issueNum)}
-                              className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950/80 text-slate-400 hover:text-rose-300 border border-slate-700/80 active:scale-95 transition"
+                              onClick={() => requestUnlinkCover(item.comicId, item.comicName, item.issueNum, item.coverUrl)}
+                              className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950/80 text-slate-400 hover:text-rose-300 border border-slate-700/80 active:scale-95 transition cursor-pointer"
                               title="Desvincular capa"
                               aria-label="Desvincular capa"
                             >
@@ -2817,6 +2851,60 @@ export default function App() {
                   );
                 });
               })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE ALERTA CUSTOMIZADO PARA CONFIRMAÇÃO DE DESVINCULAR CAPA */}
+      {unlinkConfirmation && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-[#12192B] border border-rose-500/50 w-full max-w-sm rounded-2xl p-5 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 border-b border-slate-800 pb-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-rose-400" />
+              </div>
+              <div className="overflow-hidden">
+                <h4 className="font-bold text-sm text-white leading-tight">Desvincular Capa</h4>
+                <p className="text-[11px] text-slate-400 truncate">
+                  Edição #{format2(unlinkConfirmation.issueNum)} • {unlinkConfirmation.comicName}
+                </p>
+              </div>
+            </div>
+
+            {unlinkConfirmation.coverUrl ? (
+              <div className="flex items-center gap-3 bg-slate-950/70 p-2.5 rounded-xl border border-slate-800">
+                <img 
+                  src={unlinkConfirmation.coverUrl} 
+                  alt="Capa a desvincular" 
+                  className="w-12 h-16 object-cover rounded-lg border border-slate-700 shrink-0" 
+                />
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Deseja realmente desvincular a capa oficial desta edição? Ao desvincular, o carrossel de sugestões será reaberto para você escolher outra capa.
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Deseja realmente desvincular a capa desta edição? Ao desvincular, o carrossel de sugestões será reaberto imediatamente.
+              </p>
+            )}
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setUnlinkConfirmation(null)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmUnlinkCover}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition shadow-lg shadow-rose-600/30 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Sim, Desvincular</span>
+              </button>
             </div>
           </div>
         </div>

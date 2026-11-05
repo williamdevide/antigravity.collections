@@ -3,10 +3,10 @@
 ## 1. Visão Geral e Propósito
 Aplicação Web First Mobile para controle ágil de coleções de Histórias em Quadrinhos, Especiais, Minisséries e Coleções em tela única.
 * **Nome Oficial:** `HQs Collections`
-* **Versão:** `1.5.0`
+* **Versão:** `1.6.0`
 
 ## 2. Header & Navegação Mobile First
-* **Marca e Identidade:** Logotipo `BookOpen`, Título `HQs Collections`, versão SemVer (`v1.5.0`), badge `Mobile` e slogan `Controle Ágil de Coleções`.
+* **Marca e Identidade:** Logotipo `BookOpen`, Título `HQs Collections`, versão SemVer (`v1.6.0`), badge `Mobile` e slogan `Controle Ágil de Coleções`.
 * **Monitor de Capas no Header:** Objeto tátil composto estritamente pelo ícone e pela porcentagem (ex: `🖼️ 85%`), sem o texto "capas". Ao tocar nesse objeto, abre o **Modal Detalhado de Status da Busca de Capas**.
 * **Alternador de Modos:** Ícone único de alternância (Lápis para Edição / Olho para Consulta).
 * **Badge de Conexão e Estatísticas:** Status em tempo real (`Nuvem` / `Local`) e contagem total (`XX HQs • YY ed.`).
@@ -48,5 +48,11 @@ Aplicação Web First Mobile para controle ágil de coleções de Histórias em 
 
 ## 7. Carrossel de Alternativas na Tela de Detalhes da Edição
 * Ao clicar sobre qualquer número de edição no Modo Consulta, o modal de detalhes exibe a capa ampliada e, logo abaixo, um **carrossel horizontal integrado** com todas as ocorrências e sugestões de capas encontradas para aquela edição.
-* **Carregamento Automático:** Carrega em segundo plano assim que o modal de detalhes é aberto.
-* **Seleção Imediata para Pré-visualização:** Ao tocar em qualquer miniatura do carrossel, a imagem selecionada é imediatamente exibida no quadro principal de pré-visualização, acompanhada dos botões de aprovação rápida (✓ verde) e rejeição (✗ vermelho).
+* **Ciclo de Vida Condicional:** Enquanto a edição tiver uma capa fixada oficialmente, o carrossel de sugestões permanece recolhido/fechado para manter a interface limpa e focada.
+* **Carregamento Condicional:** Carrega em segundo plano assim que o modal de detalhes é aberto apenas se a edição ainda não possuir capa oficial fixada.
+* **Seleção Imediata para Pré-visualização:** Ao tocar em qualquer miniatura do carrossel, a imagem selecionada é imediatamente exibida no quadro principal de pré-visualização, acompanhada dos botões de aprovação rápida (✓ verde) e rejeição (✗ vermelho). Ao aprovar (✓), a capa é fixada e o carrossel se fecha automaticamente.
+
+## 8. Confirmação Customizada para Desvincular Capa
+* Ao clicar no botão **Desvincular capa desta edição** (no modal de detalhes ou no painel de status), o sistema abre um **modal de alerta customizado** (`z-[70]`) com tema escuro e destaque em vermelho.
+* Exibe miniatura da capa a ser desvinculada, número da edição e nome da HQ com opções **Cancelar** e **Sim, Desvincular**.
+* Ao confirmar, a capa é desvinculada e o **carrossel de sugestões é imediatamente reaberto e recarregado**, permitindo selecionar e aprovar uma nova imagem instantaneamente.
