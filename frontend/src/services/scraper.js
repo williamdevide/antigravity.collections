@@ -358,7 +358,17 @@ export function scoreCandidate(candidate, cleanTitle, issueNum, prefSeries) {
     score += 500000;
   }
 
-  // Penalização para páginas de universo, equipes ou personagens avulsos
+  // Bônus massivo para correspondência exata do título base da série (evita spinoffs como Novíssima Wolverine para Wolverine)
+  const normS = cleanTitle.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  const baseTitle = normCandidate.replace(/\s*\(\d{4}\).*$/, '').replace(/\s+vol(?:ume|\.)?\s*\d+.*$/i, '').trim();
+  if (baseTitle === normS || normCandidate.startsWith(normS + ' ') || normCandidate.startsWith(normS + '(')) {
+    score += 600000;
+  }
+
+  // Penalização para capas variantes de revendedores ou páginas de equipes/universos
+  if (normCandidate.includes('variant') || normCandidate.includes('exclusive') || normCandidate.includes('homage')) {
+    score -= 200000;
+  }
   if (normCandidate.includes('universe') || normCandidate.includes('earth') || normCandidate.includes('character')) {
     score -= 300000;
   }
@@ -382,13 +392,14 @@ export function scoreCandidate(candidate, cleanTitle, issueNum, prefSeries) {
  * Busca de contingência da Panini Brasil direto no cliente via proxy CORS público
  * Usado se o backend local ou endpoint serverless estiverem inacessíveis
  */
-export async function searchPaniniClientSide(title, issueNum, rejectedUrls = [], returnAll = false, prefYear = null) {
+export async function searchPaniniClientSide(title, issueNum, rejectedUrls = [], returnAll = false, prefSeries = null) {
   try {
     const issueStr = String(issueNum || '1').trim();
     const issuePad = issueStr.padStart(2, '0');
+    // Consulta prioritária por edição formatada em 2 dígitos (padrão Panini Brasil: "Wolverine 01", "Wolverine 16")
     const queries = [
-      `${title} ${issueStr}`,
       `${title} ${issuePad}`,
+      `${title} ${issueStr}`,
       `${title}`
     ];
 
@@ -465,12 +476,7 @@ export async function searchPaniniClientSide(title, issueNum, rejectedUrls = [],
         }
 
         if (allFound.length > 0 && !returnAll) {
-          allFound.sort((a, b) => {
-            const matchA = prefYear && a.year === prefYear ? 1 : 0;
-            const matchB = prefYear && b.year === prefYear ? 1 : 0;
-            if (matchB !== matchA) return matchB - matchA;
-            return b.year - a.year;
-          });
+          allFound.sort((a, b) => scoreCandidate(b, title, issueNum, prefSeries) - scoreCandidate(a, title, issueNum, prefSeries));
           return allFound[0];
         }
       } catch {
@@ -479,12 +485,7 @@ export async function searchPaniniClientSide(title, issueNum, rejectedUrls = [],
     }
 
     if (allFound.length > 0) {
-      allFound.sort((a, b) => {
-        const matchA = prefYear && a.year === prefYear ? 1 : 0;
-        const matchB = prefYear && b.year === prefYear ? 1 : 0;
-        if (matchB !== matchA) return matchB - matchA;
-        return b.year - a.year;
-      });
+      allFound.sort((a, b) => scoreCandidate(b, title, issueNum, prefSeries) - scoreCandidate(a, title, issueNum, prefSeries));
       return returnAll ? allFound : allFound[0];
     }
     return returnAll ? [] : null;
@@ -560,7 +561,7 @@ export async function searchIssueCover(comic, issueNum, rejectedUrls = []) {
 
   // 3. Contingência: Forçar busca direta no site da Panini Brasil via proxy de cliente
   try {
-    const paniniDirect = await searchPaniniClientSide(title, issueNum, rejectedUrls, false, prefSeries?.year);
+    const paniniDirect = await searchPaniniClientSide(title, issueNum, rejectedUrls, false, prefSeries);
     if (paniniDirect && paniniDirect.coverUrl) {
       return {
         found: true,
@@ -826,7 +827,7 @@ export async function searchAllIssueCovers(comic, issueNum, rejectedUrls = []) {
   // 3. Fallback no cliente: Combinar Panini Client-Side, Fandom Multi-Wiki e OpenLibrary
   try {
     const [paniniCandidates, fandomCandidates, olCandidates] = await Promise.all([
-      searchPaniniClientSide(title, issueNum, rejectedUrls, true, prefSeries?.year).catch(() => []),
+      searchPaniniClientSide(title, issueNum, rejectedUrls, true, prefSeries).catch(() => []),
       searchFandomClient(title, issueNum, publisher, rejectedUrls, prefSeries, true).catch(() => []),
       searchOpenLibraryClient(title, issueNum, rejectedUrls, prefSeries, true).catch(() => [])
     ]);

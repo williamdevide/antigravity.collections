@@ -417,7 +417,17 @@ function scoreCandidate(candidate, cleanTitle, issueNum, prefSeries) {
     score += 500000;
   }
 
-  // Penalização para páginas de universo, equipes ou personagens avulsos
+  // Bônus massivo para correspondência exata do título base da série (evita spinoffs como Novíssima Wolverine para Wolverine)
+  const normS = cleanTitle.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  const baseTitle = normCandidate.replace(/\s*\(\d{4}\).*$/, '').replace(/\s+vol(?:ume|\.)?\s*\d+.*$/i, '').trim();
+  if (baseTitle === normS || normCandidate.startsWith(normS + ' ') || normCandidate.startsWith(normS + '(')) {
+    score += 600000;
+  }
+
+  // Penalização para capas variantes de revendedores ou páginas de equipes/universos
+  if (normCandidate.includes('variant') || normCandidate.includes('exclusive') || normCandidate.includes('homage')) {
+    score -= 200000;
+  }
   if (normCandidate.includes('universe') || normCandidate.includes('earth') || normCandidate.includes('character')) {
     score -= 300000;
   }
@@ -439,116 +449,105 @@ function scoreCandidate(candidate, cleanTitle, issueNum, prefSeries) {
 
 /**
  * Busca forçada no site oficial da Panini Brasil (panini.com.br)
- * Utiliza o binário curl para ultrapassar firewalls/Fastly e extrair capas originais
- * Prioriza estritamente a série preferencial e os anos mais recentes (2026 > 2025 > 2024...) e filtra URLs rejeitadas
+ * Utiliza fetch nativo com cabeçalhos de navegador e fallback para curl para contornar restrições
+ * Prioriza estritamente a série preferencial, correspondência exata do título base e os anos mais recentes
  */
-function searchPaniniBrasil(title, issueNum, rejectedUrls = [], returnAll = false, prefYear = null) {
-  return new Promise((resolve) => {
+function searchPaniniBrasil(title, issueNum, rejectedUrls = [], returnAll = false, prefSeries = null) {
+  return new Promise(async (resolve) => {
     const issueStr = String(issueNum || '1').trim();
     const issuePad = issueStr.padStart(2, '0');
 
-    // Múltiplas variações de busca para tentar a todo custo
+    // Múltiplas variações de busca priorizando 2 dígitos (padrão Panini Brasil: "Wolverine 01", "Wolverine 16")
     const queries = [
-      `${title} ${issueStr}`,
       `${title} ${issuePad}`,
+      `${title} ${issueStr}`,
       `${title}`
     ];
 
-    let currentIdx = 0;
     const allFound = [];
     const seenUrls = new Set();
 
-    function tryNextQuery() {
-      if (currentIdx >= queries.length) {
-        if (allFound.length > 0) {
-          allFound.sort((a, b) => {
-            const matchA = prefYear && a.year === prefYear ? 1 : 0;
-            const matchB = prefYear && b.year === prefYear ? 1 : 0;
-            if (matchB !== matchA) return matchB - matchA;
-            return b.year - a.year;
-          });
-          return resolve(returnAll ? allFound : allFound[0]);
-        }
-        return resolve(returnAll ? [] : null);
-      }
-
-      const q = queries[currentIdx++];
-      const url = `https://panini.com.br/catalogsearch/result/?q=${encodeURIComponent(q)}`;
-      const curlBin = process.platform === 'win32' ? 'curl.exe' : 'curl';
-      const cmd = `${curlBin} -s -L --max-time 8 "${url}"`;
-
-      exec(cmd, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
-        if (err || !stdout) {
-          return tryNextQuery();
-        }
+    for (const q of queries) {
+      try {
+        const url = `https://panini.com.br/catalogsearch/result/?q=${encodeURIComponent(q)}`;
+        let stdout = '';
 
         try {
-          const itemRegex = /<li[^>]*class=["'][^"']*product-item[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi;
-          const items = [...stdout.matchAll(itemRegex)];
-          if (!items || items.length === 0) {
-            return tryNextQuery();
-          }
-
-          for (const item of items) {
-            const content = item[1];
-            const titleMatch = content.match(/class=["'][^"']*product-item-link[^"']*["'][^>]*>\s*([\s\S]*?)\s*<\/a>/i);
-            const prodTitle = titleMatch ? titleMatch[1].trim().replace(/\s+/g, ' ') : '';
-            const imgMatch = content.match(/<img[^>]*class=["'][^"']*product-image-photo[^"']*["'][^>]*src=["']([^"']+)["']/i) ||
-                             content.match(/<img[^>]*src=["']([^"']+)["']/i);
-            let imgUrl = imgMatch ? imgMatch[1] : '';
-
-            if (imgUrl && prodTitle) {
-              // 1. Validação estrita do título da HQ e número da edição
-              if (!matchIssueNumber(prodTitle, title, issueNum)) {
-                continue;
-              }
-
-              imgUrl = imgUrl.replace(/&amp;/g, '&');
-              // Elevação de resolução segura (S300 é suportado pelo CDN Cloudfront da Panini sem erro 302)
-              if (imgUrl.includes('-S170-')) {
-                imgUrl = imgUrl.replace('-S170-', '-S300-');
-              }
-              if (imgUrl.includes('/media/catalog/product/')) {
-                imgUrl = imgUrl.split('?')[0];
-              }
-
-              // 2. Pular capas já rejeitadas ou já registradas
-              if (rejectedUrls.includes(imgUrl) || seenUrls.has(imgUrl)) {
-                continue;
-              }
-              seenUrls.add(imgUrl);
-
-              // Detectar ano de publicação (ex: "Wolverine (2025) 02" -> 2025)
-              const yearMatch = prodTitle.match(/\b(20[0-2][0-9]|19[5-9][0-9])\b/);
-              const parsedYear = yearMatch ? parseInt(yearMatch[1], 10) : 2020;
-
-              allFound.push({
-                title: prodTitle,
-                coverUrl: imgUrl,
-                source: 'Panini Brasil (panini.com.br)',
-                year: parsedYear
-              });
+          const controller = new AbortController();
+          const tid = setTimeout(() => controller.abort(), 4000);
+          const res = await fetch(url, {
+            signal: controller.signal,
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+              'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
             }
+          });
+          clearTimeout(tid);
+          if (res.ok) {
+            stdout = await res.text();
           }
+        } catch {}
 
-          if (allFound.length > 0 && !returnAll) {
-            allFound.sort((a, b) => {
-              const matchA = prefYear && a.year === prefYear ? 1 : 0;
-              const matchB = prefYear && b.year === prefYear ? 1 : 0;
-              if (matchB !== matchA) return matchB - matchA;
-              return b.year - a.year;
+        if (!stdout) {
+          const curlBin = process.platform === 'win32' ? 'curl.exe' : 'curl';
+          const cmd = `${curlBin} -s -L --max-time 6 "${url}"`;
+          stdout = await new Promise((resCurl) => {
+            exec(cmd, { maxBuffer: 10 * 1024 * 1024 }, (err, out) => {
+              resCurl(err || !out ? '' : out);
             });
-            return resolve(allFound[0]);
-          }
-
-          tryNextQuery();
-        } catch {
-          tryNextQuery();
+          });
         }
-      });
+
+        if (!stdout) continue;
+
+        const itemRegex = /<li[^>]*class=["'][^"']*product-item[^"']*["'][^>]*>([\s\S]*?)<\/li>/gi;
+        const items = [...stdout.matchAll(itemRegex)];
+        if (!items || items.length === 0) continue;
+
+        for (const item of items) {
+          const content = item[1];
+          const titleMatch = content.match(/class=["'][^"']*product-item-link[^"']*["'][^>]*>\s*([\s\S]*?)\s*<\/a>/i);
+          const prodTitle = titleMatch ? titleMatch[1].trim().replace(/\s+/g, ' ') : '';
+          const imgMatch = content.match(/<img[^>]*class=["'][^"']*product-image-photo[^"']*["'][^>]*src=["']([^"']+)["']/i) ||
+                           content.match(/<img[^>]*src=["']([^"']+)["']/i);
+          let imgUrl = imgMatch ? imgMatch[1] : '';
+
+          if (imgUrl && prodTitle) {
+            if (!matchIssueNumber(prodTitle, title, issueNum)) continue;
+
+            imgUrl = imgUrl.replace(/&amp;/g, '&');
+            if (imgUrl.includes('-S170-')) imgUrl = imgUrl.replace('-S170-', '-S300-');
+            if (imgUrl.includes('/media/catalog/product/')) imgUrl = imgUrl.split('?')[0];
+
+            if (rejectedUrls.includes(imgUrl) || seenUrls.has(imgUrl)) continue;
+            seenUrls.add(imgUrl);
+
+            const yearMatch = prodTitle.match(/\b(20[0-2][0-9]|19[5-9][0-9])\b/);
+            const parsedYear = yearMatch ? parseInt(yearMatch[1], 10) : 2020;
+
+            allFound.push({
+              title: prodTitle,
+              coverUrl: imgUrl,
+              source: 'Panini Brasil (panini.com.br)',
+              year: parsedYear
+            });
+          }
+        }
+
+        if (allFound.length > 0 && !returnAll) {
+          allFound.sort((a, b) => scoreCandidate(b, title, issueNum, prefSeries) - scoreCandidate(a, title, issueNum, prefSeries));
+          return resolve(allFound[0]);
+        }
+      } catch {}
     }
 
-    tryNextQuery();
+    if (allFound.length > 0) {
+      allFound.sort((a, b) => scoreCandidate(b, title, issueNum, prefSeries) - scoreCandidate(a, title, issueNum, prefSeries));
+      return resolve(returnAll ? allFound : allFound[0]);
+    }
+
+    return resolve(returnAll ? [] : null);
   });
 }
 

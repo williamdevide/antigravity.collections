@@ -1,6 +1,12 @@
 /**
  * Versão e Nome do Sistema
  * Gerenciado automaticamente pelo Agente Orquestrador sob o padrão SemVer (MAJOR.MINOR.PATCH)
+ * v1.10.2: Endpoint Serverless Panini Brasil oficial (/api/scrape-cover), middleware de desenvolvimento
+ *          no Vite (vite.config.js) com fetch Node.js direto contornando bloqueios de proxy/WAF,
+ *          priorização de consulta com preenchimento em 2 dígitos ('Wolverine 01'), bônus massivo (+600k)
+ *          para correspondência exata do título base da série (eliminando falsos positivos e spinoffs
+ *          como 'Novíssima Wolverine' em buscas por 'Wolverine') e penalização severa (-200k) para capas
+ *          variantes de revendedores (ex: 616 Comics Exclusive, Homage, etc.).
  * v1.10.1: Descoberta dinâmica e tradução automática de títulos PT-BR ➔ EN via API da Wikipédia/Wikidata,
  *          expansão massiva do catálogo DC Comics/Vertigo (A Brigada dos Encapotados / The Trenchcoat Brigade,
  *          Os Livros da Magia, Hellblazer, Sandman, etc.), busca resiliente com e sem artigos ('The', 'A', 'O')
@@ -45,4 +51,4 @@
  *         fallback progressivo para edições mais antigas ao rejeitar uma capa.
  */
 export const APP_NAME = 'HQs Collections';
-export const APP_VERSION = '1.10.1';
+export const APP_VERSION = '1.10.2';

@@ -463,4 +463,10 @@ atualize com a versão correta o titulo da aba do navegador
 /agente-orquestrador /grill-me /goal tentei achar capa para "A Brigada dos Encapotados" é um especial da DC, selecionei edição 01. retorna que não achou nenhuma capa
 ```
 
+### Prompt 30
+```text
+/agente-orquestrador /grill-me /goal a busca no site da panini tambem estava bem melhor. nas buscas por wolverine nem todos estão retornando as capas corretas
+```
+
+
 
