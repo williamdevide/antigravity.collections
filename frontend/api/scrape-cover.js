@@ -88,7 +88,7 @@ function getEnglishTitle(title) {
  * Utiliza o binário curl para ultrapassar firewalls/Fastly e extrair capas originais
  * Prioriza estritamente os anos mais recentes (2026 > 2025 > 2024...) e filtra URLs rejeitadas
  */
-function searchPaniniBrasil(title, issueNum, rejectedUrls = [], returnAll = false) {
+function searchPaniniBrasil(title, issueNum, rejectedUrls = [], returnAll = false, prefYear = null) {
   return new Promise((resolve) => {
     const issueStr = String(issueNum || '1').trim();
     const issuePad = issueStr.padStart(2, '0');
@@ -106,7 +106,12 @@ function searchPaniniBrasil(title, issueNum, rejectedUrls = [], returnAll = fals
     function tryNextQuery() {
       if (currentIdx >= queries.length) {
         if (allFound.length > 0) {
-          allFound.sort((a, b) => b.year - a.year);
+          allFound.sort((a, b) => {
+            const matchA = prefYear && a.year === prefYear ? 1 : 0;
+            const matchB = prefYear && b.year === prefYear ? 1 : 0;
+            if (matchB !== matchA) return matchB - matchA;
+            return b.year - a.year;
+          });
           return resolve(returnAll ? allFound : allFound[0]);
         }
         return resolve(returnAll ? [] : null);
@@ -172,7 +177,12 @@ function searchPaniniBrasil(title, issueNum, rejectedUrls = [], returnAll = fals
           }
 
           if (allFound.length > 0 && !returnAll) {
-            allFound.sort((a, b) => b.year - a.year);
+            allFound.sort((a, b) => {
+              const matchA = prefYear && a.year === prefYear ? 1 : 0;
+              const matchB = prefYear && b.year === prefYear ? 1 : 0;
+              if (matchB !== matchA) return matchB - matchA;
+              return b.year - a.year;
+            });
             return resolve(allFound[0]);
           }
 
@@ -189,9 +199,9 @@ function searchPaniniBrasil(title, issueNum, rejectedUrls = [], returnAll = fals
 
 /**
  * Busca no Fandom MediaWiki com ordenação estrita do maior volume (mais novo) para o menor
- * e fallback progressivo para volumes anteriores caso uma capa seja rejeitada
+ * ou priorizando a série preferencial confirmada
  */
-function searchFandom(title, issueNum, publisher, rejectedUrls = [], returnAll = false) {
+function searchFandom(title, issueNum, publisher, rejectedUrls = [], returnAll = false, prefYear = null, prefVol = null) {
   return new Promise(async (resolve) => {
     let wiki = 'marvel';
     if (publisher && (String(publisher).toLowerCase().includes('dc') || String(publisher).toLowerCase().includes('vertigo'))) {
@@ -200,6 +210,13 @@ function searchFandom(title, issueNum, publisher, rejectedUrls = [], returnAll =
 
     const engTitle = getEnglishTitle(title);
     const issueStr = String(issueNum);
+
+    const getFandomRank = (vol, yr) => {
+      let r = (vol * 10000) + yr;
+      if (prefVol && vol === prefVol) r += 400000;
+      if (prefYear && yr === prefYear) r += 300000;
+      return r;
+    };
 
     // Passo A: Consultar diretamente os volumes de 10 a 1 em lote (Titles API)
     // Volumes maiores correspondem às publicações mais recentes (ex: Wolverine Vol 8 = 2024-2026)
@@ -250,7 +267,7 @@ function searchFandom(title, issueNum, publisher, rejectedUrls = [], returnAll =
                 source: `${wiki.toUpperCase()} Fandom (Vol ${vol})`,
                 volume: vol,
                 year: yr,
-                rank: (vol * 10000) + yr
+                rank: getFandomRank(vol, yr)
               });
             }
 
@@ -305,7 +322,7 @@ function searchFandom(title, issueNum, publisher, rejectedUrls = [], returnAll =
               source: `${wiki.toUpperCase()} Fandom (Vol ${vol})`,
               volume: vol,
               year: yr,
-              rank: (vol * 10000) + yr
+              rank: getFandomRank(vol, yr)
             });
           }
 
@@ -332,7 +349,7 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const { title, issue, publisher, rejected } = req.query;
+  const { title, issue, publisher, rejected, prefYear, prefVol, prefSource } = req.query;
   if (!title) {
     return res.status(400).json({ found: false, message: 'Parâmetro "title" é obrigatório.' });
   }
@@ -340,6 +357,11 @@ export default async function handler(req, res) {
   const issueNum = issue || '1';
   const cleanTitle = String(title).trim();
   const returnAll = req.query.all === 'true' || req.query.all === '1';
+
+  // Parâmetros de série preferencial confirmada
+  const parsedPrefYear = prefYear ? parseInt(prefYear, 10) : null;
+  const parsedPrefVol = prefVol ? parseInt(prefVol, 10) : null;
+  const parsedPrefSource = prefSource ? String(prefSource).trim().toLowerCase() : null;
 
   const rejectedUrls = rejected 
     ? String(rejected).split(',').map(u => decodeURIComponent(u.trim())).filter(Boolean)
@@ -349,8 +371,8 @@ export default async function handler(req, res) {
     if (returnAll) {
       // Coleta todas as ocorrências encontradas em todas as fontes
       const [paniniList, fandomList] = await Promise.all([
-        searchPaniniBrasil(cleanTitle, issueNum, rejectedUrls, true),
-        searchFandom(cleanTitle, issueNum, publisher, rejectedUrls, true)
+        searchPaniniBrasil(cleanTitle, issueNum, rejectedUrls, true, parsedPrefYear),
+        searchFandom(cleanTitle, issueNum, publisher, rejectedUrls, true, parsedPrefYear, parsedPrefVol)
       ]);
 
       const seenUrls = new Set();
@@ -363,12 +385,20 @@ export default async function handler(req, res) {
         }
       }
 
-      // Ordenar por relevância (Panini mais recentes e Fandom maiores volumes/anos)
-      combined.sort((a, b) => {
-        const scoreA = (a.volume ? a.volume * 10000 : (a.source?.includes('Panini') ? 90000 : 0)) + (a.year || 1990);
-        const scoreB = (b.volume ? b.volume * 10000 : (b.source?.includes('Panini') ? 90000 : 0)) + (b.year || 1990);
-        return scoreB - scoreA;
-      });
+      // Ordenar com máxima prioridade para itens da série confirmada (Ano, Volume, Fonte)
+      const getCandidateScore = (c) => {
+        let base = (c.volume ? c.volume * 10000 : (c.source?.includes('Panini') ? 90000 : 0)) + (c.year || 1990);
+        const src = (c.source || '').toLowerCase();
+        if (parsedPrefSource && src.includes(parsedPrefSource)) base += 300000;
+        if (parsedPrefYear && c.year === parsedPrefYear) base += 400000;
+        if (parsedPrefVol && c.volume === parsedPrefVol) base += 350000;
+        if (parsedPrefSource && src.includes(parsedPrefSource) && parsedPrefYear && c.year === parsedPrefYear) {
+          base += 600000;
+        }
+        return base;
+      };
+
+      combined.sort((a, b) => getCandidateScore(b) - getCandidateScore(a));
 
       return res.status(200).json({
         found: combined.length > 0,
@@ -380,30 +410,57 @@ export default async function handler(req, res) {
       });
     }
 
-    // 1. Forçar a busca na Panini Brasil
-    const paniniResult = await searchPaniniBrasil(cleanTitle, issueNum, rejectedUrls, false);
-    if (paniniResult) {
-      return res.status(200).json({
-        found: true,
-        coverUrl: paniniResult.coverUrl,
-        source: paniniResult.source,
-        year: paniniResult.year,
-        title: paniniResult.title,
-        candidates: [paniniResult]
-      });
-    }
+    // Se o usuário confirmou previamente uma série do Fandom, busca no Fandom primeiro
+    if (parsedPrefSource === 'fandom') {
+      const fandomResult = await searchFandom(cleanTitle, issueNum, publisher, rejectedUrls, false, parsedPrefYear, parsedPrefVol);
+      if (fandomResult) {
+        return res.status(200).json({
+          found: true,
+          coverUrl: fandomResult.coverUrl,
+          source: fandomResult.source,
+          year: fandomResult.year,
+          title: fandomResult.title,
+          candidates: [fandomResult]
+        });
+      }
 
-    // 2. Fandom MediaWiki (maior volume / mais recente primeiro)
-    const fandomResult = await searchFandom(cleanTitle, issueNum, publisher, rejectedUrls, false);
-    if (fandomResult) {
-      return res.status(200).json({
-        found: true,
-        coverUrl: fandomResult.coverUrl,
-        source: fandomResult.source,
-        year: fandomResult.year,
-        title: fandomResult.title,
-        candidates: [fandomResult]
-      });
+      const paniniResult = await searchPaniniBrasil(cleanTitle, issueNum, rejectedUrls, false, parsedPrefYear);
+      if (paniniResult) {
+        return res.status(200).json({
+          found: true,
+          coverUrl: paniniResult.coverUrl,
+          source: paniniResult.source,
+          year: paniniResult.year,
+          title: paniniResult.title,
+          candidates: [paniniResult]
+        });
+      }
+    } else {
+      // 1. Forçar a busca na Panini Brasil
+      const paniniResult = await searchPaniniBrasil(cleanTitle, issueNum, rejectedUrls, false, parsedPrefYear);
+      if (paniniResult) {
+        return res.status(200).json({
+          found: true,
+          coverUrl: paniniResult.coverUrl,
+          source: paniniResult.source,
+          year: paniniResult.year,
+          title: paniniResult.title,
+          candidates: [paniniResult]
+        });
+      }
+
+      // 2. Fandom MediaWiki (maior volume / mais recente primeiro)
+      const fandomResult = await searchFandom(cleanTitle, issueNum, publisher, rejectedUrls, false, parsedPrefYear, parsedPrefVol);
+      if (fandomResult) {
+        return res.status(200).json({
+          found: true,
+          coverUrl: fandomResult.coverUrl,
+          source: fandomResult.source,
+          year: fandomResult.year,
+          title: fandomResult.title,
+          candidates: [fandomResult]
+        });
+      }
     }
 
     // 3. Fallback OpenLibrary

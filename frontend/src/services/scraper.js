@@ -84,7 +84,7 @@ function getEnglishTitle(title) {
  * Busca de contingência da Panini Brasil direto no cliente via proxy CORS público
  * Usado se o backend local ou endpoint serverless estiverem inacessíveis
  */
-export async function searchPaniniClientSide(title, issueNum, rejectedUrls = [], returnAll = false) {
+export async function searchPaniniClientSide(title, issueNum, rejectedUrls = [], returnAll = false, prefYear = null) {
   try {
     const issueStr = String(issueNum || '1').trim();
     const issuePad = issueStr.padStart(2, '0');
@@ -167,7 +167,12 @@ export async function searchPaniniClientSide(title, issueNum, rejectedUrls = [],
         }
 
         if (allFound.length > 0 && !returnAll) {
-          allFound.sort((a, b) => b.year - a.year);
+          allFound.sort((a, b) => {
+            const matchA = prefYear && a.year === prefYear ? 1 : 0;
+            const matchB = prefYear && b.year === prefYear ? 1 : 0;
+            if (matchB !== matchA) return matchB - matchA;
+            return b.year - a.year;
+          });
           return allFound[0];
         }
       } catch {
@@ -176,7 +181,12 @@ export async function searchPaniniClientSide(title, issueNum, rejectedUrls = [],
     }
 
     if (allFound.length > 0) {
-      allFound.sort((a, b) => b.year - a.year);
+      allFound.sort((a, b) => {
+        const matchA = prefYear && a.year === prefYear ? 1 : 0;
+        const matchB = prefYear && b.year === prefYear ? 1 : 0;
+        if (matchB !== matchA) return matchB - matchA;
+        return b.year - a.year;
+      });
       return returnAll ? allFound : allFound[0];
     }
     return returnAll ? [] : null;
@@ -191,9 +201,16 @@ export async function searchIssueCover(comic, issueNum, rejectedUrls = []) {
   const issue = String(issueNum);
   const rejectedParam = rejectedUrls.length > 0 ? `&rejected=${encodeURIComponent(rejectedUrls.join(','))}` : '';
 
+  // Parâmetros da série confirmada para guiar as outras edições
+  const prefSeries = comic.preferredSeries;
+  const prefYearParam = prefSeries?.year ? `&prefYear=${encodeURIComponent(prefSeries.year)}` : '';
+  const prefVolParam = prefSeries?.volume ? `&prefVol=${encodeURIComponent(prefSeries.volume)}` : '';
+  const prefSrcParam = prefSeries?.source ? `&prefSource=${encodeURIComponent(prefSeries.source)}` : '';
+  const prefParams = `${prefYearParam}${prefVolParam}${prefSrcParam}`;
+
   // 1. Tentar primeiro o endpoint relativo /api/scrape-cover (Vercel Serverless / Proxy local)
   try {
-    const relativeUrl = `/api/scrape-cover?title=${encodeURIComponent(title)}&issue=${encodeURIComponent(issue)}&publisher=${encodeURIComponent(publisher)}${rejectedParam}`;
+    const relativeUrl = `/api/scrape-cover?title=${encodeURIComponent(title)}&issue=${encodeURIComponent(issue)}&publisher=${encodeURIComponent(publisher)}${rejectedParam}${prefParams}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4000);
 
@@ -219,7 +236,7 @@ export async function searchIssueCover(comic, issueNum, rejectedUrls = []) {
 
   // 2. Tentar endpoint do backend Express local se estiver ativo na porta 3001
   try {
-    const backendUrl = `http://localhost:3001/api/scrape-cover?title=${encodeURIComponent(title)}&issue=${encodeURIComponent(issue)}&publisher=${encodeURIComponent(publisher)}${rejectedParam}`;
+    const backendUrl = `http://localhost:3001/api/scrape-cover?title=${encodeURIComponent(title)}&issue=${encodeURIComponent(issue)}&publisher=${encodeURIComponent(publisher)}${rejectedParam}${prefParams}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3500);
 
@@ -245,7 +262,7 @@ export async function searchIssueCover(comic, issueNum, rejectedUrls = []) {
 
   // 3. Contingência: Forçar busca direta no site da Panini Brasil via proxy de cliente
   try {
-    const paniniDirect = await searchPaniniClientSide(title, issueNum, rejectedUrls, false);
+    const paniniDirect = await searchPaniniClientSide(title, issueNum, rejectedUrls, false, prefSeries?.year);
     if (paniniDirect && paniniDirect.coverUrl) {
       return {
         found: true,
@@ -263,6 +280,13 @@ export async function searchIssueCover(comic, issueNum, rejectedUrls = []) {
   try {
     const wiki = publisher.toLowerCase().includes('dc') || publisher.toLowerCase().includes('vertigo') ? 'dc' : 'marvel';
     const engTitle = getEnglishTitle(title);
+
+    const getFandomRank = (vol, yr) => {
+      let r = (vol * 10000) + yr;
+      if (prefSeries?.volume && vol === prefSeries.volume) r += 400000;
+      if (prefSeries?.year && yr === prefSeries.year) r += 300000;
+      return r;
+    };
 
     // Passo A: Consultar diretamente os volumes de 10 a 1 em lote (Titles API)
     const directTitles = [];
@@ -298,7 +322,7 @@ export async function searchIssueCover(comic, issueNum, rejectedUrls = []) {
             title: p.title,
             year: yr,
             volume: vol,
-            rank: (vol * 10000) + yr,
+            rank: getFandomRank(vol, yr),
             source: `${wiki.toUpperCase()} Fandom (Vol ${vol})`
           });
         }
@@ -345,7 +369,7 @@ export async function searchIssueCover(comic, issueNum, rejectedUrls = []) {
             title: p.title,
             year: yr,
             volume: vol,
-            rank: (vol * 10000) + yr,
+            rank: getFandomRank(vol, yr),
             source: `${wiki.toUpperCase()} Fandom`
           });
         }
@@ -412,9 +436,16 @@ export async function searchAllIssueCovers(comic, issueNum, rejectedUrls = []) {
   const issue = String(issueNum);
   const rejectedParam = rejectedUrls.length > 0 ? `&rejected=${encodeURIComponent(rejectedUrls.join(','))}` : '';
 
+  // Parâmetros da série confirmada para ordenar todas as ocorrências
+  const prefSeries = comic.preferredSeries;
+  const prefYearParam = prefSeries?.year ? `&prefYear=${encodeURIComponent(prefSeries.year)}` : '';
+  const prefVolParam = prefSeries?.volume ? `&prefVol=${encodeURIComponent(prefSeries.volume)}` : '';
+  const prefSrcParam = prefSeries?.source ? `&prefSource=${encodeURIComponent(prefSeries.source)}` : '';
+  const prefParams = `${prefYearParam}${prefVolParam}${prefSrcParam}`;
+
   // 1. Tentar endpoint com all=true (Vercel Serverless / Proxy Vite local)
   try {
-    const url = `/api/scrape-cover?title=${encodeURIComponent(title)}&issue=${encodeURIComponent(issue)}&publisher=${encodeURIComponent(publisher)}&all=true${rejectedParam}`;
+    const url = `/api/scrape-cover?title=${encodeURIComponent(title)}&issue=${encodeURIComponent(issue)}&publisher=${encodeURIComponent(publisher)}&all=true${rejectedParam}${prefParams}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6000);
     const resp = await fetch(url, { signal: controller.signal });
@@ -436,7 +467,7 @@ export async function searchAllIssueCovers(comic, issueNum, rejectedUrls = []) {
 
   // 2. Tentar backend local porta 3001
   try {
-    const backendUrl = `http://localhost:3001/api/scrape-cover?title=${encodeURIComponent(title)}&issue=${encodeURIComponent(issue)}&publisher=${encodeURIComponent(publisher)}&all=true${rejectedParam}`;
+    const backendUrl = `http://localhost:3001/api/scrape-cover?title=${encodeURIComponent(title)}&issue=${encodeURIComponent(issue)}&publisher=${encodeURIComponent(publisher)}&all=true${rejectedParam}${prefParams}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4000);
     const resp = await fetch(backendUrl, { signal: controller.signal });
@@ -459,7 +490,7 @@ export async function searchAllIssueCovers(comic, issueNum, rejectedUrls = []) {
   // 3. Fallback no cliente: Combinar Panini Client-Side e Fandom MediaWiki
   try {
     const [paniniCandidates, fandomCandidates] = await Promise.all([
-      searchPaniniClientSide(title, issueNum, rejectedUrls, true).catch(() => []),
+      searchPaniniClientSide(title, issueNum, rejectedUrls, true, prefSeries?.year).catch(() => []),
       (async () => {
         const wiki = publisher.toLowerCase().includes('dc') || publisher.toLowerCase().includes('vertigo') ? 'dc' : 'marvel';
         const engTitle = getEnglishTitle(title);
@@ -518,11 +549,16 @@ export async function searchAllIssueCovers(comic, issueNum, rejectedUrls = []) {
       }
     }
 
-    combined.sort((a, b) => {
-      const scoreA = (a.volume ? a.volume * 10000 : (a.source?.includes('Panini') ? 90000 : 0)) + (a.year || 1990);
-      const scoreB = (b.volume ? b.volume * 10000 : (b.source?.includes('Panini') ? 90000 : 0)) + (b.year || 1990);
-      return scoreB - scoreA;
-    });
+    const getCandidateScore = (item) => {
+      let score = (item.volume ? item.volume * 10000 : (item.source?.includes('Panini') ? 90000 : 0)) + (item.year || 1990);
+      const itemSrc = (item.source || '').toLowerCase();
+      if (prefSeries?.source && itemSrc.includes(prefSeries.source.toLowerCase())) score += 300000;
+      if (prefSeries?.year && item.year === prefSeries.year) score += 400000;
+      if (prefSeries?.volume && item.volume === prefSeries.volume) score += 350000;
+      return score;
+    };
+
+    combined.sort((a, b) => getCandidateScore(b) - getCandidateScore(a));
 
     if (combined.length > 0) {
       return {

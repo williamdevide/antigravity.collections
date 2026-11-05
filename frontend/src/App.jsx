@@ -37,7 +37,8 @@ import {
   Bookmark,
   CheckCircle,
   HelpCircle,
-  RefreshCw
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
 import { 
   subscribeComics, 
@@ -143,6 +144,9 @@ export default function App() {
 
   // Modal de Confirmação para Desvincular Capa
   const [unlinkConfirmation, setUnlinkConfirmation] = useState(null); // { comicId, comicName, issueNum, coverUrl }
+
+  // Notificação Discreta Temporária de Alinhamento de Série de Capas
+  const [seriesToast, setSeriesToast] = useState(null); // { message, detail, type: 'loading' | 'success' | 'info' }
 
   // Modal de Título de Edição Específica (Minissérie e Coleção no Modo Edição)
   const [issueTitleModal, setIssueTitleModal] = useState(null); // { comic, issueNum, currentTitle }
@@ -541,7 +545,121 @@ export default function App() {
     }
   };
 
+  // Propagação inteligente de sugestões de capas da mesma série para as outras edições
+  const propagateSeriesSuggestions = async (targetComic, series) => {
+    if (!targetComic || !series) return;
+
+    const seriesLabel = series.sourceLabel || (series.source === 'panini' ? 'Panini Brasil' : 'Fandom');
+    const seriesDesc = `${seriesLabel}${series.year ? ' • ' + series.year : ''}${series.volume ? ' • Vol ' + series.volume : ''}`;
+
+    setSeriesToast({
+      message: `Série identificada para ${targetComic.name}`,
+      detail: `${seriesDesc}: buscando e alinhando capas para as outras edições...`,
+      type: 'loading'
+    });
+
+    const startFrom = typeof targetComic.startFrom === 'number' && targetComic.startFrom > 1 ? targetComic.startFrom : 1;
+    const initialChunkStart = Math.floor((startFrom - 1) / 10) * 10 + 1;
+    const ownedNumbers = targetComic.ownedNumbers || [];
+    const maxOwned = ownedNumbers.length > 0 ? Math.max(...ownedNumbers) : startFrom;
+    const currentLimit = targetComic.completedUntil || Math.max(initialChunkStart + 9, maxOwned, startFrom);
+
+    const issuesToSearch = [];
+    for (let n = initialChunkStart; n <= currentLimit; n++) {
+      // Alinha todas as edições que ainda não possuem capa fixada oficialmente
+      if (!targetComic.issueCovers?.[n]) {
+        issuesToSearch.push(n);
+      }
+    }
+
+    if (issuesToSearch.length === 0) {
+      setSeriesToast({
+        message: `Série alinhada para ${targetComic.name}`,
+        detail: `Todas as edições já possuem capa oficial fixada.`,
+        type: 'success'
+      });
+      setTimeout(() => setSeriesToast(null), 4000);
+      return;
+    }
+
+    let foundCount = 0;
+    let currentComicState = { ...targetComic };
+
+    try {
+      for (const n of issuesToSearch) {
+        // Coleta capas já usadas para garantir unicidade
+        const otherCoverUrls = Object.entries(currentComicState.issueCovers || {})
+          .filter(([k]) => k !== String(n))
+          .map(([, url]) => url)
+          .concat(
+            Object.entries(currentComicState.pendingCovers || {})
+              .filter(([k]) => k !== String(n))
+              .map(([, p]) => p?.coverUrl)
+              .filter(Boolean)
+          );
+
+        const issueRejected = currentComicState.rejectedCovers?.[n] || [];
+        const excludedUrls = Array.from(new Set([...issueRejected, ...otherCoverUrls]));
+
+        const queueKey = `${targetComic.id}_${n}`;
+        scrapingQueueRef.current.delete(queueKey);
+
+        const res = await searchIssueCover(currentComicState, n, excludedUrls);
+        if (res && res.found && res.coverUrl && !excludedUrls.includes(res.coverUrl)) {
+          foundCount++;
+          const updatedPending = {
+            ...(currentComicState.pendingCovers || {}),
+            [n]: {
+              coverUrl: res.coverUrl,
+              source: res.source,
+              year: res.year,
+              title: res.title
+            }
+          };
+          const updatedSearched = {
+            ...(currentComicState.searchedIssues || {}),
+            [n]: true
+          };
+          currentComicState = {
+            ...currentComicState,
+            pendingCovers: updatedPending,
+            searchedIssues: updatedSearched
+          };
+        }
+
+        await new Promise(r => setTimeout(r, 300));
+      }
+
+      const saved = await saveComic(currentComicState);
+      setComics(saved);
+
+      if (viewingIssueDetail && viewingIssueDetail.comic.id === targetComic.id) {
+        const fresh = saved.find(c => c.id === targetComic.id);
+        if (fresh) {
+          setViewingIssueDetail({ comic: fresh, issueNum: viewingIssueDetail.issueNum });
+        }
+      }
+
+      setSeriesToast({
+        message: `Capas da série alinhadas com sucesso!`,
+        detail: `${foundCount} sugestão(ões) da série ${seriesDesc} adicionada(s) para ${targetComic.name}. Toque no botão verde (✓) em cada edição para confirmar.`,
+        type: 'success'
+      });
+      setTimeout(() => setSeriesToast(null), 6000);
+    } catch (err) {
+      console.warn('Erro ao propagar série:', err);
+      setSeriesToast({
+        message: `Alinhamento de série`,
+        detail: `Houve uma intermitência na busca, mas a série foi gravada e as buscas continuarão em segundo plano.`,
+        type: 'info'
+      });
+      setTimeout(() => setSeriesToast(null), 4000);
+    }
+  };
+
   // Aprovar Capa Pendente (Botão com V verde sem texto)
+  // Ao aprovar, identifica a série (Ano, Volume, Fonte) e auxilia na escolha/sugestão
+  // de capas para as outras edições da mesma HQ que ainda não possuem capa fixada.
   const handleApproveCover = async (comicId, issueNum) => {
     const comic = comics.find(c => c.id === comicId);
     if (!comic) return;
@@ -549,14 +667,38 @@ export default function App() {
     const pendingCover = comic.pendingCovers?.[issueNum];
     if (!pendingCover) return;
 
-    const updatedCovers = { ...(comic.issueCovers || {}), [issueNum]: pendingCover.coverUrl };
+    const approvedUrl = pendingCover.coverUrl;
+    const approvedSource = pendingCover.source || '';
+    const approvedYear = pendingCover.year || null;
+    let approvedVol = pendingCover.volume || null;
+
+    if (!approvedVol && approvedSource) {
+      const volM = approvedSource.match(/Vol\s*(\d+)/i) || (pendingCover.title && pendingCover.title.match(/Vol(?:ume|\.)?\s*(\d+)/i));
+      if (volM) approvedVol = parseInt(volM[1], 10);
+    }
+
+    let srcKey = 'panini';
+    if (approvedSource.toLowerCase().includes('fandom')) srcKey = 'fandom';
+    else if (approvedSource.toLowerCase().includes('open library')) srcKey = 'openlibrary';
+    else if (approvedSource.toLowerCase().includes('panini')) srcKey = 'panini';
+
+    const preferredSeries = {
+      year: approvedYear,
+      volume: approvedVol,
+      source: srcKey,
+      sourceLabel: approvedSource || (srcKey === 'panini' ? 'Panini Brasil' : 'Fandom'),
+      approvedFromIssue: issueNum
+    };
+
+    const updatedCovers = { ...(comic.issueCovers || {}), [issueNum]: approvedUrl };
     const updatedPending = { ...(comic.pendingCovers || {}) };
     delete updatedPending[issueNum];
 
     const updatedComic = {
       ...comic,
       issueCovers: updatedCovers,
-      pendingCovers: updatedPending
+      pendingCovers: updatedPending,
+      preferredSeries
     };
 
     const updated = await saveComic(updatedComic);
@@ -565,6 +707,9 @@ export default function App() {
     if (viewingIssueDetail && viewingIssueDetail.comic.id === comicId) {
       setViewingIssueDetail({ comic: updatedComic, issueNum });
     }
+
+    // Auxilia na escolha de capas para as outras edições da mesma HQ
+    propagateSeriesSuggestions(updatedComic, preferredSeries);
   };
 
   // Rejeitar Capa Pendente (Botão com X vermelho sem texto)
@@ -691,6 +836,7 @@ export default function App() {
         coverUrl: candidate.coverUrl,
         source: candidate.source,
         year: candidate.year,
+        volume: candidate.volume,
         title: candidate.title
       }
     };
@@ -1396,6 +1542,43 @@ export default function App() {
 
       {/* CONTEÚDO PRINCIPAL - TELA ÚNICA */}
       <main className="flex-1 max-w-xl w-full mx-auto p-3.5 sm:p-4 space-y-3.5">
+
+        {/* BANNER/TOAST DE NOTIFICAÇÃO DISCRETA DE ALINHAMENTO DE SÉRIE */}
+        {seriesToast && (
+          <aside
+            role="status"
+            aria-live="polite"
+            className="relative overflow-hidden p-3 rounded-2xl bg-gradient-to-r from-indigo-950/90 via-slate-900/95 to-purple-950/90 border border-indigo-500/40 shadow-xl backdrop-blur-md animate-fadeIn"
+          >
+            <div className="flex items-start gap-2.5">
+              <div className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-400 shrink-0 mt-0.5">
+                {seriesToast.type === 'loading' ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-indigo-400" />
+                ) : (
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0 pr-6">
+                <h3 className="text-xs font-bold text-white tracking-wide flex items-center gap-1.5">
+                  {seriesToast.message}
+                </h3>
+                {seriesToast.detail && (
+                  <p className="text-[11px] text-indigo-200/90 mt-0.5 leading-snug break-words">
+                    {seriesToast.detail}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setSeriesToast(null)}
+                className="absolute top-2.5 right-2.5 p-1 rounded-lg text-indigo-300/60 hover:text-white hover:bg-white/10 transition"
+                title="Fechar notificação"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </aside>
+        )}
         
         {/* BARRA DE ADICIONAR NOVO TÍTULO COM TIPO, EDITORA, INÍCIO E BOTÃO DETALHADO */}
         <section className={`p-3 rounded-2xl border shadow-xl space-y-2.5 transition ${
@@ -2058,6 +2241,17 @@ export default function App() {
                     </span>
                   );
                 })()}
+
+                {/* Alinhamento de Série Reconhecida */}
+                {viewingIssueDetail.comic.preferredSeries && (
+                  <span 
+                    className="text-[10px] font-semibold px-2 py-0.5 rounded border border-indigo-500/40 bg-indigo-950/70 text-indigo-300 flex items-center gap-1 shadow-sm"
+                    title={`Série Confirmada: ${viewingIssueDetail.comic.preferredSeries.sourceLabel || ''}${viewingIssueDetail.comic.preferredSeries.year ? ' (' + viewingIssueDetail.comic.preferredSeries.year + ')' : ''}`}
+                  >
+                    <Sparkles className="w-3 h-3 text-amber-400" />
+                    Série: {viewingIssueDetail.comic.preferredSeries.year || viewingIssueDetail.comic.preferredSeries.sourceLabel}
+                  </span>
+                )}
               </div>
 
               {viewingIssueDetail.comic.issueTitles?.[viewingIssueDetail.issueNum] && (
@@ -2809,6 +3003,14 @@ export default function App() {
                               <>
                                 <span>•</span>
                                 <span className="text-amber-400/80 truncate max-w-[120px]">{item.source}</span>
+                              </>
+                            )}
+                            {item.comic.preferredSeries && (
+                              <>
+                                <span>•</span>
+                                <span className="text-[10px] text-indigo-300 font-semibold truncate max-w-[140px]" title={`Série Alinhada: ${item.comic.preferredSeries.sourceLabel || ''}`}>
+                                  ⚡ {item.comic.preferredSeries.year || item.comic.preferredSeries.sourceLabel}
+                                </span>
                               </>
                             )}
                           </div>

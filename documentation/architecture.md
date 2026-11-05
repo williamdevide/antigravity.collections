@@ -1,7 +1,7 @@
-# 🏛️ Arquitetura do Sistema: HQs Collections `v1.7.0`
+# 🏛️ Arquitetura do Sistema: HQs Collections `v1.8.0`
 
 ## 1. Visão Geral
-O **HQs Collections** é um sistema projetado para colecionadores de quadrinhos com foco em extrema agilidade no ambiente mobile ("Mobile First"). A aplicação opera em **tela única**, minimizando cliques, eliminando navegações desnecessárias, agrupando edições em blocos táteis de 10 em 10, categorizando coleções por Tipo e Editora, permitindo ordenação personalizada com **Drag & Drop**, títulos específicos por fascículo, suporte a início em edições avançadas (`startFrom`), **ciclo interativo de 4 estágios com destaque em neon**, **alternador cíclico de 3 modos (Consulta / Edição / Consulta Capa)**, **grade compacta de cards em 2 colunas com a última edição adquirida**, **scraper da Panini Brasil de alta precisão com suporte a Vol. N e resolução S300**, **carrossel condicional de sugestões de capas** e **modal de alerta customizado de confirmação**.
+O **HQs Collections** é um sistema projetado para colecionadores de quadrinhos com foco em extrema agilidade no ambiente mobile ("Mobile First"). A aplicação opera em **tela única**, minimizando cliques, eliminando navegações desnecessárias, agrupando edições em blocos táteis de 10 em 10, categorizando coleções por Tipo e Editora, permitindo ordenação personalizada com **Drag & Drop**, títulos específicos por fascículo, suporte a início em edições avançadas (`startFrom`), **ciclo interativo de 4 estágios com destaque em neon**, **alternador cíclico de 3 modos (Consulta / Edição / Consulta Capa)**, **grade compacta de cards em 2 colunas com a última edição adquirida**, **scraper da Panini Brasil de alta precisão com suporte a Vol. N e resolução S300**, **carrossel condicional de sugestões de capas**, **modal de alerta customizado de confirmação** e **propagação inteligente de séries de capas com alinhamento automatizado de coleções**.
 
 ---
 
@@ -104,6 +104,34 @@ sequenceDiagram
         UI->>Engine: Re-busca adicionando URL de 2025 em rejectedUrls
         Engine-->>UI: Retorna próxima alternativa mais antiga: Wolverine Vol 7 #2 (2020)
     end
+```
+
+---
+
+## 4. Fluxo de Propagação Inteligente de Séries de Capas
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Colecionador
+    participant UI as HQs Collections UI
+    participant Sync as Firestore / LocalStorage
+    participant Scraper as Scraper Engine (Panini & Web)
+
+    User->>UI: Confirma e aprova capa oficial do Wolverine #16 (Panini 2025)
+    UI->>UI: Extrai metadados da série: { year: 2025, volume: null, source: 'panini' }
+    UI->>Sync: Salva preferredSeries na HQ Wolverine
+    UI->>UI: Exibe Toast discreto: "Série identificada: buscando e alinhando outras edições..."
+    
+    loop Para cada edição sem capa fixada (#1 a #15)
+        UI->>Scraper: searchIssueCover(comic, issue, excludedUrls, prefYear=2025, prefSource='panini')
+        Scraper-->>UI: Retorna candidato prioritário da mesma série (Panini 2025)
+        UI->>UI: Define como pendingCovers[n] (Aguardando Aprovação ✓)
+    end
+
+    UI->>Sync: Persiste novas sugestões pendentes alinhadas
+    UI->>UI: Notificação Toast: "Capas alinhadas com sucesso! Confirme as edições."
+    User->>UI: Toca no [✓] de cada edição para aprovar rapidamente
 ```
 
 ---

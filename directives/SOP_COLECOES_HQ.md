@@ -3,7 +3,7 @@
 ## 1. Visão Geral e Propósito
 Aplicação Web First Mobile para controle ágil de coleções de Histórias em Quadrinhos, Especiais, Minisséries e Coleções em tela única.
 * **Nome Oficial:** `HQs Collections`
-* **Versão:** `1.7.0`
+* **Versão:** `1.8.0`
 
 ## 2. Header & Navegação Mobile First
 * **Marca e Identidade:** Logotipo `BookOpen`, Título `HQs Collections`, versão SemVer (`v1.7.0`), badge `Mobile` e slogan `Controle Ágil de Coleções`.
@@ -68,3 +68,10 @@ Aplicação Web First Mobile para controle ágil de coleções de Histórias em 
   * **Linha 1:** Nome da HQ e número da última edição que tenho (ex: *"Wolverine #16"* ou *"Wolverine (Sem ed.)"*).
   * **Linha 2:** Badges compactos com a **Editora** e o **Tipo de Publicação** (ex: `[Marvel] [Mensal]`).
 * **Interatividade ao Tocar:** Ao tocar no card, abre o **Modal de Detalhes daquela edição** exibindo a capa em tamanho ampliado, metadados e opções de curadoria. Suporta reordenação via Drag & Drop.
+
+## 10. Propagação Inteligente de Séries de Capas
+* **Auxílio Automatizado por Confirmação:** Ao escolher e aprovar a capa de uma edição (ex: Wolverine #16 da Panini 2025 ou Fandom Vol 8), o sistema armazena a série identificada (`preferredSeries` contendo Ano, Volume e Fonte).
+* **Alinhamento para Outras Edições:** Automaticamente busca e sugere para **todas as outras edições** daquela HQ que ainda não possuem capa fixada as imagens pertencentes à mesma série/ano/volume, substituindo sugestões pendentes divergentes.
+* **Segurança e Confirmação Pendente:** As novas capas sugeridas permanecem no estado **pendente de aprovação** (`status === 'pending'`), exigindo que o colecionador revise e confirme cada uma com o botão verde (`✓`).
+* **Notificação Visual em Tempo Real:** Banner/toast discreto no topo do aplicativo informa o início do alinhamento da série e a conclusão da busca em lote.
+* **Badges de Série Reconhecida:** Exibe distintivo visual `⚡ Série: [Ano/Fonte]` no modal de detalhes da edição e no painel de status de busca de capas.

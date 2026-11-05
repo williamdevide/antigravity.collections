@@ -263,6 +263,30 @@ Pergunta: Como você prefere a ordem do ciclo e a representação visual do bot�
 Resposta do Usuário: (Recommended) Ciclo de 3 toques: Consulta [Eye] ➔ Edição [Pencil] ➔ Consulta Capa [ScanEye / Olho com destaque de Capa], com tooltip indicando o modo ativo
 ```
 
+### Prompt 19
+```text
+/agente-orquestrador /grill-me /goal o fato de escolher e confirmar a capa de uma edição deve auxiliar na escolha das capas das outras edições da mesma hq (exemplo escolhi a capa do wolverine 16, automaticamente sugere como escolha de capa para as outras edições as que fazem parte da mesma série, contudo ainda fica pendente a confirmação.
+```
+
+### Resposta Grill-Me / Interação 26
+```text
+Pergunta: Ao confirmar a capa de uma edição (ex: Wolverine #16 da série 2025), para quais outras edições daquela HQ o sistema deve buscar e sugerir capas da mesma série?
+Resposta do Usuário: (Recommended) Todas as edições daquela HQ que ainda não possuem capa fixada (substitui sugestões pendentes antigas para alinhar toda a coleção à mesma série)
+```
+
+### Resposta Grill-Me / Interação 27
+```text
+Pergunta: Quando você confirmar uma capa e o sistema disparar a sugestão para as outras edições da série, como você prefere ser avisado?
+Resposta do Usuário: (Recommended) Notificação visual discreta temporária (banner/toast no topo informando que a série foi alinhada e as outras edições estão sendo atualizadas)
+```
+
+### Resposta Grill-Me / Interação 28
+```text
+Pergunta: Como você prefere que o sistema identifique se outra edição pertence à 'mesma série' da capa confirmada?
+Resposta do Usuário: (Recommended) Correspondência inteligente por Ano, Volume e Fonte (ex: Panini Brasil 2025 ou Fandom Vol 8), garantindo coerência visual em toda a coleção
+```
+
+
 
 
 

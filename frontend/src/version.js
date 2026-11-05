@@ -1,6 +1,10 @@
 /**
  * Versão e Nome do Sistema
  * Gerenciado automaticamente pelo Agente Orquestrador sob o padrão SemVer (MAJOR.MINOR.PATCH)
+ * v1.8.0: Propagação inteligente de séries de capas: ao confirmar a capa de uma edição (ex: Wolverine #16),
+ *         o sistema identifica automaticamente o Ano, Volume e Fonte da publicação e propaga sugestões
+ *         da mesma série para todas as outras edições daquela HQ que ainda não possuem capa fixada,
+ *         mantendo-as pendentes de aprovação e exibindo notificação discreta em tempo real no topo do app.
  * v1.7.0: Novo Modo Consulta Capa com botão cíclico de 3 modos no header (Consulta [Eye] ➔ Edição [Pencil]
  *         ➔ Consulta Capa [ScanEye]), exibindo galeria de cards compactos em 2 colunas com nome da HQ
  *         e número da última edição que tenho na linha 1, editora e tipo na linha 2, e capa da última edição.
@@ -19,4 +23,4 @@
  *         fallback progressivo para edições mais antigas ao rejeitar uma capa.
  */
 export const APP_NAME = 'HQs Collections';
-export const APP_VERSION = '1.7.0';
+export const APP_VERSION = '1.8.0';
