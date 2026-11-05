@@ -2,33 +2,56 @@ import { exec } from 'child_process';
 import https from 'https';
 
 /**
- * Validador estrito de número de edição
- * Impede que edições diferentes recebam a mesma capa genérica
- * e garante que anos de 4 dígitos (ex: 2025) não sejam confundidos com o número do fascículo
+ * Validador estrito de número de edição e identificador de HQ
+ * Impede que edições diferentes recebam a mesma capa genérica,
+ * garante que o título pertença à HQ pesquisada (ex: não sugerir Deadpool para Wolverine)
+ * e reconhece edições tanto no padrão Panini ("Wolverine (2022) Vol. 16") quanto Fandom ("Wolverine Vol 8 2")
  */
-function matchIssueNumber(title, issueNum) {
+function matchIssueNumber(title, comicOrIssue, maybeIssue) {
+  const comicName = maybeIssue !== undefined ? comicOrIssue : '';
+  const issueNum = maybeIssue !== undefined ? maybeIssue : comicOrIssue;
+
+  if (!title) return false;
   const num = parseInt(issueNum, 10);
   if (isNaN(num)) return false;
 
-  let cleaned = title.replace(/\b(19\d{2}|20[0-3]\d)\b/g, ' ');
+  const normTitle = title.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const normComic = comicName ? comicName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
 
-  const fandomVolMatch = cleaned.match(/\bVol(?:ume|\.)?\s+(\d+)\s+(\d+)\b/i);
+  // 1. Validar que o produto pertence à HQ pesquisada
+  if (normComic) {
+    const comicWords = normComic.split(/\s+/).filter(w => w.length > 2);
+    const hasComicTitle = comicWords.length === 0 || comicWords.every(w => normTitle.includes(w));
+    if (!hasComicTitle) {
+      return false;
+    }
+  }
+
+  // 2. Remover anos de 4 dígitos (1950 a 2035) para não confundir anos como 2025 ou 2026 com edições
+  const withoutYears = normTitle.replace(/\b(19\d{2}|20[0-3]\d)\b/g, ' ');
+
+  // 3. Tratar padrão Fandom internacional: "Wolverine Vol 8 2" (volume 8, edição 2)
+  const fandomVolMatch = withoutYears.match(/\bvol(?:ume|\.)?\s+(\d+)\s+(\d+)\b/i);
   if (fandomVolMatch) {
     const pageIssue = parseInt(fandomVolMatch[2], 10);
     return pageIssue === num;
   }
 
-  if (/\bVol(?:ume|\.)?\s+\d+\b/i.test(cleaned) && !/\b(?:#|n[º°]|ed(?:ição|\.)?)\s*\d+/i.test(cleaned)) {
-    return false;
+  // 4. Extrair números avulsos (desconsiderando Vol/Volume)
+  const withoutVol = withoutYears.replace(/\bvol(?:ume|\.)?\s*\d+\b/gi, ' ');
+  const standaloneNumbers = [...withoutVol.matchAll(/\b0*(\d+)\b/g)].map(m => parseInt(m[1], 10));
+
+  if (standaloneNumbers.length > 0) {
+    return standaloneNumbers.includes(num);
   }
 
-  const numRegex = new RegExp(`(?:^|[\\s#nº°\\-/:,(])0*${num}(?:$|[\\s\\-/:,)])`, 'i');
-  if (!numRegex.test(cleaned)) {
-    return false;
+  // 5. Padrão Panini Brasil: "Wolverine (2022) Vol. 16" onde "Vol. 16" é a própria edição
+  const volMatch = withoutYears.match(/\bvol(?:ume|\.)?\s*(\d+)\b/i);
+  if (volMatch && parseInt(volMatch[1], 10) === num) {
+    return true;
   }
 
-  const candidates = [...cleaned.matchAll(/\b0*(\d+)\b/g)].map(m => parseInt(m[1], 10));
-  return candidates.includes(num);
+  return false;
 }
 
 const TITLE_MAP = {
@@ -115,14 +138,15 @@ function searchPaniniBrasil(title, issueNum, rejectedUrls = [], returnAll = fals
             let imgUrl = imgMatch ? imgMatch[1] : '';
 
             if (imgUrl && prodTitle) {
-              // Validação estrita do número da edição
-              if (!matchIssueNumber(prodTitle, issueNum)) {
+              // Validação estrita do título da HQ e número da edição
+              if (!matchIssueNumber(prodTitle, title, issueNum)) {
                 continue;
               }
 
               imgUrl = imgUrl.replace(/&amp;/g, '&');
+              // Elevação de resolução segura (S300 é suportado pelo CDN Cloudfront da Panini sem erro 302)
               if (imgUrl.includes('-S170-')) {
-                imgUrl = imgUrl.replace('-S170-', '-S600-');
+                imgUrl = imgUrl.replace('-S170-', '-S300-');
               }
               if (imgUrl.includes('/media/catalog/product/')) {
                 imgUrl = imgUrl.split('?')[0];
@@ -167,7 +191,7 @@ function searchPaniniBrasil(title, issueNum, rejectedUrls = [], returnAll = fals
  * Busca no Fandom MediaWiki com ordenação estrita do maior volume (mais novo) para o menor
  * e fallback progressivo para volumes anteriores caso uma capa seja rejeitada
  */
-function searchFandom(title, issueNum, publisher, rejectedUrls = []) {
+function searchFandom(title, issueNum, publisher, rejectedUrls = [], returnAll = false) {
   return new Promise(async (resolve) => {
     let wiki = 'marvel';
     if (publisher && (String(publisher).toLowerCase().includes('dc') || String(publisher).toLowerCase().includes('vertigo'))) {

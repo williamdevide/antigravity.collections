@@ -579,17 +579,9 @@ export default function App() {
     handleOpenAlternatives(updatedComic, issueNum, rejectedUrl ? [rejectedUrl] : []);
   };
 
-  // Abrir ou alternar o carrossel de todas as ocorrências de capas para uma edição
-  const handleOpenAlternatives = async (comic, issueNum, customExcluded = []) => {
+  // Carregar todas as ocorrências de capas para uma edição
+  const loadAlternatives = async (comic, issueNum, customExcluded = []) => {
     const key = `${comic.id}_${issueNum}`;
-    
-    // Se já estiver aberto para esta chave e não for uma rejeição forçada, permite alternar/fechar
-    if (expandedAlternativesKey === key && customExcluded.length === 0) {
-      setExpandedAlternativesKey(null);
-      return;
-    }
-
-    setExpandedAlternativesKey(key);
     setAlternativesMap(prev => ({
       ...prev,
       [key]: { loading: true, candidates: prev[key]?.candidates || [] }
@@ -606,8 +598,13 @@ export default function App() {
             .filter(Boolean)
         );
 
+      const existingRejected = comic.rejectedCovers?.[issueNum];
+      const rejectedArr = Array.isArray(existingRejected) 
+        ? existingRejected 
+        : (existingRejected ? [existingRejected] : []);
+
       const allExcluded = Array.from(new Set([
-        ...(comic.rejectedCovers?.[issueNum] || []),
+        ...rejectedArr,
         ...otherCoverUrls,
         ...customExcluded
       ]));
@@ -625,6 +622,30 @@ export default function App() {
       }));
     }
   };
+
+  // Abrir ou alternar o carrossel de todas as ocorrências de capas para uma edição
+  const handleOpenAlternatives = async (comic, issueNum, customExcluded = []) => {
+    const key = `${comic.id}_${issueNum}`;
+    
+    // Se já estiver aberto para esta chave e não for uma rejeição forçada, permite alternar/fechar
+    if (expandedAlternativesKey === key && customExcluded.length === 0) {
+      setExpandedAlternativesKey(null);
+      return;
+    }
+
+    setExpandedAlternativesKey(key);
+    await loadAlternatives(comic, issueNum, customExcluded);
+  };
+
+  // Carregamento automático de alternativas de capa quando o modal de detalhes da edição for aberto
+  useEffect(() => {
+    if (!viewingIssueDetail) return;
+    const { comic, issueNum } = viewingIssueDetail;
+    const key = `${comic.id}_${issueNum}`;
+    if (!alternativesMap[key]) {
+      loadAlternatives(comic, issueNum);
+    }
+  }, [viewingIssueDetail?.comic?.id, viewingIssueDetail?.issueNum]);
 
   // Selecionar uma capa alternativa do carrossel para ser a nova candidata pendente
   const handleSelectAlternative = async (comicId, issueNum, candidate) => {
@@ -1974,6 +1995,108 @@ export default function App() {
                 </div>
               )}
             </div>
+
+            {/* CARROSSEL INTEGRADO DE SUGESTÕES DE CAPA DISPONÍVEIS */}
+            {(() => {
+              const detailKey = `${viewingIssueDetail.comic.id}_${viewingIssueDetail.issueNum}`;
+              const altState = alternativesMap[detailKey];
+              const candidates = altState?.candidates || [];
+              const isLoadingAlts = altState?.loading;
+              const currentPendingUrl = viewingIssueDetail.comic.pendingCovers?.[viewingIssueDetail.issueNum]?.coverUrl;
+              const currentFixedUrl = viewingIssueDetail.comic.issueCovers?.[viewingIssueDetail.issueNum];
+
+              return (
+                <div className="w-full bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 space-y-2.5 text-left shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" /> 
+                      Sugestões de Capas
+                      {candidates.length > 0 && (
+                        <span className="text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded-full">
+                          {candidates.length}
+                        </span>
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => loadAlternatives(viewingIssueDetail.comic, viewingIssueDetail.issueNum)}
+                      disabled={isLoadingAlts}
+                      className="text-[10px] text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1 transition px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700"
+                      title="Recarregar todas as capas encontradas"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isLoadingAlts ? 'animate-spin' : ''}`} />
+                      <span>{isLoadingAlts ? 'Buscando...' : 'Atualizar'}</span>
+                    </button>
+                  </div>
+
+                  {isLoadingAlts ? (
+                    <div className="py-6 flex flex-col items-center justify-center gap-2 text-slate-400">
+                      <RefreshCw className="w-5 h-5 animate-spin text-amber-400" />
+                      <span className="text-xs">Buscando edições na Panini e acervos web...</span>
+                    </div>
+                  ) : candidates.length > 0 ? (
+                    <div className="flex items-stretch gap-2.5 overflow-x-auto pb-2 pt-1 custom-scrollbar snap-x">
+                      {candidates.map((cand, cIdx) => {
+                        const isCurrentActive = currentPendingUrl === cand.coverUrl || currentFixedUrl === cand.coverUrl;
+
+                        return (
+                          <button
+                            key={`${cand.coverUrl}_${cIdx}`}
+                            type="button"
+                            onClick={() => handleSelectAlternative(viewingIssueDetail.comic.id, viewingIssueDetail.issueNum, cand)}
+                            className={`flex-shrink-0 w-24 sm:w-28 text-left rounded-xl p-1.5 transition border flex flex-col gap-1.5 relative group snap-start cursor-pointer active:scale-95 ${
+                              isCurrentActive
+                                ? 'bg-amber-950/40 border-amber-400 ring-2 ring-amber-400/50 shadow-lg'
+                                : 'bg-slate-950/90 border-slate-800 hover:border-amber-400/60 hover:bg-slate-900'
+                            }`}
+                            title={`Selecionar: ${cand.title || 'Capa'} (${cand.year || ''})`}
+                          >
+                            <div className="w-full aspect-[2/3] rounded-lg overflow-hidden bg-slate-900 border border-slate-800 relative">
+                              <img
+                                src={cand.coverUrl}
+                                alt={cand.title || 'Capa'}
+                                className="w-full h-full object-cover transition group-hover:scale-105"
+                                loading="lazy"
+                              />
+                              {isCurrentActive && (
+                                <div className="absolute top-1 right-1 bg-amber-500 text-slate-950 p-1 rounded-full shadow-md font-bold">
+                                  <Check className="w-3 h-3 stroke-[3]" />
+                                </div>
+                              )}
+                              {cand.year && (
+                                <div className="absolute bottom-1 left-1 bg-black/80 backdrop-blur-sm text-[9px] font-bold text-white px-1.5 py-0.5 rounded border border-white/20">
+                                  {cand.year}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="space-y-0.5 w-full overflow-hidden">
+                              <p className="text-[10px] font-bold text-slate-200 truncate" title={cand.title}>
+                                {cand.title || `Edição #${viewingIssueDetail.issueNum}`}
+                              </p>
+                              <p className="text-[9px] text-slate-400 truncate" title={cand.source}>
+                                {cand.source || 'Panini / Web'}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="py-3.5 px-3 bg-slate-950/50 rounded-xl border border-dashed border-slate-800 text-center space-y-1">
+                      <p className="text-xs text-slate-400">Nenhuma outra ocorrência de capa encontrada.</p>
+                      <button
+                        type="button"
+                        onClick={() => loadAlternatives(viewingIssueDetail.comic, viewingIssueDetail.issueNum)}
+                        className="text-xs text-amber-400 hover:underline font-semibold"
+                      >
+                        Buscar ocorrências agora
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Metadados Complementares da HQ */}
             <div className="bg-slate-900/60 rounded-xl p-3 border border-slate-800 space-y-1.5 text-xs">

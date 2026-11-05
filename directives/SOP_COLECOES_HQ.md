@@ -3,10 +3,10 @@
 ## 1. Visão Geral e Propósito
 Aplicação Web First Mobile para controle ágil de coleções de Histórias em Quadrinhos, Especiais, Minisséries e Coleções em tela única.
 * **Nome Oficial:** `HQs Collections`
-* **Versão:** `1.4.0`
+* **Versão:** `1.5.0`
 
 ## 2. Header & Navegação Mobile First
-* **Marca e Identidade:** Logotipo `BookOpen`, Título `HQs Collections`, versão SemVer (`v1.4.0`), badge `Mobile` e slogan `Controle Ágil de Coleções`.
+* **Marca e Identidade:** Logotipo `BookOpen`, Título `HQs Collections`, versão SemVer (`v1.5.0`), badge `Mobile` e slogan `Controle Ágil de Coleções`.
 * **Monitor de Capas no Header:** Objeto tátil composto estritamente pelo ícone e pela porcentagem (ex: `🖼️ 85%`), sem o texto "capas". Ao tocar nesse objeto, abre o **Modal Detalhado de Status da Busca de Capas**.
 * **Alternador de Modos:** Ícone único de alternância (Lápis para Edição / Olho para Consulta).
 * **Badge de Conexão e Estatísticas:** Status em tempo real (`Nuvem` / `Local`) e contagem total (`XX HQs • YY ed.`).
@@ -19,9 +19,9 @@ Aplicação Web First Mobile para controle ágil de coleções de Histórias em 
 * Ciclo ao clicar no Modo Edição: `none ➔ owned ➔ read ➔ wishlist ➔ none`.
 
 ## 4. Scraper Panini Brasil & Web em Segundo Plano
-* **Busca Forçada no panini.com.br:** O scraper executa buscas automatizadas no catálogo oficial da Panini Brasil utilizando curl/serverless com múltiplas variações de consulta (`nome edição`, `nome 0N`, `nome`) para contornar bloqueios de CDN/Fastly e capturar capas originais de alta resolução (897x1373 ou Cloudfront -S600-).
+* **Busca Forçada no panini.com.br:** O scraper executa buscas automatizadas no catálogo oficial da Panini Brasil utilizando curl/serverless e fallback com proxy de cliente para contornar bloqueios de CDN/Fastly e capturar capas originais de alta resolução sem erros 302 do Cloudfront (-S300-FWEBP).
+* **Validação Estrita do Título e Edição:** Função `matchIssueNumber` valida estritamente tanto o nome da HQ quanto o número da edição alvo (ex: `#16` ou `Vol. 16` no padrão editorial brasileiro da Panini), impedindo que títulos alheios (ex: Deadpool) interfiram ou que anos de 4 dígitos sejam confundidos com o fascículo.
 * **Ordenação Cronológica Estrita (Mais Recentes Primeiro):** A busca prioriza sempre as publicações mais novas (2025/2026, maiores volumes na Fandom como Vol 8 > Vol 7 > Vol 6...).
-* **Validação Rigorosa de Edição:** Função `matchIssueNumber` valida estritamente o número da edição alvo (ex: `#2` ou `02`), isolando anos de 4 dígitos e volumes inteiros para garantir que edições diferentes NUNCA recebam a mesma capa genérica.
 * **Unicidade por Coleção:** Uma URL de capa já atribuída a uma edição é bloqueada para qualquer outro fascículo da mesma HQ.
 * **Fallback Progressivo por Rejeição:** Ao rejeitar uma capa, o sistema descarta a imagem atual e busca automaticamente a próxima alternativa mais antiga disponível.
 
@@ -45,3 +45,8 @@ Aplicação Web First Mobile para controle ágil de coleções de Histórias em 
 * Tanto no card de detalhes da edição quanto no modal de busca de capas, a capa encontrada pendente apresenta dois botões dedicados **SEM TEXTO**:
   - **Aprovar:** Botão verde com ícone `Check` (`✓`) que fixa a capa como imagem oficial daquela edição no Firestore e LocalStorage.
   - **Rejeitar:** Botão vermelho com ícone `X` (`✗`) que descarta a imagem, armazena no histórico de rejeições daquela edição e dispara a busca imediata da versão cronologicamente anterior.
+
+## 7. Carrossel de Alternativas na Tela de Detalhes da Edição
+* Ao clicar sobre qualquer número de edição no Modo Consulta, o modal de detalhes exibe a capa ampliada e, logo abaixo, um **carrossel horizontal integrado** com todas as ocorrências e sugestões de capas encontradas para aquela edição.
+* **Carregamento Automático:** Carrega em segundo plano assim que o modal de detalhes é aberto.
+* **Seleção Imediata para Pré-visualização:** Ao tocar em qualquer miniatura do carrossel, a imagem selecionada é imediatamente exibida no quadro principal de pré-visualização, acompanhada dos botões de aprovação rápida (✓ verde) e rejeição (✗ vermelho).

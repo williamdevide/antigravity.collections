@@ -1,7 +1,7 @@
-# 🏛️ Arquitetura do Sistema: HQs Collections `v1.4.0`
+# 🏛️ Arquitetura do Sistema: HQs Collections `v1.5.0`
 
 ## 1. Visão Geral
-O **HQs Collections** é um sistema projetado para colecionadores de quadrinhos com foco em extrema agilidade no ambiente mobile ("Mobile First"). A aplicação opera em **tela única**, minimizando cliques, eliminando navegações desnecessárias, agrupando edições em blocos táteis de 10 em 10, categorizando coleções por Tipo e Editora, permitindo ordenação personalizada com **Drag & Drop**, títulos específicos por fascículo, suporte a início em edições avançadas (`startFrom`), **ciclo interativo de 4 estágios com destaque em neon**, **scraper com prioridade cronológica decrescente (lançamentos 2025/2026 e maiores volumes primeiro)**, **validador estrito de número de edição (`matchIssueNumber`)**, **carrossel tátil expansível com todas as ocorrências de capas ao rejeitar ou explorar via galeria** e **ações em lote (Aceitar Todos / Rejeitar Todos) para curadoria de capas pendentes**.
+O **HQs Collections** é um sistema projetado para colecionadores de quadrinhos com foco em extrema agilidade no ambiente mobile ("Mobile First"). A aplicação opera em **tela única**, minimizando cliques, eliminando navegações desnecessárias, agrupando edições em blocos táteis de 10 em 10, categorizando coleções por Tipo e Editora, permitindo ordenação personalizada com **Drag & Drop**, títulos específicos por fascículo, suporte a início em edições avançadas (`startFrom`), **ciclo interativo de 4 estágios com destaque em neon**, **scraper da Panini Brasil de alta precisão com suporte a Vol. N e resolução S300**, **carrossel de sugestões e alternativas integrado no modal de detalhes da edição e na tela de status** e **ações em lote (Aceitar Todos / Rejeitar Todos) para curadoria rápida**.
 
 ---
 
@@ -12,7 +12,7 @@ flowchart TD
     User["📱 Usuário (Colecionador no Mobile / Desktop)"] --> UI["🖥️ Interface Web Mobile First (Vite + React)"]
 
     subgraph HeaderSection ["Cabeçalho e Navegação"]
-        UI --> Brand["Logotipo + Versão v1.4.0 + Badge Mobile + Slogan"]
+        UI --> Brand["Logotipo + Versão v1.5.0 + Badge Mobile + Slogan"]
         UI --> CoverProgressBtn["Botão Tátil [🖼️ XX%] (Apenas Ícone e Porcentagem)"]
         UI --> ModeToggle["Alternador de Modo (Consulta 👁️ / Edição ✏️)"]
         UI --> ConnectionBadge["Status Conexão [☁️ Nuvem / 💾 Local] + Contadores [XX HQs • YY ed.]"]
@@ -28,13 +28,14 @@ flowchart TD
         SelectAlternative --> ApproveBtn["Confirmar e Fixar via [✓]"]
     end
 
-    subgraph ScraperEngine ["Motor de Busca Cronológico & Validador de Edições"]
+    subgraph ScraperEngine ["Motor de Busca Panini Brasil & Web de Alta Precisão"]
         CoverProgressBtn --> BackgroundWorker["Worker Assíncrono em Segundo Plano"]
-        BackgroundWorker --> ScraperEndpoint["/api/scrape-cover (Vercel Serverless / Backend Express)"]
+        BackgroundWorker --> ScraperEndpoint["/api/scrape-cover (Vercel Serverless / Backend Express / Proxy Vite)"]
         
-        ScraperEndpoint --> StrictValidator["Validador matchIssueNumber(title, issueNum)"]
+        ScraperEndpoint --> StrictValidator["Validador matchIssueNumber(title, comicName, issueNum)"]
+        StrictValidator --> ComicNameCheck["Verificação de Pertencimento à HQ Pesquisada"]
         StrictValidator --> YearFilter["Isola anos de 4 dígitos (ex: 2025/2026) da numeração"]
-        StrictValidator --> VolumeDetector["Diferencia Volume de Edição (ex: Vol 8 #2)"]
+        StrictValidator --> VolumeDetector["Diferencia Volume e Edição Panini ('Vol. 16' = Ed. 16)"]
         
         ScraperEndpoint --> ChronoRanker["Classificador Cronológico Decrescente"]
         ChronoRanker --> PaniniNewest["Panini Brasil: Anos 2026 > 2025 > 2024..."]
@@ -51,7 +52,9 @@ flowchart TD
         TactileCircles --> FourStageCycle["Ciclo de 4 Estágios (Owned -> Read -> Wishlist -> None)"]
         
         ChunkEngine --> IssueDetailModal["Modal de Detalhes da Edição (Modo Consulta)"]
-        IssueDetailModal --> CoverFrame["Moldura Estética de Capa (2:3)"]
+        IssueDetailModal --> CoverFrame["Moldura Estética de Capa Ampliada (2:3)"]
+        IssueDetailModal --> IntegratedCarousel["Carrossel Horizontal Integrado de Alternativas"]
+        IntegratedCarousel --> DetailSelect["Toque na Variante -> Pré-visualização Imediata"]
         IssueDetailModal --> TextFreeCurator["Curadoria Sem Texto: Aprovar [✓] e Rejeitar [✗]"]
     end
 

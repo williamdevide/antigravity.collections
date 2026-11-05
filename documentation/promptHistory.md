@@ -205,9 +205,22 @@ Pergunta: Você gostaria de poder abrir esse carrossel de opções a qualquer mo
 Resposta do Usuário: (Recommended) Sim, além de abrir automaticamente ao rejeitar, incluir também um pequeno botão com ícone de galeria para abrir o carrossel a qualquer momento
 ```
 
+### Prompt 16
+```text
+/agente-orquestrador /grill-me /goal quero poder ver o carrossel de imagens de sugestão de capa tambem na tela de detalhes da edição.
+você precisa melhorar muito o scrapper na panini, fiz um teste, busquei no site da panini por wolverine 16 e a primeira sugestão já era a capa certa, mas no scrapper sugeriu varias capas e nenhuma vez a correta.
+```
 
+### Resposta Grill-Me / Interação 19
+```text
+Pergunta: Na tela de detalhes da edição, como você prefere visualizar e interagir com o carrossel de opções de capas?
+Resposta do Usuário: (Recommended) Carrossel horizontal integrado na própria tela de detalhes (logo abaixo da capa principal), permitindo rolar e tocar em qualquer variante para pré-visualizar e aprovar
+```
 
-
-
+### Resposta Grill-Me / Interação 20
+```text
+Pergunta: Na tela de detalhes, o carrossel de variantes deve ser carregado automaticamente ao abrir o modal ou sob demanda?
+Resposta do Usuário: (Recommended) Carregar automaticamente em segundo plano ao abrir o modal de detalhes, exibindo o carrossel assim que estiver pronto
+```
 
 
