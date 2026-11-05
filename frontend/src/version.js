@@ -1,6 +1,13 @@
 /**
  * Versão e Nome do Sistema
  * Gerenciado automaticamente pelo Agente Orquestrador sob o padrão SemVer (MAJOR.MINOR.PATCH)
+ * v1.9.0: Menu Hambúrguer ao tocar na marca/logo com gaveta lateral elegante, Autenticação de Usuários
+ *         (Firebase Auth com Google e E-mail/Senha, persistência de login e recuperação de senha),
+ *         Painel Meu Perfil com atualização de nome de exibição, alteração de senha e ação de segurança
+ *         'Zerar Minha Coleção' com confirmação estrita da palavra 'ZERAR', Tela de Configurações Visuais
+ *         com 5 presets prontos e seletores livres de cor para os modos Consulta, Edição e Consulta Capa,
+ *         e Módulo de Entrada por Voz com Web Speech API (PT-BR), transcrição em tempo real, parser
+ *         estruturado inteligente de HQs e cadastro/mesclagem instantânea no catálogo.
  * v1.8.0: Propagação inteligente de séries de capas: ao confirmar a capa de uma edição (ex: Wolverine #16),
  *         o sistema identifica automaticamente o Ano, Volume e Fonte da publicação e propaga sugestões
  *         da mesma série para todas as outras edições daquela HQ que ainda não possuem capa fixada,
@@ -23,4 +30,4 @@
  *         fallback progressivo para edições mais antigas ao rejeitar uma capa.
  */
 export const APP_NAME = 'HQs Collections';
-export const APP_VERSION = '1.8.0';
+export const APP_VERSION = '1.9.0';

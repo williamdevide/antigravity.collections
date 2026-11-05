@@ -1,10 +1,87 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Permite leitura e escrita na coleção de quadrinhos (comics)
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // 1. Coleção Legada: /comics/{comicId}
+    //    - Document ID: comicId (compatibilidade com versão anterior e testes)
+    //    - Campos: dados de HQ ou testes de conectividade
+    //    - Acesso: Leitura e escrita públicas / autenticadas
+    //
+    // 2. Coleção de Usuários: /users/{userId}
+    //    - Document ID: userId (UID do Firebase Auth)
+    //    - Subcoleção: /comics/{comicId}
+    //      * Armazena as HQs da coleção privada do usuário
+    //      * Campos: name, type, publisher, startFrom, showHiddenChunks,
+    //        ownedNumbers, issueStates, issueCovers, pendingCovers,
+    //        rejectedCovers, searchedIssues, issueTitles, position,
+    //        isCompleted, completedUntil, highestOpenedChunk, expandedChunks,
+    //        startYear, brazilPublisher, mainHero, preferredSeries, updatedAt
+    //    - Subcoleção: /settings/{settingId}
+    //      * Armazena preferências (ex: 'preferences') do usuário
+    //      * Campos: viewModeBg, editModeBg, density, hapticFeedback, updatedAt
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    // Verifica se a requisição possui um usuário autenticado
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Verifica se o usuário autenticado é o proprietário do caminho
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Flag de controle de ambiente para desenvolvimento:
+    // Em modo de desenvolvimento (true), permite leitura e escrita se request.auth != null.
+    // Em modo de produção estrito (false), exige request.auth.uid == userId.
+    function isDevMode() {
+      return true;
+    }
+
+    // Autorização para o escopo do usuário (/users/{userId}/...)
+    // Permite quando autenticado e for o dono do recurso, ou em modo de desenvolvimento se autenticado.
+    function canAccessUserData(userId) {
+      return isAuthenticated() && (request.auth.uid == userId || isDevMode());
+    }
+
+    // ===============================================================
+    // Regras de Acesso por Coleção
+    // ===============================================================
+
+    // 1. Documentos e Subcoleções de Usuários
+    match /users/{userId} {
+      // Documento raiz do perfil do usuário
+      allow read, write: if canAccessUserData(userId);
+
+      // Subcoleção de quadrinhos do usuário (/users/{userId}/comics/{comicId})
+      match /comics/{comicId} {
+        allow read, write: if canAccessUserData(userId);
+      }
+
+      // Subcoleção de configurações e preferências (/users/{userId}/settings/{settingId})
+      match /settings/{settingId} {
+        allow read, write: if canAccessUserData(userId);
+      }
+    }
+
+    // 2. Coleção Legada de Quadrinhos (mantém retrocompatibilidade total com /comics/{comicId})
     match /comics/{comicId} {
       allow read, write: if true;
     }
+
+    // 3. Bloqueio padrão para qualquer outra coleção não explicitamente mapeada
+    match /{document=**} {
+      allow read, write: if false;
+    }
   }
 }
-

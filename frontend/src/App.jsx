@@ -38,7 +38,12 @@ import {
   CheckCircle,
   HelpCircle,
   RefreshCw,
-  Loader2
+  Loader2,
+  Menu,
+  User,
+  Settings,
+  Mic,
+  LogOut
 } from 'lucide-react';
 import { 
   subscribeComics, 
@@ -46,10 +51,29 @@ import {
   deleteComic, 
   saveAllComicsOrder,
   saveComicsBatch,
-  loadFromLocalStorage
+  loadFromLocalStorage,
+  loginWithEmail,
+  registerWithEmail,
+  loginWithGoogle,
+  logoutUser,
+  resetPassword,
+  updateUserProfile,
+  changeUserPassword,
+  onAuthChange,
+  getCurrentUser,
+  clearUserCollection,
+  loadUserSettings,
+  saveUserSettings
 } from './firebase';
 import { APP_NAME, APP_VERSION } from './version';
 import { searchIssueCover, searchAllIssueCovers } from './services/scraper';
+import { parseVoiceComicCommand } from './services/voiceParser';
+import AuthScreen from './components/AuthScreen';
+import DrawerMenu from './components/DrawerMenu';
+import ProfileModal from './components/ProfileModal';
+import ClearCollectionModal from './components/ClearCollectionModal';
+import SettingsModal, { DEFAULT_USER_SETTINGS } from './components/SettingsModal';
+import VoiceInputModal from './components/VoiceInputModal';
 
 const COMIC_TYPES = ['Mensal', 'Especial', 'Minissérie', 'Coleção'];
 const PUBLISHERS = ['Marvel', 'DC', 'Vertigo', 'Outras'];
@@ -148,6 +172,22 @@ export default function App() {
   // Notificação Discreta Temporária de Alinhamento de Série de Capas
   const [seriesToast, setSeriesToast] = useState(null); // { message, detail, type: 'loading' | 'success' | 'info' }
 
+  // Autenticação Firebase & Modo Visitante
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [guestMode, setGuestMode] = useState(false);
+
+  // Estados dos Novos Menus e Modais
+  const [showDrawerMenu, setShowDrawerMenu] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
+  const [isClearingCollection, setIsClearingCollection] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
+
+  // Configurações Visuais de Fundo e Preferências
+  const [userSettings, setUserSettings] = useState(DEFAULT_USER_SETTINGS);
+
   // Modal de Título de Edição Específica (Minissérie e Coleção no Modo Edição)
   const [issueTitleModal, setIssueTitleModal] = useState(null); // { comic, issueNum, currentTitle }
   const [issueTitleInput, setIssueTitleInput] = useState('');
@@ -158,9 +198,31 @@ export default function App() {
 
   const inputRef = useRef(null);
 
-  // Sincronização em tempo real (Firestore com fallback para LocalStorage)
+  // Efeito de escuta do estado de autenticação Firebase
   useEffect(() => {
+    const unsubscribe = onAuthChange((user) => {
+      setCurrentUser(user);
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Sincronização em tempo real (Firestore com fallback para LocalStorage por usuário)
+  useEffect(() => {
+    if (authLoading) return;
+    if (!currentUser && !guestMode) {
+      setComics([]);
+      return;
+    }
+
+    const userId = currentUser ? currentUser.uid : 'guest';
+    const savedSettings = loadUserSettings(userId);
+    if (savedSettings) {
+      setUserSettings(prev => ({ ...prev, ...savedSettings }));
+    }
+
     const unsubscribe = subscribeComics(
+      userId,
       (updatedComics) => {
         setComics(updatedComics);
       },
@@ -169,7 +231,125 @@ export default function App() {
       }
     );
     return () => unsubscribe();
-  }, []);
+  }, [currentUser, guestMode, authLoading]);
+
+  // Logout do Usuário
+  const handleLogout = async () => {
+    try {
+      await logoutUser();
+      setCurrentUser(null);
+      setGuestMode(false);
+      setComics([]);
+      setShowDrawerMenu(false);
+    } catch (e) {
+      console.warn('Erro ao desconectar:', e);
+    }
+  };
+
+  // Limpeza Completa da Coleção do Usuário com Confirmação
+  const handleConfirmClearCollection = async () => {
+    setIsClearingCollection(true);
+    try {
+      const userId = currentUser ? currentUser.uid : 'guest';
+      await clearUserCollection(userId);
+      setComics([]);
+      setShowClearConfirmModal(false);
+      setShowProfileModal(false);
+      setSeriesToast({
+        type: 'info',
+        message: 'Coleção Zerada!',
+        detail: 'Todas as HQs e capas foram removidas com sucesso.'
+      });
+      setTimeout(() => setSeriesToast(null), 4000);
+    } catch (e) {
+      console.warn('Erro ao zerar coleção:', e);
+    } finally {
+      setIsClearingCollection(false);
+    }
+  };
+
+  // Salvar Configurações Visuais
+  const handleSaveSettings = async (newSettings) => {
+    setUserSettings(newSettings);
+    const userId = currentUser ? currentUser.uid : 'guest';
+    await saveUserSettings(userId, newSettings);
+  };
+
+  // Processamento e Inclusão de HQ Reconhecida por Voz
+  const handleConfirmVoiceComic = async (parsed, existingComic) => {
+    if (!parsed || !parsed.name) return;
+
+    if (existingComic) {
+      // Mescla edições na HQ existente
+      const currentOwned = existingComic.ownedNumbers || [];
+      const mergedOwned = Array.from(new Set([...currentOwned, ...parsed.ownedNumbers])).sort((a, b) => a - b);
+      
+      const newIssueStates = { ...(existingComic.issueStates || {}) };
+      parsed.ownedNumbers.forEach(n => {
+        if (!newIssueStates[n] || newIssueStates[n] === 'none') {
+          newIssueStates[n] = 'owned';
+        }
+      });
+
+      const updatedComic = {
+        ...existingComic,
+        ownedNumbers: mergedOwned,
+        issueStates: newIssueStates,
+        highestOpenedChunk: Math.max(
+          existingComic.highestOpenedChunk || 10,
+          Math.ceil(Math.max(...mergedOwned, 1) / 10) * 10
+        )
+      };
+
+      const updated = await saveComic(updatedComic);
+      setComics(updated);
+
+      setSeriesToast({
+        type: 'success',
+        message: `HQ "${existingComic.name}" Atualizada!`,
+        detail: `${parsed.ownedNumbers.length} edições incorporadas com sucesso.`
+      });
+      setTimeout(() => setSeriesToast(null), 4000);
+    } else {
+      // Cria uma nova HQ
+      const startFrom = parsed.startFrom || (parsed.ownedNumbers.length > 0 ? Math.min(...parsed.ownedNumbers) : 1);
+      const newComic = {
+        id: 'comic_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        name: parsed.name,
+        type: parsed.type || 'Mensal',
+        publisher: parsed.publisher || 'Marvel',
+        startFrom: startFrom > 1 ? startFrom : 1,
+        showHiddenChunks: false,
+        ownedNumbers: parsed.ownedNumbers,
+        issueStates: parsed.ownedNumbers.reduce((acc, num) => ({ ...acc, [num]: 'owned' }), {}),
+        issueCovers: {},
+        pendingCovers: {},
+        rejectedCovers: {},
+        searchedIssues: {},
+        issueTitles: {},
+        position: comics.length,
+        isCompleted: false,
+        completedUntil: null,
+        highestOpenedChunk: Math.max(10, Math.ceil(Math.max(...parsed.ownedNumbers, 1) / 10) * 10),
+        expandedChunks: [],
+        startYear: '',
+        brazilPublisher: '',
+        mainHero: '',
+        preferredSeries: null,
+        createdAt: new Date().toISOString()
+      };
+
+      const updated = await saveComic(newComic);
+      setComics(updated);
+
+      setSeriesToast({
+        type: 'success',
+        message: `HQ "${newComic.name}" Criada via Voz!`,
+        detail: `${parsed.ownedNumbers.length} edições marcadas e busca de capas iniciada.`
+      });
+      setTimeout(() => setSeriesToast(null), 4000);
+    }
+  };
 
   // Cálculo da Porcentagem de Buscas de Capas Concluídas em relação às edições
   const coverStats = useMemo(() => {
@@ -1417,14 +1597,43 @@ export default function App() {
 
   const hasActiveFilters = filterType !== 'Todos' || filterPublisher !== 'Todas' || filterStatus !== 'Todos' || viewMode !== 'all';
 
+  // Cor de fundo dinâmica a partir das configurações do usuário
+  const activeBgColor = useMemo(() => {
+    if (appMode === 'edicao') return userSettings.editModeBg || '#0c1e38';
+    if (appMode === 'capas') return userSettings.coversModeBg || '#0b1220';
+    return userSettings.viewModeBg || '#070B14';
+  }, [appMode, userSettings]);
+
+  // Tela de Carregamento Inicial de Autenticação
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#070B14] flex flex-col items-center justify-center text-white p-4 font-sans">
+        <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 text-slate-950 flex items-center justify-center mb-4 shadow-xl shadow-amber-500/20 animate-pulse">
+          <BookOpen className="w-8 h-8" />
+        </div>
+        <div className="flex items-center gap-2 text-amber-400 mb-2">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="font-bold text-sm font-mono">Iniciando HQ Tracker...</span>
+        </div>
+        <p className="text-xs text-slate-500">Conectando aos serviços seguros do Firebase</p>
+      </div>
+    );
+  }
+
+  // Se não autenticado e não estiver em modo convidado local, exibe a tela de login/cadastro
+  if (!currentUser && !guestMode) {
+    return (
+      <AuthScreen 
+        onGuestLogin={() => setGuestMode(true)}
+      />
+    );
+  }
+
   return (
-    <div className={`min-h-screen transition-colors duration-300 flex flex-col font-sans ${
-      appMode === 'edicao' 
-        ? 'bg-[#0c1e38] text-slate-100' 
-        : appMode === 'capas'
-        ? 'bg-[#0b1220] text-slate-100'
-        : 'bg-[#070B14] text-slate-100'
-    }`}>
+    <div 
+      style={{ backgroundColor: activeBgColor }}
+      className="min-h-screen transition-colors duration-300 flex flex-col font-sans text-slate-100"
+    >
       {/* HEADER MOBILE-FIRST COM VERSÃO, MODO E PROGRESSO DE CAPAS */}
       <header className={`sticky top-0 z-30 backdrop-blur-md border-b px-4 py-2.5 shadow-md transition-colors duration-300 ${
         appMode === 'edicao' 
@@ -1434,9 +1643,14 @@ export default function App() {
           : 'bg-[#0A0F1D]/95 border-slate-800/80'
       }`}>
         <div className="max-w-xl mx-auto flex items-center justify-between gap-2">
-          {/* Logo & Marca com Slogan e Badges */}
-          <div className="flex items-center space-x-2.5 min-w-0">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold shadow-lg transition shrink-0 ${
+          {/* Botão Logo & Marca com Gatilho do Menu Hambúrguer */}
+          <button
+            type="button"
+            onClick={() => setShowDrawerMenu(true)}
+            className="flex items-center space-x-2.5 min-w-0 text-left group cursor-pointer hover:opacity-95 transition"
+            title="Abrir Menu Principal (Meu Perfil, Configurações, Entrada por Voz...)"
+          >
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold shadow-lg transition shrink-0 relative ${
               appMode === 'edicao'
                 ? 'bg-gradient-to-tr from-cyan-400 to-blue-500 text-slate-950 shadow-cyan-500/30'
                 : appMode === 'capas'
@@ -1444,11 +1658,15 @@ export default function App() {
                 : 'bg-gradient-to-tr from-amber-500 to-amber-300 text-slate-950 shadow-amber-500/20'
             }`}>
               <BookOpen className="w-5 h-5 text-slate-950" />
+              <div className="absolute -top-1 -right-1 w-4 h-4 bg-slate-950 border border-slate-700 rounded-full flex items-center justify-center text-amber-400 shadow">
+                <Menu className="w-2.5 h-2.5" />
+              </div>
             </div>
             <div className="truncate">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <h1 className="text-base sm:text-lg font-black tracking-tight text-white leading-tight">
-                  {APP_NAME}
+                <h1 className="text-base sm:text-lg font-black tracking-tight text-white leading-tight flex items-center gap-1">
+                  <span>{APP_NAME}</span>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-amber-400 transition" />
                 </h1>
                 <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-amber-400 border border-slate-700 shrink-0">
                   v{APP_VERSION}
@@ -1457,9 +1675,11 @@ export default function App() {
                   Mobile
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 leading-none mt-0.5 truncate">Controle Ágil de Coleções</p>
+              <p className="text-[11px] text-slate-400 leading-none mt-0.5 truncate">
+                {currentUser?.displayName ? `Olá, ${currentUser.displayName}` : currentUser?.email ? `Olá, ${currentUser.email.split('@')[0]}` : 'Controle Ágil de Coleções'}
+              </p>
             </div>
-          </div>
+          </button>
 
           {/* ÁREA DIREITA DO HEADER: MODO + PROGRESSO DE CAPAS + CONEXÃO & STATS */}
           <div className="flex items-center gap-2 shrink-0">
@@ -3254,6 +3474,54 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* MENU LATERAL HAMBÚRGUER */}
+      <DrawerMenu
+        isOpen={showDrawerMenu}
+        onClose={() => setShowDrawerMenu(false)}
+        currentUser={currentUser}
+        coverStats={coverStats}
+        onOpenProfile={() => setShowProfileModal(true)}
+        onOpenSettings={() => setShowSettingsModal(true)}
+        onOpenVoice={() => setShowVoiceModal(true)}
+        onOpenCoverSearch={() => setShowCoverSearchModal(true)}
+        onLogout={handleLogout}
+      />
+
+      {/* MODAL MEU PERFIL */}
+      <ProfileModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        currentUser={currentUser}
+        onOpenClearConfirm={() => setShowClearConfirmModal(true)}
+        onProfileUpdated={() => {
+          setCurrentUser(getCurrentUser());
+        }}
+      />
+
+      {/* MODAL DE CONFIRMAÇÃO DE ALERTA MÁXIMO: ZERAR COLEÇÃO */}
+      <ClearCollectionModal
+        isOpen={showClearConfirmModal}
+        onClose={() => setShowClearConfirmModal(false)}
+        onConfirmClear={handleConfirmClearCollection}
+        isClearing={isClearingCollection}
+      />
+
+      {/* MODAL DE CONFIGURAÇÕES VISUAIS E CORES */}
+      <SettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        currentSettings={userSettings}
+        onSaveSettings={handleSaveSettings}
+      />
+
+      {/* MODAL DE ENTRADA POR VOZ INTELIGENTE */}
+      <VoiceInputModal
+        isOpen={showVoiceModal}
+        onClose={() => setShowVoiceModal(false)}
+        existingComics={comics}
+        onConfirmVoiceComic={handleConfirmVoiceComic}
+      />
     </div>
   );
 }

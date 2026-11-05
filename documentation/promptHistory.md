@@ -286,6 +286,52 @@ Pergunta: Como você prefere que o sistema identifique se outra edição pertenc
 Resposta do Usuário: (Recommended) Correspondência inteligente por Ano, Volume e Fonte (ex: Panini Brasil 2025 ou Fandom Vol 8), garantindo coerência visual em toda a coleção
 ```
 
+### Prompt 20
+```text
+/agente-orquestrador /grill-me /goal ao clicar no logo quero que abra um menu tipo hamburguer com a opção Meu Perfil (a partir de agora teremos um login no sistema podendo cadastrar usuário, recuperar senha, utilizar conta google (e tudo que julgar necessário).
+no menu meu perfil eu posso atualizar meus dados, zerar minha coleção (exige confirmação), trocar senha e afins. para logar posso deixar senha salva ou logar com conta google, ddai não precisa preencher senha.
+no menu hamburguer tambem quero uma tela de configurações (crie as configurações que julgar necessário), mas sugiro que tenha uma para trocarmos as cores de fundo do modo consulta e edição.
+quero tambem no menu hamburguer um item Entrada por voz onde consigo mandar uma mensagem de voz (por exemplo: tenho a hq wolverine da marvel mensal das edições 01 até 09) e automaticamente ele cria o card e já preenche essas edições.
+```
+
+### Resposta Grill-Me / Interação 29
+```text
+Pergunta: Como você prefere que o sistema gerencie o acesso inicial e as coleções com a introdução do novo sistema de Login (E-mail/Senha e Google)?
+Resposta do Usuário: Login Obrigatório na Inicialização: Exige login ou cadastro (Google ou E-mail/Senha) logo na primeira tela para acessar o app e as coleções
+```
+
+### Resposta Grill-Me / Interação 30
+```text
+Pergunta: Como você prefere que funcione o fluxo da Entrada por Voz ao cadastrar HQs?
+Resposta do Usuário: (Recommended) Modal Interativo com Transcrição e Pré-visualização: Exibe as ondas sonoras/microfone, transcreve o texto em tempo real, exibe o resumo interpretado (Nome, Editora, Tipo e Edições) com botão de confirmação rápida para evitar erros de interpretação
+```
+
+### Resposta Grill-Me / Interação 31
+```text
+Pergunta: Como você prefere que funcione a personalização de cores e a tela de Configurações?
+Resposta do Usuário: (Recommended) Presets Elegantes + Seletor Livre de Cores: Oferece paletas modernas para fundo do Modo Consulta e Modo Edição (Dark Slate, Dark Navy, Deep Purple, Cyberpunk, Charcoal) com seletor livre (color picker), além de opções de densidade visual e confirmações táteis
+```
+
+### Resposta Grill-Me / Interação 32
+```text
+Pergunta: Ao solicitar 'Zerar Minha Coleção' no Meu Perfil, qual mecanismo de confirmação de segurança você prefere?
+Resposta do Usuário: (Recommended) Digitar palavra de segurança ('ZERAR') em Modal de Alerta Máximo: Exige confirmação explícita digitando a palavra 'ZERAR' para desbloquear o botão vermelho de exclusão permanente
+```
+
+### Prompt 21 (Subagente Especialista em Regras Firestore)
+```text
+Atualize o arquivo firestore.rules na raiz do projeto g:\antigravity\projetos\antigravity.collections\firestore.rules para:
+1. Permitir leitura e escrita para coleções de usuários em /users/{userId}/comics/{comicId} e /users/{userId}/settings/{settingId} quando autenticado (request.auth != null && request.auth.uid == userId), ou em modo de desenvolvimento se request.auth != null.
+2. Manter compatibilidade com a coleção existente /comics/{comicId} (allow read, write: if true ou se autenticado).
+3. Garantir regras seguras, livres de erros e compatíveis com Firestore Rules v2.
+```
+
+
+
+
+
+
+
 
 
 

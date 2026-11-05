@@ -3,10 +3,16 @@
 ## 1. Visão Geral e Propósito
 Aplicação Web First Mobile para controle ágil de coleções de Histórias em Quadrinhos, Especiais, Minisséries e Coleções em tela única.
 * **Nome Oficial:** `HQs Collections`
-* **Versão:** `1.8.0`
+* **Versão:** `1.9.0`
 
-## 2. Header & Navegação Mobile First
-* **Marca e Identidade:** Logotipo `BookOpen`, Título `HQs Collections`, versão SemVer (`v1.7.0`), badge `Mobile` e slogan `Controle Ágil de Coleções`.
+## 2. Header, Menu Hambúrguer & Navegação Mobile First
+* **Marca e Identidade com Menu Hambúrguer Integrado:** Ao tocar em qualquer ponto do logotipo (`BookOpen`), título ou versão no cabeçalho, uma elegante **Gaveta Lateral (Drawer Menu)** desliza da esquerda com efeito de desfoque de fundo (backdrop-blur).
+* **Opções da Gaveta Lateral:**
+  - **Meu Perfil:** Informações da conta, atualização de nome, troca de senha e ação de risco "Zerar Minha Coleção".
+  - **Entrada por Voz:** Interface tátil e auditiva para ditar comandos e cadastrar HQs automaticamente.
+  - **Configurações Visuais:** Personalização livre de cores de fundo (Modos Consulta, Edição e Capas) e 5 presets prontos.
+  - **Status de Busca de Capas:** Acesso direto ao painel com porcentagem e curadoria de capas da Panini.
+  - **Sair da Conta:** Desconexão segura do Firebase Auth com limpeza de sessão.
 * **Monitor de Capas no Header:** Objeto tátil composto estritamente pelo ícone e pela porcentagem (ex: `🖼️ 85%`), sem o texto "capas". Ao tocar nesse objeto, abre o **Modal Detalhado de Status da Busca de Capas**.
 * **Alternador Cíclico de 3 Modos:** Botão único no cabeçalho com ciclo de 3 toques:
   - **Modo Consulta (Eye):** Exibe a lista completa de coleções com blocos de dezenas e dezenas expandidas.
@@ -75,3 +81,30 @@ Aplicação Web First Mobile para controle ágil de coleções de Histórias em 
 * **Segurança e Confirmação Pendente:** As novas capas sugeridas permanecem no estado **pendente de aprovação** (`status === 'pending'`), exigindo que o colecionador revise e confirme cada uma com o botão verde (`✓`).
 * **Notificação Visual em Tempo Real:** Banner/toast discreto no topo do aplicativo informa o início do alinhamento da série e a conclusão da busca em lote.
 * **Badges de Série Reconhecida:** Exibe distintivo visual `⚡ Série: [Ano/Fonte]` no modal de detalhes da edição e no painel de status de busca de capas.
+
+## 11. Autenticação e Multi-Tenancy (Firebase Auth)
+* **Login Obrigatório na Inicialização:** Tela de entrada com suporte a autenticação oficial Google (`loginWithGoogle`) e cadastro/login com E-mail e Senha (`loginWithEmail`, `registerWithEmail`).
+* **Recuperação de Senha & Lembrar E-mail:** Envio de e-mail seguro para redefinição de credenciais (`resetPassword`) e persistência opcional do e-mail no navegador.
+* **Isolamento de Coleções por Usuário:** Cada usuário possui subcoleções isoladas no Cloud Firestore (`/users/{userId}/comics/{comicId}` e `/users/{userId}/settings/preferences`), com chave de cache local dedicada e regras de segurança v2 com fallback retrocompatível.
+
+## 12. Painel "Meu Perfil" e Zerar Coleção com Confirmação
+* **Acesso:** Disponível na gaveta lateral (Menu Hambúrguer).
+* **Edição de Perfil:** Atualização de nome de exibição (`displayName`) e alteração de senha de acesso.
+* **Zerar Minha Coleção (Segurança Máxima):** Botão na zona de perigo que abre o modal de confirmação irreversível. O botão vermelho de exclusão só é desbloqueado se o usuário digitar exatamente a palavra de segurança `ZERAR` em letras maiúsculas. Ao confirmar, executa limpeza atômica em batch no Firestore e LocalStorage.
+
+## 13. Configurações Visuais e Paletas de Cores
+* **5 Presets Elegantes (1-Clique):**
+  - **Dark Slate (Padrão):** Fundo original de alto contraste (`#070B14`, `#0c1e38`, `#0b1220`).
+  - **Dark Navy (Oceano):** Tons azuis náuticos profundos (`#0a192f`, `#112240`, `#020c1b`).
+  - **Deep Purple (Galáxia):** Ambientação cósmica violeta e lilás (`#130924`, `#27104d`, `#1e0836`).
+  - **Cyberpunk (Neon):** Base escura de alto realce para bordas neon (`#090d16`, `#16122c`, `#0c192c`).
+  - **Charcoal (Minimalista):** Tons neutros de cinza grafite e preto puro (`#121212`, `#1e1e1e`, `#181818`).
+* **Seletores Livres de Cor:** Controles com seletor nativo `<input type="color">` e código hexadecimal para customizar individualmente os fundos dos Modos Consulta, Edição e Consulta Capa.
+* **Preferências de Interface:** Ajustes de densidade de cards (Compacto / Normal / Amplo) e feedback tátil (vibração).
+
+## 14. Entrada por Voz Inteligente (Web Speech API PT-BR)
+* **Microfone Dinâmico com Ondas Sonoras:** Interface tátil com botão pulsante e anéis concêntricos que ativam a Web Speech API no idioma Português do Brasil (`pt-BR`).
+* **Transcrição e Fallback:** Transcrição em tempo real da fala e área de texto editável para pequenos ajustes manuais antes do cadastro.
+* **Parser Semântico Estruturado (`parseVoiceComicCommand`):** Extrai automaticamente o nome da HQ (ex: *"Wolverine"*), a editora (ex: *"Marvel"*), o tipo de publicação (ex: *"Mensal"*) e o intervalo ou lista de edições (ex: *"01 até 09"*).
+* **Detecção Inteligente de HQ Existente:** Se a HQ já estiver cadastrada na coleção, mescla as edições sem sobrescrever o histórico anterior; se for uma nova série, cria o card no topo do acervo.
+* **Disparo Automático de Capas:** Ao confirmar a inclusão, o robô de busca de capas Panini é iniciado imediatamente em segundo plano para todas as edições cadastradas.
