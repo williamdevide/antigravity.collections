@@ -14,6 +14,8 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   signOut,
   onAuthStateChanged,
@@ -74,6 +76,22 @@ export async function loginWithGoogle() {
   if (!auth) throw new Error("Firebase Auth não inicializado");
   const cred = await signInWithPopup(auth, googleProvider);
   return cred.user;
+}
+
+export async function loginWithGoogleRedirect() {
+  if (!auth) throw new Error("Firebase Auth não inicializado");
+  await signInWithRedirect(auth, googleProvider);
+}
+
+export async function checkRedirectResult() {
+  if (!auth) return null;
+  try {
+    const cred = await getRedirectResult(auth);
+    return cred?.user || null;
+  } catch (err) {
+    console.warn('Erro ao processar redirect result:', err);
+    throw err;
+  }
 }
 
 export async function logoutUser() {

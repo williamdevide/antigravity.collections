@@ -102,7 +102,9 @@ Aplicação Web First Mobile para controle ágil de coleções de Histórias em 
   - **Painel de Status de Capas:** Badge pulsante `⚡ Sugestão da Série ([Ano/Fonte])` na identificação do fascículo.
 
 ## 11. Autenticação e Multi-Tenancy (Firebase Auth)
-* **Login Obrigatório na Inicialização:** Tela de entrada com suporte a autenticação oficial Google (`loginWithGoogle`) e cadastro/login com E-mail e Senha (`loginWithEmail`, `registerWithEmail`).
+* **Login Obrigatório na Inicialização:** Tela de entrada com suporte a autenticação oficial Google (`loginWithGoogle`, `loginWithGoogleRedirect`) e cadastro/login com E-mail e Senha (`loginWithEmail`, `registerWithEmail`).
+* **Suporte Híbrido Popup e Redirecionamento:** Opera prioritariamente via popup e oferece fallback automático e botão dedicado de redirecionamento (`signInWithRedirect` + `getRedirectResult`) para navegadores móveis (Safari, Chrome mobile) ou com bloqueador de janelas ativado.
+* **Diagnóstico Inteligente de Domínios Vercel (`auth/unauthorized-domain`):** Quando a aplicação roda na Vercel ou em domínios personalizados, a tela de login detecta o erro de domínio não autorizado e exibe caixa educativa com o hostname atual (`window.location.hostname`), botão de cópia em 1 clique e link direto para os Domínios Autorizados no Firebase Console (`vercel.app`).
 * **Recuperação de Senha & Lembrar E-mail:** Envio de e-mail seguro para redefinição de credenciais (`resetPassword`) e persistência opcional do e-mail no navegador.
 * **Isolamento de Coleções por Usuário:** Cada usuário possui subcoleções isoladas no Cloud Firestore (`/users/{userId}/comics/{comicId}` e `/users/{userId}/settings/preferences`), com chave de cache local dedicada e regras de segurança v2 com fallback retrocompatível.
 

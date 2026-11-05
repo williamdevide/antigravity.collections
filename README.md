@@ -48,6 +48,7 @@
   - Dedicated series suggestion banner in the Edition Detail modal with quick 1-tap `✓` approval.
   - Pulsing `⚡ Sugestão da Série` badges in the Cover Search Status panel.
 - **Hamburger Drawer Menu via Brand Logo:** Tapping the app logo or title opens a smooth sliding navigation drawer with user avatar, profile status, and quick shortcuts.
+- **Google Sign-In Diagnostics & Redirect Fallback:** Smart detection of `auth/unauthorized-domain` with a 1-click domain copy button and direct link to Firebase Console's Authorized Domains list (essential for Vercel `*.vercel.app` deployments), plus automatic and manual redirect fallback (`signInWithRedirect` + `getRedirectResult`) for mobile and popup-blocked browsers.
 - **Firebase Authentication & Multi-Tenancy:** Complete authentication suite supporting Google Sign-In (no password required), email/password login and registration, remembered email, and password recovery. Each user's comics are strictly isolated in Cloud Firestore subcollections (`/users/{userId}/comics`).
 - **My Profile Panel:** View account details, update display name, change account password, and access high-risk operations.
 - **Safety-Gated "Clear Collection":** Permanent collection wipe requiring typing the exact security keyword `ZERAR` to unlock the destruction button.
@@ -97,7 +98,8 @@ O **HQs Collections** (v1.9.0) é uma aplicação web mobile-first ultra-rápida
   - Distintivo pulsante `⚡ Sugestão da Série` na tela detalhada de status de busca de capas.
 - **Menu Hambúrguer ao Tocar no Logo:** Toque no logo ou no título no cabeçalho para abrir a gaveta lateral com o perfil do colecionador, status de sincronização e atalhos rápidos.
 - **Autenticação Firebase & Isolamento Multi-Usuário:**
-  - Login rápido com Conta Google (dispensa digitação de senha).
+  - Login rápido com Conta Google (dispensa digitação de senha) com suporte a popup e redirecionamento (`signInWithRedirect`).
+  - Diagnóstico Inteligente de Domínios Vercel: Detecção automática de `auth/unauthorized-domain` com cópia do hostname em 1 clique e atalho direto para o painel de Domínios Autorizados do Firebase Console.
   - Cadastro e login com E-mail e Senha, recuperação de senha esquecida e opção "Lembrar meu e-mail".
   - Isolamento estrito de dados na nuvem: cada usuário possui suas próprias HQs e preferências no Firestore (`/users/{userId}/comics`).
 - **Painel "Meu Perfil":** Permite atualizar o nome de exibição, alterar a senha de acesso e monitorar o status da conta.

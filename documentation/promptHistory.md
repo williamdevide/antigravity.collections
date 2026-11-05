@@ -394,3 +394,26 @@ Resposta do Usuário: (Recommended) Ícone LayoutGrid (Grade de Capas) no 4º pa
 Pergunta: O que deve acontecer ao tocar em uma minicapa no modo "Consulta Total com Capas"?
 Resposta do Usuário: (Recommended) Abrir Modal de Detalhes da Edição: Ao tocar em qualquer capa, abre o modal de detalhes daquela edição com carrossel de imagens, metadados e opções de curadoria (igual ao modo consulta normal).
 ```
+
+### Prompt 25
+```text
+/agente-orquestrador /grill-me /goal não funcionou entrar ou criar conta utilizando conta do google
+```
+
+### Resposta Grill-Me / Interação 42
+```text
+Pergunta: O que aconteceu exatamente quando você tentou entrar com a Conta do Google?
+Resposta do Usuário: (Recommended) Mensagem de Erro na Tela: A janela popup do Google abriu (ou tentou abrir), mas retornou a mensagem 'Falha ao autenticar com o Google' na tela de login.
+```
+
+### Resposta Grill-Me / Interação 43
+```text
+Pergunta: Em qual endereço você estava testando quando a mensagem apareceu?
+Resposta do Usuário: Na Vercel (produção na web): Estou acessando pelo link publicado na Vercel (ex: *.vercel.app).
+```
+
+### Resposta Grill-Me / Interação 44
+```text
+Pergunta: No Firebase Console do seu projeto ('antigravitycollections'), o provedor Google e os domínios da Vercel já foram configurados?
+Resposta do Usuário: Já ativei o provedor Google no Console, mas não adicionei o domínio da Vercel: Só falta adicionar o domínio da Vercel nos Domínios Autorizados.
+```

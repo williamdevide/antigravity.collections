@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   BookOpen, 
   Mail, 
@@ -12,12 +12,19 @@ import {
   EyeOff, 
   Loader2,
   ShieldCheck,
-  Compass
+  Compass,
+  Copy,
+  Check,
+  ExternalLink,
+  AlertTriangle,
+  Globe
 } from 'lucide-react';
 import { 
   loginWithEmail, 
   registerWithEmail, 
   loginWithGoogle, 
+  loginWithGoogleRedirect,
+  checkRedirectResult,
   resetPassword 
 } from '../firebase';
 import { APP_NAME, APP_VERSION } from '../version';
@@ -48,7 +55,17 @@ export default function AuthScreen({ onGuestLogin }) {
   // Estados de feedback
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [errorDetail, setErrorDetail] = useState(null);
+  const [copiedDomain, setCopiedDomain] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Processar resultado de autenticação por redirecionamento caso ocorra
+  useEffect(() => {
+    checkRedirectResult().catch((err) => {
+      console.warn('Erro ao processar retorno de redirect Google:', err);
+      handleGoogleError(err);
+    });
+  }, []);
 
   // Salva ou remove o e-mail lembrado
   const persistRememberEmail = (emailToRemember) => {
@@ -63,25 +80,87 @@ export default function AuthScreen({ onGuestLogin }) {
     }
   };
 
-  // Login com Google
+  // Tratamento Inteligente e Diagnóstico de Erros do Google Auth
+  const handleGoogleError = (err) => {
+    console.warn('Erro ao autenticar com Google:', err);
+    const code = err?.code || '';
+    const currentDomain = typeof window !== 'undefined' ? window.location.hostname : '';
+
+    if (code === 'auth/unauthorized-domain') {
+      setErrorMsg(`Domínio '${currentDomain}' não está autorizado no Firebase Authentication.`);
+      setErrorDetail({
+        type: 'unauthorized-domain',
+        domain: currentDomain,
+        code: code,
+        message: 'O Firebase bloqueou este domínio por segurança até que seja cadastrado no Console.'
+      });
+    } else if (code === 'auth/operation-not-allowed') {
+      setErrorMsg('O provedor de login do Google não está ativado no Firebase Console.');
+      setErrorDetail({
+        type: 'operation-not-allowed',
+        code: code,
+        message: 'Acesse o Firebase Console e ative o provedor Google na aba Sign-in method.'
+      });
+    } else if (code === 'auth/popup-blocked') {
+      setErrorMsg('A janela popup foi bloqueada pelo navegador.');
+      setErrorDetail({
+        type: 'popup-blocked',
+        code: code,
+        message: 'O navegador bloqueou a abertura do popup. Utilize o botão de redirecionamento.'
+      });
+    } else if (code === 'auth/popup-closed-by-user') {
+      setErrorMsg('A janela de login com o Google foi fechada antes de concluir.');
+      setErrorDetail(null);
+    } else if (code === 'auth/cancelled-popup-request') {
+      setErrorMsg('Operação de login com o Google cancelada.');
+      setErrorDetail(null);
+    } else {
+      setErrorMsg(err?.message || 'Falha ao autenticar com o Google.');
+      setErrorDetail({
+        type: 'generic',
+        code: code,
+        message: err?.message || 'Erro inesperado'
+      });
+    }
+  };
+
+  // Login com Google via Popup
   const handleGoogleLogin = async () => {
     setErrorMsg('');
+    setErrorDetail(null);
     setSuccessMsg('');
     setLoading(true);
     try {
       await loginWithGoogle();
       // O listener onAuthChange atualizará a aplicação
     } catch (err) {
-      console.warn('Erro ao autenticar com Google:', err);
-      if (err.code === 'auth/popup-closed-by-user') {
-        setErrorMsg('A janela de login com o Google foi fechada.');
-      } else if (err.code === 'auth/cancelled-popup-request') {
-        setErrorMsg('Operação de login com o Google cancelada.');
-      } else {
-        setErrorMsg('Falha ao autenticar com o Google. Verifique a conexão ou tente com e-mail.');
-      }
+      handleGoogleError(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Login com Google via Redirecionamento (Alternativa para mobile ou popup bloqueado)
+  const handleGoogleRedirectLogin = async () => {
+    setErrorMsg('');
+    setErrorDetail(null);
+    setSuccessMsg('');
+    setLoading(true);
+    try {
+      await loginWithGoogleRedirect();
+    } catch (err) {
+      handleGoogleError(err);
+      setLoading(false);
+    }
+  };
+
+  const copyToClipboard = (text) => {
+    try {
+      navigator.clipboard.writeText(text);
+      setCopiedDomain(true);
+      setTimeout(() => setCopiedDomain(false), 2500);
+    } catch {
+      // Fallback
     }
   };
 
@@ -250,9 +329,89 @@ export default function AuthScreen({ onGuestLogin }) {
 
           {/* Alertas de Erro ou Sucesso */}
           {errorMsg && (
-            <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2 animate-shake">
-              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
-              <span>{errorMsg}</span>
+            <div className="space-y-2">
+              <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center justify-between gap-2 animate-shake">
+                <div className="flex items-center gap-2 min-w-0">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                  <span className="truncate">{errorMsg}</span>
+                </div>
+                {errorDetail?.code && (
+                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-rose-950 border border-rose-800 text-rose-300 shrink-0">
+                    {errorDetail.code}
+                  </span>
+                )}
+              </div>
+
+              {/* Caixa de Diagnóstico Inteligente para Domínio Não Autorizado na Vercel */}
+              {errorDetail?.type === 'unauthorized-domain' && (
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/40 text-amber-200 text-xs space-y-3 animate-fadeIn">
+                  <div className="flex items-start gap-2.5">
+                    <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <h4 className="font-bold text-white text-xs">
+                        Como liberar o login no seu domínio da Vercel:
+                      </h4>
+                      <p className="text-[11px] text-amber-300/90 leading-relaxed">
+                        O Firebase exige que o endereço onde a aplicação está rodando esteja na lista de domínios autorizados.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-slate-950/80 border border-amber-500/30 flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="text-[10px] text-slate-400 block font-mono">Domínio Atual:</span>
+                      <span className="text-xs font-mono font-bold text-white truncate block">
+                        {errorDetail.domain || window.location.hostname}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(errorDetail.domain || window.location.hostname)}
+                      className="px-2.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[11px] flex items-center gap-1 transition shrink-0 active:scale-95 cursor-pointer"
+                    >
+                      {copiedDomain ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedDomain ? 'Copiado!' : 'Copiar'}</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5 text-[11px] text-slate-300">
+                    <p className="font-semibold text-white">Passo a passo no Firebase Console:</p>
+                    <ol className="list-decimal list-inside space-y-1 text-slate-300">
+                      <li>Acesse <b>Authentication &gt; Settings &gt; Authorized domains</b>.</li>
+                      <li>Clique em <b>Add domain</b> (Adicionar domínio).</li>
+                      <li>Cole <code className="bg-slate-900 px-1 py-0.5 rounded text-amber-300 font-mono">{errorDetail.domain || window.location.hostname}</code> (ou simplesmente <code className="bg-slate-900 px-1 py-0.5 rounded text-amber-300 font-mono">vercel.app</code>).</li>
+                      <li>Clique em <b>Save</b>. Pronto! O login com Google passará a funcionar imediatamente.</li>
+                    </ol>
+                  </div>
+
+                  <a
+                    href="https://console.firebase.google.com/project/antigravitycollections/authentication/settings"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-500/40 text-amber-300 font-bold text-[11px] transition shadow-sm cursor-pointer"
+                  >
+                    <span>Abrir Configurações do Firebase Console</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              )}
+
+              {/* Opção de Redirecionamento quando popup é bloqueado */}
+              {errorDetail?.type === 'popup-blocked' && (
+                <div className="p-3.5 rounded-2xl bg-cyan-500/10 border border-cyan-500/40 text-cyan-200 text-xs space-y-2.5 animate-fadeIn">
+                  <p className="text-[11px] text-cyan-300">
+                    Seu navegador impediu a abertura da janela popup. Você pode autenticar por redirecionamento direto de página:
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleGoogleRedirectLogin}
+                    className="w-full py-2 px-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer"
+                  >
+                    <span>Entrar por Redirecionamento</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
           )}
           {successMsg && (
