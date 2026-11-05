@@ -4,82 +4,160 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ===============================================================
-    // Assumed Data Model
+    // Modelo de Dados e Arquitetura de Segurança
     // ===============================================================
     //
-    // 1. Coleção Legada: /comics/{comicId}
-    //    - Document ID: comicId (compatibilidade com versão anterior e testes)
-    //    - Campos: dados de HQ ou testes de conectividade
-    //    - Acesso: Leitura e escrita públicas / autenticadas
+    // 1. Coleção de Usuários: /users/{userId}
+    //    - Document ID: userId (UID exclusivo do Firebase Auth)
+    //    - Acesso: Restrito unicamente ao proprietário autenticado (request.auth.uid == userId).
+    //    - Subcoleção /users/{userId}/comics/{comicId}:
+    //      * Catálogo de HQs do usuário.
+    //      * Validação estrita de tipo, limites de tamanho e integridade de autoria.
+    //    - Subcoleção /users/{userId}/settings/{settingId}:
+    //      * Preferências e configurações visuais exclusivas do usuário.
     //
-    // 2. Coleção de Usuários: /users/{userId}
-    //    - Document ID: userId (UID do Firebase Auth)
-    //    - Subcoleção: /comics/{comicId}
-    //      * Armazena as HQs da coleção privada do usuário
-    //      * Campos: name, type, publisher, startFrom, showHiddenChunks,
-    //        ownedNumbers, issueStates, issueCovers, pendingCovers,
-    //        rejectedCovers, searchedIssues, issueTitles, position,
-    //        isCompleted, completedUntil, highestOpenedChunk, expandedChunks,
-    //        startYear, brazilPublisher, mainHero, preferredSeries, updatedAt
-    //    - Subcoleção: /settings/{settingId}
-    //      * Armazena preferências (ex: 'preferences') do usuário
-    //      * Campos: viewModeBg, editModeBg, density, hapticFeedback, updatedAt
+    // 2. Coleção Legada / Healthcheck: /comics/{comicId}
+    //    - Escrita permanentemente bloqueada.
+    //    - Leitura permitida apenas para usuários autenticados (diagnóstico/healthcheck).
+    //
+    // 3. Regra Global Restritiva (Default Deny):
+    //    - Nega explicitamente qualquer rota não mapeada.
     //
     // ===============================================================
 
     // ===============================================================
-    // Helper Functions
+    // Funções Auxiliares de Autenticação e Autorização (RBAC)
     // ===============================================================
 
-    // Verifica se a requisição possui um usuário autenticado
+    // Verifica se a requisição provém de um usuário autenticado no Firebase Auth
     function isAuthenticated() {
       return request.auth != null;
     }
 
-    // Verifica se o usuário autenticado é o proprietário do caminho
+    // Verifica se o usuário autenticado é o legítimo proprietário do recurso pelo UID
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // Flag de controle de ambiente para desenvolvimento:
-    // Em modo de desenvolvimento (true), permite leitura e escrita se request.auth != null.
-    // Em modo de produção estrito (false), exige request.auth.uid == userId.
-    function isDevMode() {
-      return true;
+    // ===============================================================
+    // Funções de Validação de Integridade e Domínio
+    // ===============================================================
+
+    // Garante que campos identificadores de autoria correspondam obrigatoriamente ao UID do caminho
+    function hasValidComicOwnership(data, userId) {
+      return (!('userId' in data) || data.userId == userId)
+          && (!('uid' in data) || data.uid == userId)
+          && (!('ownerId' in data) || data.ownerId == userId);
     }
 
-    // Autorização para o escopo do usuário (/users/{userId}/...)
-    // Permite quando autenticado e for o dono do recurso, ou em modo de desenvolvimento se autenticado.
-    function canAccessUserData(userId) {
-      return isAuthenticated() && (request.auth.uid == userId || isDevMode());
+    // Impede a transferência de posse, alteração de UID ou mutação do identificador em atualizações
+    function isImmutableOwnership() {
+      return (!('userId' in resource.data) || (('userId' in request.resource.data) && request.resource.data.userId == resource.data.userId))
+          && (!('uid' in resource.data) || (('uid' in request.resource.data) && request.resource.data.uid == resource.data.uid))
+          && (!('ownerId' in resource.data) || (('ownerId' in request.resource.data) && request.resource.data.ownerId == resource.data.ownerId))
+          && (!('id' in resource.data) || (('id' in request.resource.data) && request.resource.data.id == resource.data.id));
+    }
+
+    // Validador de domínio para Quadrinhos (/users/{userId}/comics/{comicId})
+    // Protege contra poluição de campos (hasOnly), ataques de DoS por payloads excessivos e inconsistência de tipos
+    function isValidComic(data, userId) {
+      return hasValidComicOwnership(data, userId)
+        && data.keys().hasOnly([
+          'id', 'name', 'type', 'publisher', 'startFrom', 'showHiddenChunks',
+          'ownedNumbers', 'issueStates', 'issueCovers', 'pendingCovers',
+          'rejectedCovers', 'searchedIssues', 'issueTitles', 'position',
+          'isCompleted', 'completedUntil', 'highestOpenedChunk', 'expandedChunks',
+          'startYear', 'brazilPublisher', 'mainHero', 'preferredSeries',
+          'createdAt', 'updatedAt', 'userId', 'uid', 'ownerId'
+        ])
+        && (!('name' in data) || (data.name is string && data.name.size() > 0 && data.name.size() <= 200))
+        && (!('type' in data) || (data.type is string && data.type.size() <= 100))
+        && (!('publisher' in data) || (data.publisher is string && data.publisher.size() <= 100))
+        && (!('startFrom' in data) || (data.startFrom is int || data.startFrom is float))
+        && (!('showHiddenChunks' in data) || data.showHiddenChunks is bool)
+        && (!('ownedNumbers' in data) || (data.ownedNumbers is list && data.ownedNumbers.size() <= 10000))
+        && (!('issueStates' in data) || (data.issueStates is map && data.issueStates.size() <= 5000))
+        && (!('issueCovers' in data) || (data.issueCovers is map && data.issueCovers.size() <= 5000))
+        && (!('pendingCovers' in data) || (data.pendingCovers is map && data.pendingCovers.size() <= 5000))
+        && (!('rejectedCovers' in data) || (data.rejectedCovers is map && data.rejectedCovers.size() <= 5000))
+        && (!('searchedIssues' in data) || (data.searchedIssues is map && data.searchedIssues.size() <= 5000))
+        && (!('issueTitles' in data) || (data.issueTitles is map && data.issueTitles.size() <= 5000))
+        && (!('position' in data) || (data.position is int || data.position is float))
+        && (!('isCompleted' in data) || data.isCompleted is bool)
+        && (!('completedUntil' in data) || data.completedUntil == null || data.completedUntil is int || data.completedUntil is float || data.completedUntil is string)
+        && (!('highestOpenedChunk' in data) || (data.highestOpenedChunk is int || data.highestOpenedChunk is float))
+        && (!('expandedChunks' in data) || (data.expandedChunks is list && data.expandedChunks.size() <= 500))
+        && (!('startYear' in data) || (data.startYear is int || data.startYear is float || (data.startYear is string && data.startYear.size() <= 10)))
+        && (!('brazilPublisher' in data) || (data.brazilPublisher is string && data.brazilPublisher.size() <= 100))
+        && (!('mainHero' in data) || (data.mainHero is string && data.mainHero.size() <= 100))
+        && (!('preferredSeries' in data) || (data.preferredSeries == null || data.preferredSeries is map))
+        && (!('createdAt' in data) || (data.createdAt is timestamp || (data.createdAt is string && data.createdAt.size() <= 50)))
+        && (!('updatedAt' in data) || (data.updatedAt is timestamp || (data.updatedAt is string && data.updatedAt.size() <= 50)))
+        && (!('id' in data) || (data.id is string && data.id.size() <= 128))
+        && (!('userId' in data) || (data.userId is string && data.userId == userId))
+        && (!('uid' in data) || (data.uid is string && data.uid == userId))
+        && (!('ownerId' in data) || (data.ownerId is string && data.ownerId == userId));
+    }
+
+    // Validador de preferências visuais e opções (/users/{userId}/settings/{settingId})
+    function isValidSettings(data) {
+      return data.keys().hasOnly([
+          'viewModeBg', 'editModeBg', 'coversModeBg', 'fullCoversModeBg',
+          'density', 'hapticFeedback', 'updatedAt', 'userId', 'uid'
+        ])
+        && (!('viewModeBg' in data) || (data.viewModeBg is string && data.viewModeBg.size() <= 30))
+        && (!('editModeBg' in data) || (data.editModeBg is string && data.editModeBg.size() <= 30))
+        && (!('coversModeBg' in data) || (data.coversModeBg is string && data.coversModeBg.size() <= 30))
+        && (!('fullCoversModeBg' in data) || (data.fullCoversModeBg is string && data.fullCoversModeBg.size() <= 30))
+        && (!('density' in data) || (data.density is string && data.density.size() <= 30))
+        && (!('hapticFeedback' in data) || data.hapticFeedback is bool)
+        && (!('updatedAt' in data) || (data.updatedAt is timestamp || (data.updatedAt is string && data.updatedAt.size() <= 50)));
     }
 
     // ===============================================================
     // Regras de Acesso por Coleção
     // ===============================================================
 
-    // 1. Documentos e Subcoleções de Usuários
+    // 1. Escopo Isolado de Usuário (/users/{userId})
     match /users/{userId} {
-      // Documento raiz do perfil do usuário
-      allow read, write: if canAccessUserData(userId);
+      // Documento raiz do perfil do usuário: acessível apenas pelo próprio usuário autenticado
+      allow read, write: if isOwner(userId);
 
       // Subcoleção de quadrinhos do usuário (/users/{userId}/comics/{comicId})
       match /comics/{comicId} {
-        allow read, write: if canAccessUserData(userId);
+        // Leitura e exclusão restritas unicamente ao proprietário
+        allow read, delete: if isOwner(userId);
+
+        // Criação: exige autenticação do proprietário, campo obrigatório 'name' e validação integral
+        allow create: if isOwner(userId)
+                      && ('name' in request.resource.data)
+                      && isValidComic(request.resource.data, userId);
+
+        // Atualização: exige autenticação do proprietário, preservação de campos imutáveis e validação integral
+        allow update: if isOwner(userId)
+                      && isImmutableOwnership()
+                      && isValidComic(request.resource.data, userId);
       }
 
-      // Subcoleção de configurações e preferências (/users/{userId}/settings/{settingId})
+      // Subcoleção de configurações visuais (/users/{userId}/settings/{settingId})
       match /settings/{settingId} {
-        allow read, write: if canAccessUserData(userId);
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId)
+                              && isValidSettings(request.resource.data);
       }
     }
 
-    // 2. Coleção Legada de Quadrinhos (mantém retrocompatibilidade total com /comics/{comicId})
+    // 2. Coleção Legada / Healthcheck (/comics/{comicId})
+    // Bloqueia categoricamente qualquer gravação, criação ou exclusão.
+    // Permite leitura apenas para usuários autenticados (healthcheck/diagnóstico),
+    // impedindo acesso público não autenticado.
     match /comics/{comicId} {
-      allow read, write: if true;
+      allow read: if isAuthenticated();
+      allow write: if false;
     }
 
-    // 3. Bloqueio padrão para qualquer outra coleção não explicitamente mapeada
+    // 3. Bloqueio Restritivo Global (Default Deny)
+    // Nega categoricamente leitura e escrita em qualquer outro caminho não especificado
     match /{document=**} {
       allow read, write: if false;
     }

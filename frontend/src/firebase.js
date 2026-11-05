@@ -131,31 +131,19 @@ export function getCurrentUser() {
 }
 
 /**
- * Utilitários de Chave de Armazenamento por Usuário
+ * Utilitários de Chave de Armazenamento por Usuário (Isolamento Estrito)
  */
 function getUserStorageKey(userId) {
-  return userId ? `hq_tracker_collections_${userId}` : 'hq_tracker_collections_v1';
+  return userId ? `hq_tracker_collections_${userId}` : 'hq_tracker_collections_guest';
 }
 
 /**
- * Carrega coleções do armazenamento local (com suporte a escopo por usuário)
+ * Carrega coleções do armazenamento local (estritamente isoladas por usuário)
  */
 export function loadFromLocalStorage(userId = null) {
   try {
     const raw = localStorage.getItem(getUserStorageKey(userId));
     if (raw) return JSON.parse(raw);
-    
-    // Migração transparente: se a conta do usuário estiver vazia, importa a coleção legado do browser
-    if (userId) {
-      const legacy = localStorage.getItem('hq_tracker_collections_v1');
-      if (legacy) {
-        const parsed = JSON.parse(legacy);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          saveToLocalStorage(parsed, userId);
-          return parsed;
-        }
-      }
-    }
     return [];
   } catch (e) {
     console.error('Erro ao ler do LocalStorage:', e);
@@ -178,10 +166,10 @@ export function saveToLocalStorage(data, userId = null) {
  * Assina atualizações em tempo real do Firestore isoladas por usuário
  */
 export function subscribeComics(userId, onUpdate, onStatusChange) {
-  // Se não estiver inicializado ou sem usuário autenticado, opera no cache local
+  // Se não estiver inicializado ou sem usuário autenticado, opera no cache local do convidado
   if (!db || !isFirebaseInitialized || !userId) {
-    onStatusChange?.({ status: 'local', message: 'Armazenamento Local Ativo' });
-    onUpdate(loadFromLocalStorage(userId));
+    onStatusChange?.({ status: 'local', message: 'Armazenamento Local Convidado' });
+    onUpdate(loadFromLocalStorage(userId || 'guest'));
     return () => {};
   }
 
@@ -195,22 +183,10 @@ export function subscribeComics(userId, onUpdate, onStatusChange) {
         remoteComics.push({ id: docSnap.id, ...docSnap.data() });
       });
 
-      // Se o Firebase retornou dados remotos, sincroniza localmente
-      if (remoteComics.length > 0) {
-        saveToLocalStorage(remoteComics, userId);
-        onUpdate(remoteComics);
-        onStatusChange?.({ status: 'connected', message: 'Nuvem Conectada (Firestore Sincronizado)' });
-      } else {
-        // Se a subcoleção do usuário na nuvem estiver vazia, verifica se há dados locais para migrar
-        const local = loadFromLocalStorage(userId);
-        if (local.length > 0) {
-          local.forEach(item => saveComic(userId, item));
-          onUpdate(local);
-        } else {
-          onUpdate([]);
-        }
-        onStatusChange?.({ status: 'connected', message: 'Nuvem Conectada (Pronto)' });
-      }
+      // Sincroniza o cache local EXCLUSIVO deste userId
+      saveToLocalStorage(remoteComics, userId);
+      onUpdate(remoteComics);
+      onStatusChange?.({ status: 'connected', message: 'Nuvem Conectada (Firestore Sincronizado)' });
     }, (error) => {
       console.warn('⚠️ Firestore listener error:', error.message);
       onStatusChange?.({ 

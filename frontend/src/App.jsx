@@ -210,11 +210,14 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Sincronização em tempo real (Firestore com fallback para LocalStorage por usuário)
+  // Sincronização em tempo real (Firestore com fallback para LocalStorage estritamente isolado por usuário)
   useEffect(() => {
     if (authLoading) return;
+    
+    // Limpa a tela imediatamente ao alternar ou deslogar usuário para isolamento absoluto
+    setComics([]);
+
     if (!currentUser && !guestMode) {
-      setComics([]);
       return;
     }
 
@@ -222,6 +225,8 @@ export default function App() {
     const savedSettings = loadUserSettings(userId);
     if (savedSettings) {
       setUserSettings(prev => ({ ...prev, ...savedSettings }));
+    } else {
+      setUserSettings(DEFAULT_USER_SETTINGS);
     }
 
     const unsubscribe = subscribeComics(
@@ -236,14 +241,19 @@ export default function App() {
     return () => unsubscribe();
   }, [currentUser, guestMode, authLoading]);
 
-  // Logout do Usuário
+  // Logout do Usuário com Limpeza Completa de Memória de Sessão
   const handleLogout = async () => {
     try {
       await logoutUser();
       setCurrentUser(null);
       setGuestMode(false);
       setComics([]);
+      setUserSettings(DEFAULT_USER_SETTINGS);
       setShowDrawerMenu(false);
+      setShowProfileModal(false);
+      setShowSettingsModal(false);
+      setShowVoiceModal(false);
+      setShowCoverSearchModal(false);
     } catch (e) {
       console.warn('Erro ao desconectar:', e);
     }

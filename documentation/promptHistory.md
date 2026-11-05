@@ -417,3 +417,37 @@ Resposta do Usuário: Na Vercel (produção na web): Estou acessando pelo link p
 Pergunta: No Firebase Console do seu projeto ('antigravitycollections'), o provedor Google e os domínios da Vercel já foram configurados?
 Resposta do Usuário: Já ativei o provedor Google no Console, mas não adicionei o domínio da Vercel: Só falta adicionar o domínio da Vercel nos Domínios Autorizados.
 ```
+
+### Prompt 26
+```text
+/agente-orquestrador /grill-me /goal garanta que as coleções são separadas por usuário, a coleção de um usuário não é vista pelos outros.
+```
+
+### Resposta Grill-Me / Interação 45
+```text
+Pergunta: Ao criar uma nova conta ou fazer login pela primeira vez em um computador/celular, como você prefere que o sistema se comporte caso existam HQs salvas localmente no navegador?
+Resposta do Usuário: (Recommended) Isolamento Estrito Absoluto: Todo novo usuário autenticado inicia com sua coleção 100% vazia e isolada na nuvem. Nenhuma HQ prévia do navegador ou de outro usuário é copiada ou mesclada automaticamente.
+```
+
+### Resposta Grill-Me / Interação 46
+```text
+Pergunta: Como deve ser o comportamento do aplicativo ao deslogar ou alternar entre contas no mesmo dispositivo?
+Resposta do Usuário: (Recommended) Limpeza Instantânea de Sessão e Cache Isolado por UID: Ao deslogar ou trocar de conta, a tela zera imediatamente (setComics([])), a escuta da nuvem anterior é encerrada e cada usuário mantém seu cache estritamente isolado por 'hq_tracker_collections_{uid}', impedindo que um veja os dados do outro.
+```
+
+### Prompt 27
+```text
+Por favor, reescreva o arquivo `firestore.rules` do projeto para garantir segurança estrita e isolamento absoluto de dados por usuário.
+
+Requisitos Mandatórios para `firestore.rules`:
+1. Version 2 (`rules_version = '2';`).
+2. Isolamento Estrito por Usuário:
+   - Os documentos em `/users/{userId}` e todas as suas subcoleções (como `/users/{userId}/comics/{comicId}` e `/users/{userId}/settings/{settingId}`) DEVEM ser acessíveis EXCLUSIVAMENTE pelo usuário autenticado cujo UID corresponde a `{userId}` (`request.auth != null && request.auth.uid == userId`).
+   - NENHUM outro usuário (mesmo autenticado) pode ler, listar, criar, alterar ou excluir documentos de outro usuário.
+   - REMOVA completamente a função `isDevMode()` e qualquer bypass ou brecha de desenvolvimento que permita acesso cruzado entre usuários autenticados.
+3. Coleção Legada / Healthcheck:
+   - Para `/comics/{comicId}`, restrinja ou bloqueie leituras não autorizadas. Se necessário para healthcheck ou teste de conectividade, permita leitura apenas se autenticado, ou feche completamente com deny-all padrão (`match /{document=**} { allow read, write: if false; }`).
+4. Validação de Integridade:
+   - Certifique-se de que cada documento salvo em `/users/{userId}/comics/{comicId}` não possa ser criado por outro UID.
+5. Salve o arquivo em `g:\antigravity\projetos\antigravity.collections\firestore.rules` e retorne um resumo das regras aplicadas e validação de segurança.
+```
