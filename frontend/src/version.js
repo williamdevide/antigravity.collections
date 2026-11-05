@@ -1,6 +1,10 @@
 /**
  * Versão e Nome do Sistema
  * Gerenciado automaticamente pelo Agente Orquestrador sob o padrão SemVer (MAJOR.MINOR.PATCH)
+ * v1.10.1: Descoberta dinâmica e tradução automática de títulos PT-BR ➔ EN via API da Wikipédia/Wikidata,
+ *          expansão massiva do catálogo DC Comics/Vertigo (A Brigada dos Encapotados / The Trenchcoat Brigade,
+ *          Os Livros da Magia, Hellblazer, Sandman, etc.), busca resiliente com e sem artigos ('The', 'A', 'O')
+ *          e pontuação com bônus prioritário (+500k) para candidatos com número de edição explícito correspondente.
  * v1.10.0: Quarto Modo de Visualização "Consulta Total com Capas" (appMode === 'capas_total') com
  *          botão cíclico de 4 modos no header (Consulta [Eye] ➔ Edição [Pencil] ➔ Consulta Capa [ScanEye]
  *          ➔ Consulta Total com Capas [LayoutGrid]), exibindo cada card de HQ com grade adaptativa completa
@@ -41,4 +45,4 @@
  *         fallback progressivo para edições mais antigas ao rejeitar uma capa.
  */
 export const APP_NAME = 'HQs Collections';
-export const APP_VERSION = '1.10.0';
+export const APP_VERSION = '1.10.1';

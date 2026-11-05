@@ -458,3 +458,9 @@ Requisitos Mandatórios para `firestore.rules`:
 atualize com a versão correta o titulo da aba do navegador
 ```
 
+### Prompt 29
+```text
+/agente-orquestrador /grill-me /goal tentei achar capa para "A Brigada dos Encapotados" é um especial da DC, selecionei edição 01. retorna que não achou nenhuma capa
+```
+
+

@@ -112,7 +112,46 @@ export const TITLE_MAP = {
   'dinastia m': 'House of M',
   'velho logan': 'Old Man Logan',
 
-  // DC Comics
+  // DC Comics & Vertigo
+  'a brigada dos encapotados': 'The Trenchcoat Brigade',
+  'brigada dos encapotados': 'The Trenchcoat Brigade',
+  'trenchcoat brigade': 'The Trenchcoat Brigade',
+  'os livros da magia': 'The Books of Magic',
+  'livros da magia': 'The Books of Magic',
+  'patrulha do destino': 'Doom Patrol',
+  'monstro do pantano': 'Swamp Thing',
+  'monstro do pântano': 'Swamp Thing',
+  'homem animal': 'Animal Man',
+  'homem-animal': 'Animal Man',
+  'esquadrao suicida': 'Suicide Squad',
+  'esquadrão suicida': 'Suicide Squad',
+  'novos titas': 'Teen Titans',
+  'novos titãs': 'Teen Titans',
+  'titas': 'Titans',
+  'titãs': 'Titans',
+  'asa noturna': 'Nightwing',
+  'capuz vermelho': 'Red Hood',
+  'mulher gato': 'Catwoman',
+  'mulher-gato': 'Catwoman',
+  'gaviao negro': 'Hawkman',
+  'gavião negro': 'Hawkman',
+  'mulher gaviao': 'Hawkgirl',
+  'mulher gavião': 'Hawkgirl',
+  'sociedade da justica': 'Justice Society of America',
+  'sociedade da justiça': 'Justice Society of America',
+  'legiao dos super-herois': 'Legion of Super-Heroes',
+  'legião dos super-heróis': 'Legion of Super-Heroes',
+  'aves de rapina': 'Birds of Prey',
+  'fabulas': 'Fables',
+  'fábulas': 'Fables',
+  'hellblazer': 'John Constantine, Hellblazer',
+  'sandman': 'The Sandman',
+  'lucifer': 'Lucifer',
+  'lúcifer': 'Lucifer',
+  'preacher': 'Preacher',
+  'transmetropolitan': 'Transmetropolitan',
+  'y o ultimo homem': 'Y: The Last Man',
+  'y o último homem': 'Y: The Last Man',
   'liga da justica': 'Justice League',
   'liga da justiça': 'Justice League',
   'mulher-maravilha': 'Wonder Woman',
@@ -146,10 +185,72 @@ export const TITLE_MAP = {
   'pato donald': 'Donald Duck'
 };
 
+// Cache dinâmico de tradução e mapeamento de títulos descobertos via Wikipédia / Wikidata
+const DYNAMIC_TITLE_CACHE = new Map();
+
+/**
+ * Tradução e Descoberta Dinâmica de Títulos PT-BR ➔ EN
+ * 1. Consulta o mapa estático de alta velocidade (TITLE_MAP)
+ * 2. Consulta o cache dinâmico em memória da sessão
+ * 3. Faz busca na API da Wikipédia em português (pt.wikipedia.org) e extrai o interwiki link para inglês (lllang=en)
+ */
+export async function resolveEnglishTitle(title) {
+  if (!title) return '';
+  const syncMatch = getEnglishTitle(title);
+  if (syncMatch && syncMatch !== title) {
+    return syncMatch;
+  }
+
+  const norm = title.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[:\-]/g, ' ').replace(/\s+/g, ' ');
+  if (DYNAMIC_TITLE_CACHE.has(norm)) {
+    return DYNAMIC_TITLE_CACHE.get(norm);
+  }
+
+  try {
+    const cleanSearch = title.replace(/\b(especial|minisserie|minissérie|colecao|coleção|mensal|hq|livro|edicao|edição|vol(?:ume|\.)?\s*\d+)\b/gi, '').trim();
+    const searchUrl = `https://pt.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(cleanSearch || title)}&format=json&origin=*`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2500);
+    const searchResp = await fetch(searchUrl, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (searchResp.ok) {
+      const searchData = await searchResp.json();
+      const topPage = searchData.query?.search?.[0]?.title;
+      if (topPage) {
+        const langUrl = `https://pt.wikipedia.org/w/api.php?action=query&prop=langlinks&lllang=en&titles=${encodeURIComponent(topPage)}&format=json&origin=*`;
+        const lController = new AbortController();
+        const lTimeoutId = setTimeout(() => lController.abort(), 2500);
+        const langResp = await fetch(langUrl, { signal: lController.signal });
+        clearTimeout(lTimeoutId);
+
+        if (langResp.ok) {
+          const langData = await langResp.json();
+          const pages = langData.query?.pages || {};
+          const pageObj = Object.values(pages)[0];
+          const engLink = pageObj?.langlinks?.[0]?.['*'];
+          if (engLink) {
+            // Remove sufixos como " (comics)" ou " (comic book)"
+            const cleanedEng = engLink.replace(/\s*\((?:comics|comic\s+book|limited\s+series|character|graphic\s+novel)\)$/i, '').trim();
+            DYNAMIC_TITLE_CACHE.set(norm, cleanedEng);
+            return cleanedEng;
+          }
+        }
+      }
+    }
+  } catch {
+    // Falha silenciosa no fallback da Wikipédia
+  }
+
+  DYNAMIC_TITLE_CACHE.set(norm, title);
+  return title;
+}
+
 export function getEnglishTitle(title) {
   if (!title) return '';
   const norm = title.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[:\-]/g, ' ').replace(/\s+/g, ' ');
   if (TITLE_MAP[norm]) return TITLE_MAP[norm];
+  if (DYNAMIC_TITLE_CACHE.has(norm)) return DYNAMIC_TITLE_CACHE.get(norm);
   for (const [k, v] of Object.entries(TITLE_MAP)) {
     if (norm.includes(k)) return v;
   }
@@ -170,7 +271,9 @@ export function getRelevantWikis(title, publisher) {
   if (normPub.includes('dc') || normPub.includes('vertigo') || normTitle.includes('batman') || 
       normTitle.includes('superman') || normTitle.includes('coringa') || normTitle.includes('joker') || 
       normTitle.includes('flash') || normTitle.includes('lantern') || normTitle.includes('mulher-maravilha') || 
-      normTitle.includes('wonder woman') || normTitle.includes('justica') || normTitle.includes('justice')) {
+      normTitle.includes('wonder woman') || normTitle.includes('justica') || normTitle.includes('justice') ||
+      normTitle.includes('encapotados') || normTitle.includes('trenchcoat') || normTitle.includes('constantine') ||
+      normTitle.includes('hellblazer') || normTitle.includes('sandman') || normTitle.includes('magia')) {
     wikis.push('dc');
   }
 
@@ -194,6 +297,19 @@ export function getRelevantWikis(title, publisher) {
       normTitle.includes('avengers') || normTitle.includes('hulk') || normTitle.includes('thor') || 
       normTitle.includes('ferro') || normTitle.includes('capitao')) {
     wikis.push('marvel');
+  }
+
+  // Priorização baseada na editora selecionada pelo usuário
+  if (normPub.includes('dc') || normPub.includes('vertigo')) {
+    if (!wikis.includes('dc')) {
+      wikis.unshift('dc');
+    } else {
+      const idx = wikis.indexOf('dc');
+      if (idx > 0) {
+        wikis.splice(idx, 1);
+        wikis.unshift('dc');
+      }
+    }
   }
 
   if (!wikis.includes('starwars')) wikis.push('starwars');
@@ -224,10 +340,27 @@ export function scoreCandidate(candidate, cleanTitle, issueNum, prefSeries) {
 
   let score = (candidate.volume ? candidate.volume * 10000 : (candidate.source?.includes('Panini') ? 90000 : 0)) + (candidate.year || 1990);
 
+  const cleanEng = engMapped.replace(/^(the|a|an|o|a|os|as)\s+/i, '');
+  const cleanCand = normCandidate.replace(/^(the|a|an|o|a|os|as)\s+/i, '');
+
   if (normCandidate === engMapped || normCandidate === normComic) {
     score += 500000;
-  } else if (normCandidate.includes(engMapped) || engMapped.includes(normCandidate)) {
-    score += 350000;
+  } else if (cleanCand.includes(cleanEng) || cleanEng.includes(cleanCand) || normCandidate.includes(engMapped) || engMapped.includes(normCandidate)) {
+    score += 450000;
+  }
+
+  // Bônus prioritário para candidato com número de edição explícito correspondente à edição pesquisada
+  const num = parseInt(issueNum, 10);
+  const withoutYears = normCandidate.replace(/\b(19\d{2}|20[0-3]\d)\b/g, ' ');
+  const hasExplicitVolIssue = withoutYears.match(new RegExp(`\\bvol(?:ume|\\.)?\\s*\\d+\\s+0*${num}\\b`, 'i'));
+  const hasExplicitNumber = withoutYears.match(new RegExp(`\\b0*${num}\\b`));
+  if (hasExplicitVolIssue || hasExplicitNumber) {
+    score += 500000;
+  }
+
+  // Penalização para páginas de universo, equipes ou personagens avulsos
+  if (normCandidate.includes('universe') || normCandidate.includes('earth') || normCandidate.includes('character')) {
+    score -= 300000;
   }
 
   if ((normComic.includes('princesinha') || engMapped.includes('princess')) && normCandidate.includes('princess')) {
@@ -478,9 +611,18 @@ export async function searchIssueCover(comic, issueNum, rejectedUrls = []) {
 
 export async function searchFandomClient(title, issueNum, publisher, rejectedUrls = [], prefSeries = null, returnAll = false) {
   const cleanTitle = String(title).trim();
-  const engTitle = getEnglishTitle(cleanTitle);
+  const engTitle = await resolveEnglishTitle(cleanTitle);
   const issueStr = String(issueNum);
   const wikis = getRelevantWikis(cleanTitle, publisher);
+
+  // Variações abrangentes de títulos (com e sem artigos 'The', 'A', 'An', 'O', 'Os', etc.)
+  const titleVariants = new Set();
+  [engTitle, cleanTitle].forEach(t => {
+    if (!t) return;
+    titleVariants.add(t);
+    const withoutArticle = t.replace(/^(the|a|an|o|a|os|as)\s+/i, '').trim();
+    if (withoutArticle) titleVariants.add(withoutArticle);
+  });
 
   const allCandidates = [];
   const seenUrls = new Set();
@@ -488,23 +630,19 @@ export async function searchFandomClient(title, issueNum, publisher, rejectedUrl
   for (const wiki of wikis) {
     const wikiLabel = getWikiLabel(wiki);
 
-    // Passo A: Consultar diretamente títulos de volumes (Titles API)
+    // Passo A: Consultar diretamente títulos de volumes (Titles API) para todas as variações
     const directTitles = [];
-    for (let v = 10; v >= 1; v--) {
-      directTitles.push(`${engTitle.replace(/\s+/g, '_')}_Vol_${v}_${issueStr}`);
-    }
-    if (engTitle !== cleanTitle) {
+    for (const tv of titleVariants) {
       for (let v = 10; v >= 1; v--) {
-        directTitles.push(`${cleanTitle.replace(/\s+/g, '_')}_Vol_${v}_${issueStr}`);
+        directTitles.push(`${tv.replace(/\s+/g, '_')}_Vol_${v}_${issueStr}`);
       }
-    }
-    if (issueStr === '1') {
-      directTitles.push(engTitle.replace(/\s+/g, '_'));
-      if (engTitle !== cleanTitle) directTitles.push(cleanTitle.replace(/\s+/g, '_'));
+      if (issueStr === '1') {
+        directTitles.push(tv.replace(/\s+/g, '_'));
+      }
     }
 
     try {
-      const titlesUrl = `https://${wiki}.fandom.com/api.php?action=query&format=json&titles=${encodeURIComponent(directTitles.join('|'))}&prop=pageimages|info&piprop=original|thumbnail&pithumbsize=600&origin=*`;
+      const titlesUrl = `https://${wiki}.fandom.com/api.php?action=query&format=json&titles=${encodeURIComponent(directTitles.slice(0, 50).join('|'))}&prop=pageimages|info&piprop=original|thumbnail&pithumbsize=600&origin=*`;
       const titlesResp = await fetch(titlesUrl);
       if (titlesResp.ok) {
         const titlesData = await titlesResp.json();
@@ -533,12 +671,13 @@ export async function searchFandomClient(title, issueNum, publisher, rejectedUrl
       }
     } catch {}
 
-    // Passo B: Generator search
-    const queries = [`${engTitle} ${issueStr}`];
-    if (engTitle !== cleanTitle) queries.push(`${cleanTitle} ${issueStr}`);
-    if (issueStr === '1') {
-      queries.push(engTitle);
-      if (engTitle !== cleanTitle) queries.push(cleanTitle);
+    // Passo B: Generator search para todas as variações
+    const queries = [];
+    for (const tv of titleVariants) {
+      queries.push(`${tv} ${issueStr}`);
+      if (issueStr === '1') {
+        queries.push(tv);
+      }
     }
 
     for (const q of queries) {
