@@ -3,7 +3,7 @@
 ## 1. Visão Geral e Propósito
 Aplicação Web First Mobile para controle ágil de coleções de Histórias em Quadrinhos, Especiais, Minisséries e Coleções em tela única.
 * **Nome Oficial:** `HQs Collections`
-* **Versão:** `1.9.0`
+* **Versão:** `1.9.1`
 
 ## 2. Header, Menu Hambúrguer & Navegação Mobile First
 * **Marca e Identidade com Menu Hambúrguer Integrado:** Ao tocar em qualquer ponto do logotipo (`BookOpen`), título ou versão no cabeçalho, uma elegante **Gaveta Lateral (Drawer Menu)** desliza da esquerda com efeito de desfoque de fundo (backdrop-blur).
@@ -36,9 +36,11 @@ Aplicação Web First Mobile para controle ágil de coleções de Histórias em 
 
 ## 5. Modal de Status da Busca de Capas
 * Acessível diretamente pelo botão de porcentagem no cabeçalho.
-* Métricas em tempo real: `% Progresso`, `Buscadas`, `Fixadas` e `Pendentes`.
+* **Cálculo Realista de Progresso (% Fixadas):** A porcentagem reflete estritamente a proporção de edições com capa oficial aprovada e fixada (`(fixedCount / totalIssues) * 100`). Ao rejeitar ou cancelar capas pendentes, a porcentagem diminui com precisão, nunca ficando estagnada em 100%.
+* Métricas em tempo real: `% Fixadas`, `Buscadas`, `Fixadas` e `Pendentes`.
 * Abas de navegação rápida: `Todas`, `Encontradas`, `Em Busca` e `Sem Capa / Rejeitadas`.
 * Ações diretas por edição sem texto: Aprovar (✓ verde), Rejeitar (✗ vermelho), Desvincular e Re-buscar.
+* **Foco Estável e Sem Saltos de Edição:** Ao selecionar uma alternativa ou alterar status no carrossel, o item expandido é protegido e travado na visualização, impedindo que a lista mude de foco ou salte de edição.
 * **Ações em Lote (Aceitar Todos / Rejeitar Todos):**
   - Botão **Aceitar Todos**: Aprova em lote todas as capas pendentes de aprovação na coleção (ou no filtro pesquisado), gravando-as como capas fixadas no Firestore/LocalStorage via `saveComicsBatch`.
   - Botão **Rejeitar Todos**: Rejeita em lote todas as capas pendentes, adicionando-as aos arrays de rejeição e disparando buscas sequenciais pelas edições cronologicamente anteriores.
@@ -75,12 +77,16 @@ Aplicação Web First Mobile para controle ágil de coleções de Histórias em 
   * **Linha 2:** Badges compactos com a **Editora** e o **Tipo de Publicação** (ex: `[Marvel] [Mensal]`).
 * **Interatividade ao Tocar:** Ao tocar no card, abre o **Modal de Detalhes daquela edição** exibindo a capa em tamanho ampliado, metadados e opções de curadoria. Suporta reordenação via Drag & Drop.
 
-## 10. Propagação Inteligente de Séries de Capas
+## 10. Propagação Inteligente de Séries de Capas & Indicadores Visuais
 * **Auxílio Automatizado por Confirmação:** Ao escolher e aprovar a capa de uma edição (ex: Wolverine #16 da Panini 2025 ou Fandom Vol 8), o sistema armazena a série identificada (`preferredSeries` contendo Ano, Volume e Fonte).
 * **Alinhamento para Outras Edições:** Automaticamente busca e sugere para **todas as outras edições** daquela HQ que ainda não possuem capa fixada as imagens pertencentes à mesma série/ano/volume, substituindo sugestões pendentes divergentes.
 * **Segurança e Confirmação Pendente:** As novas capas sugeridas permanecem no estado **pendente de aprovação** (`status === 'pending'`), exigindo que o colecionador revise e confirme cada uma com o botão verde (`✓`).
-* **Notificação Visual em Tempo Real:** Banner/toast discreto no topo do aplicativo informa o início do alinhamento da série e a conclusão da busca em lote.
-* **Badges de Série Reconhecida:** Exibe distintivo visual `⚡ Série: [Ano/Fonte]` no modal de detalhes da edição e no painel de status de busca de capas.
+* **Trava de Foco Rigorosa:** A aprovação ou troca de capa mantém estritamente a edição sob foco aberta no modal de detalhes ou no status de busca, sem saltar para outra edição.
+* **Indicadores Visuais Completos de Série Alinhada:**
+  - **Bolinhas das Edições (Tela Principal):** Ponto pulsante âmbar/dourado com ícone de raio (`⚡`) no canto inferior direito da bolinha e tooltip explicativo para qualquer edição que disponha de uma sugestão de capa alinhada à série pronta para aprovação.
+  - **Cards das HQs (Linha 2):** Badge `⚡ Série: [Ano/Fonte]` posicionado ao lado dos metadados da HQ (em cards ativos, coleções concluídas e no Modo Consulta Capa).
+  - **Modal de Detalhes da Edição:** Banner temático violeta/âmbar destacando `⚡ Sugestão da Mesma Série` com a indicação da série de origem e orientação para confirmação rápida pelo botão `✓`.
+  - **Painel de Status de Capas:** Badge pulsante `⚡ Sugestão da Série ([Ano/Fonte])` na identificação do fascículo.
 
 ## 11. Autenticação e Multi-Tenancy (Firebase Auth)
 * **Login Obrigatório na Inicialização:** Tela de entrada com suporte a autenticação oficial Google (`loginWithGoogle`) e cadastro/login com E-mail e Senha (`loginWithEmail`, `registerWithEmail`).

@@ -43,7 +43,8 @@ import {
   User,
   Settings,
   Mic,
-  LogOut
+  LogOut,
+  Zap
 } from 'lucide-react';
 import { 
   subscribeComics, 
@@ -394,7 +395,8 @@ export default function App() {
       }
     });
 
-    const percentage = totalIssues > 0 ? Math.round((searchedCount / totalIssues) * 100) : 100;
+    // A porcentagem agora indica estritamente a proporção de capas aprovadas/fixadas
+    const percentage = totalIssues > 0 ? Math.round((fixedCount / totalIssues) * 100) : 0;
     return { totalIssues, searchedCount, fixedCount, pendingCount, percentage };
   }, [comics]);
 
@@ -885,7 +887,7 @@ export default function App() {
     setComics(updated);
 
     if (viewingIssueDetail && viewingIssueDetail.comic.id === comicId) {
-      setViewingIssueDetail({ comic: updatedComic, issueNum });
+      setViewingIssueDetail({ comic: updatedComic, issueNum: viewingIssueDetail.issueNum });
     }
 
     // Auxilia na escolha de capas para as outras edições da mesma HQ
@@ -926,7 +928,7 @@ export default function App() {
     setComics(updated);
 
     if (viewingIssueDetail && viewingIssueDetail.comic.id === comicId) {
-      setViewingIssueDetail({ comic: updatedComic, issueNum });
+      setViewingIssueDetail({ comic: updatedComic, issueNum: viewingIssueDetail.issueNum });
     }
 
     // Abre imediatamente o carrossel na própria linha buscando todas as ocorrências encontradas
@@ -1030,7 +1032,7 @@ export default function App() {
     setComics(saved);
 
     if (viewingIssueDetail && viewingIssueDetail.comic.id === comicId) {
-      setViewingIssueDetail({ comic: nextComic, issueNum });
+      setViewingIssueDetail({ comic: nextComic, issueNum: viewingIssueDetail.issueNum });
     }
   };
 
@@ -1065,7 +1067,7 @@ export default function App() {
     setComics(updated);
 
     if (viewingIssueDetail && viewingIssueDetail.comic.id === comicId) {
-      setViewingIssueDetail({ comic: updatedComic, issueNum });
+      setViewingIssueDetail({ comic: updatedComic, issueNum: viewingIssueDetail.issueNum });
     }
 
     // Reabre imediatamente o carrossel de alternativas para escolher uma nova capa na hora
@@ -1692,7 +1694,7 @@ export default function App() {
                   ? 'bg-amber-500/20 border-amber-500/60 text-amber-300 hover:bg-amber-500/30'
                   : 'bg-slate-900/80 hover:bg-slate-800 border-slate-800 text-slate-300'
               }`}
-              title={`Busca de capas: ${coverStats.percentage}% (${coverStats.searchedCount}/${coverStats.totalIssues}) - Toque para detalhes`}
+              title={`Capas fixadas: ${coverStats.percentage}% (${coverStats.fixedCount}/${coverStats.totalIssues} edições com capa oficial) - Toque para detalhes`}
               aria-label="Status da busca de capas"
             >
               <ImageIcon className={`w-3.5 h-3.5 text-amber-400 shrink-0 ${isScrapingActive ? 'animate-pulse' : ''}`} />
@@ -2225,6 +2227,15 @@ export default function App() {
                         <span className={`text-[9px] px-1.5 py-0.5 rounded border font-semibold truncate ${getTypeBadgeStyle(comic.type || 'Mensal')}`}>
                           {comic.type || 'Mensal'}
                         </span>
+                        {comic.preferredSeries && (
+                          <span 
+                            className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-950/80 border border-indigo-500/50 text-indigo-300 font-bold truncate flex items-center gap-0.5 shadow-sm"
+                            title={`Série: ${comic.preferredSeries.year || comic.preferredSeries.sourceLabel}`}
+                          >
+                            <Zap className="w-2 h-2 text-amber-400 fill-amber-400" />
+                            {comic.preferredSeries.year || comic.preferredSeries.sourceLabel}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2515,15 +2526,34 @@ export default function App() {
               ) : viewingIssueDetail.comic.pendingCovers?.[viewingIssueDetail.issueNum] ? (
                 /* CENÁRIO 2: Capa Encontrada Pendente de Aprovação (Com Botão Verde V) */
                 <div className="space-y-3 w-full flex flex-col items-center">
-                  <div className="w-full bg-amber-500/15 border border-amber-500/40 rounded-xl px-3 py-1.5 text-xs text-amber-300 font-semibold flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                      Capa Encontrada (Aguardando Aprovação)
-                    </span>
-                    <span className="text-[10px] text-amber-400/80">
-                      {viewingIssueDetail.comic.pendingCovers[viewingIssueDetail.issueNum].source || 'Panini / Web'}
-                    </span>
-                  </div>
+                  {viewingIssueDetail.comic.preferredSeries ? (
+                    <div className="w-full bg-indigo-950/80 border border-indigo-500/60 rounded-xl p-2.5 text-xs text-indigo-200 flex items-center gap-2.5 shadow-md">
+                      <div className="w-7 h-7 rounded-lg bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-amber-400 shrink-0">
+                        <Zap className="w-4 h-4 fill-amber-400" />
+                      </div>
+                      <div className="min-w-0 flex-1 text-left">
+                        <p className="font-bold text-white text-xs leading-tight flex items-center gap-1.5">
+                          <span>Sugestão da Mesma Série</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-300 font-mono font-bold">
+                            {viewingIssueDetail.comic.preferredSeries.year || viewingIssueDetail.comic.preferredSeries.sourceLabel}
+                          </span>
+                        </p>
+                        <p className="text-[10px] text-indigo-300/80 leading-tight mt-0.5">
+                          Alinhada com a série confirmada desta HQ. Toque no botão verde (✓) para fixar.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-full bg-amber-500/15 border border-amber-500/40 rounded-xl px-3 py-1.5 text-xs text-amber-300 font-semibold flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        Capa Encontrada (Aguardando Aprovação)
+                      </span>
+                      <span className="text-[10px] text-amber-400/80">
+                        {viewingIssueDetail.comic.pendingCovers[viewingIssueDetail.issueNum].source || 'Panini / Web'}
+                      </span>
+                    </div>
+                  )}
 
                   <div className="relative group max-w-[220px] rounded-xl overflow-hidden shadow-2xl border-2 border-emerald-500/50 bg-slate-900">
                     <img 
@@ -2997,7 +3027,7 @@ export default function App() {
             <div className="grid grid-cols-4 gap-2 bg-slate-950/80 p-3 rounded-xl border border-slate-800 text-center shrink-0">
               <div className="p-1">
                 <div className="text-base font-black text-amber-400">{coverStats.percentage}%</div>
-                <div className="text-[10px] text-slate-400 uppercase font-semibold">Progresso</div>
+                <div className="text-[10px] text-slate-400 uppercase font-semibold">Fixadas %</div>
               </div>
               <div className="p-1 border-l border-slate-800">
                 <div className="text-base font-black text-white">{coverStats.searchedCount}/{coverStats.totalIssues}</div>
@@ -3153,6 +3183,10 @@ export default function App() {
             <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[220px]">
               {(() => {
                 const filtered = allTrackedIssues.filter(item => {
+                  const itemKey = `${item.comicId}_${item.issueNum}`;
+                  // Se o carrossel de opções desta edição estiver aberto, NUNCA a remova da visão para não causar saltos
+                  if (expandedAlternativesKey === itemKey) return true;
+
                   if (coverModalTab === 'found' && !(item.status === 'fixed' || item.status === 'pending')) return false;
                   if (coverModalTab === 'searching' && item.status !== 'searching') return false;
                   if (coverModalTab === 'missing' && !(item.status === 'missing' || item.status === 'rejected')) return false;
@@ -3241,9 +3275,16 @@ export default function App() {
                               </span>
                             )}
                             {item.status === 'pending' && (
-                              <span className="text-[10px] font-semibold text-amber-300 bg-amber-950/50 border border-amber-800/60 px-1.5 py-0.5 rounded animate-pulse">
-                                ⏳ Pendente de Aprovação
-                              </span>
+                              item.comic.preferredSeries ? (
+                                <span className="text-[10px] font-bold text-indigo-200 bg-indigo-950/80 border border-indigo-500/60 px-2 py-0.5 rounded flex items-center gap-1 animate-pulse shadow-sm">
+                                  <Zap className="w-2.5 h-2.5 text-amber-400 fill-amber-400" />
+                                  <span>⚡ Sugestão da Série ({item.comic.preferredSeries.year || item.comic.preferredSeries.sourceLabel})</span>
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-semibold text-amber-300 bg-amber-950/50 border border-amber-800/60 px-1.5 py-0.5 rounded animate-pulse">
+                                  ⏳ Pendente de Aprovação
+                                </span>
+                              )
                             )}
                             {item.status === 'searching' && (
                               <span className="text-[10px] font-semibold text-blue-300 bg-blue-950/50 border border-blue-800/60 px-1.5 py-0.5 rounded flex items-center gap-1 w-max">
@@ -3640,31 +3681,44 @@ function ComicRow({
         </div>
 
         {/* LINHA 2: OS 3 BOTÕES COM LARGURA IGUAL E FIXA ALINHADOS À DIREITA */}
-        <div className="flex items-center justify-end gap-1.5">
-          <button
-            onClick={onCyclePublisher}
-            className={`w-24 text-[11px] py-1 rounded-lg transition active:scale-95 text-center font-bold truncate ${getPublisherBadgeStyle(comicPublisher)}`}
-            title="Editora Original (Toque para alternar)"
-          >
-            {comicPublisher}
-          </button>
+        <div className="flex items-center justify-between gap-1.5 flex-wrap">
+          {comic.preferredSeries ? (
+            <span
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-950/80 border border-indigo-500/50 text-[10px] font-bold text-indigo-300 shadow-sm"
+              title={`Série Vinculada: ${comic.preferredSeries.sourceLabel || ''}${comic.preferredSeries.year ? ' (' + comic.preferredSeries.year + ')' : ''}`}
+            >
+              <Zap className="w-2.5 h-2.5 text-amber-400 fill-amber-400 animate-pulse shrink-0" />
+              <span className="truncate max-w-[130px] sm:max-w-[180px]">
+                ⚡ Série: {comic.preferredSeries.year || comic.preferredSeries.sourceLabel}
+              </span>
+            </span>
+          ) : <div />}
+          <div className="flex items-center justify-end gap-1.5 ml-auto">
+            <button
+              onClick={onCyclePublisher}
+              className={`w-24 text-[11px] py-1 rounded-lg transition active:scale-95 text-center font-bold truncate ${getPublisherBadgeStyle(comicPublisher)}`}
+              title="Editora Original (Toque para alternar)"
+            >
+              {comicPublisher}
+            </button>
 
-          <button
-            onClick={onCycleType}
-            className={`w-24 text-[11px] py-1 rounded-lg border transition active:scale-95 text-center font-bold truncate ${getTypeBadgeStyle(comicType)}`}
-            title="Tipo de Publicação (Toque para alternar)"
-          >
-            {comicType}
-          </button>
+            <button
+              onClick={onCycleType}
+              className={`w-24 text-[11px] py-1 rounded-lg border transition active:scale-95 text-center font-bold truncate ${getTypeBadgeStyle(comicType)}`}
+              title="Tipo de Publicação (Toque para alternar)"
+            >
+              {comicType}
+            </button>
 
-          <button
-            onClick={onToggleComplete}
-            className="w-24 text-[11px] py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30 transition font-bold flex items-center justify-center gap-1 shrink-0"
-            title="Coleção Encerrada. Toque para reabrir."
-          >
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            <span>Concluída</span>
-          </button>
+            <button
+              onClick={onToggleComplete}
+              className="w-24 text-[11px] py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30 transition font-bold flex items-center justify-center gap-1 shrink-0"
+              title="Coleção Encerrada. Toque para reabrir."
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>Concluída</span>
+            </button>
+          </div>
         </div>
 
         {/* Resumo da Coleção */}
@@ -3692,6 +3746,7 @@ function ComicRow({
 
                 const specificTitle = issueTitles[n];
                 const hasCover = comic.issueCovers?.[n];
+                const hasPendingSeries = !hasCover && comic.pendingCovers?.[n] && comic.preferredSeries;
 
                 return (
                   <button
@@ -3709,11 +3764,23 @@ function ComicRow({
                       }
                     }}
                     className={`relative h-9 rounded-full text-xs font-bold flex items-center justify-center transition-all active:scale-90 ${getIssueClasses(n)}`}
-                    title={specificTitle ? `Edição #${format2(n)}: ${specificTitle}` : `Edição #${format2(n)}`}
+                    title={
+                      specificTitle 
+                        ? `Edição #${format2(n)}: ${specificTitle}${hasPendingSeries ? ' [⚡ Sugestão da Série Disponível]' : ''}` 
+                        : `Edição #${format2(n)}${hasPendingSeries ? ' [⚡ Sugestão da Série Disponível]' : ''}`
+                    }
                   >
                     {format2(n)}
                     {hasCover && (
                       <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-400 border border-slate-950" title="Capa fixada" />
+                    )}
+                    {hasPendingSeries && (
+                      <span 
+                        className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-amber-500 border border-slate-950 flex items-center justify-center animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.8)] z-10" 
+                        title={`⚡ Sugestão da Série (${comic.preferredSeries.year || comic.preferredSeries.sourceLabel}) aguardando aprovação`}
+                      >
+                        <Zap className="w-2 h-2 text-slate-950 fill-slate-950" />
+                      </span>
                     )}
                     {specificTitle && (
                       <span className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-purple-400 border border-slate-950" title={`Título: ${specificTitle}`} />
@@ -3807,6 +3874,7 @@ function ComicRow({
             const isVisible = visibleNumbers.includes(num);
             const specificTitle = issueTitles[num];
             const hasCover = comic.issueCovers?.[num];
+            const hasPendingSeries = !hasCover && comic.pendingCovers?.[num] && comic.preferredSeries;
             const stage = getStage(num);
 
             if (!isVisible) {
@@ -3838,13 +3906,21 @@ function ComicRow({
                 className={`relative h-8 sm:h-9 rounded-full text-xs font-bold flex items-center justify-center transition-all active:scale-90 ${getIssueClasses(num)}`}
                 title={
                   specificTitle 
-                    ? `Edição #${format2(num)}: ${specificTitle} [${stage === 'read' ? 'Tenho e Já Li' : stage === 'owned' ? 'Tenho' : stage === 'wishlist' ? 'Quero Comprar' : 'Não Pretendo'}]` 
-                    : `Edição #${format2(num)} [${stage === 'read' ? 'Tenho e Já Li' : stage === 'owned' ? 'Tenho' : stage === 'wishlist' ? 'Quero Comprar' : 'Não Pretendo'}]`
+                    ? `Edição #${format2(num)}: ${specificTitle} [${stage === 'read' ? 'Tenho e Já Li' : stage === 'owned' ? 'Tenho' : stage === 'wishlist' ? 'Quero Comprar' : 'Não Pretendo'}]${hasPendingSeries ? ' [⚡ Sugestão da Série Disponível]' : ''}` 
+                    : `Edição #${format2(num)} [${stage === 'read' ? 'Tenho e Já Li' : stage === 'owned' ? 'Tenho' : stage === 'wishlist' ? 'Quero Comprar' : 'Não Pretendo'}]${hasPendingSeries ? ' [⚡ Sugestão da Série Disponível]' : ''}`
                 }
               >
                 {format2(num)}
                 {hasCover && (
                   <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-400 border border-slate-950" title="Capa fixada" />
+                )}
+                {hasPendingSeries && (
+                  <span 
+                    className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-amber-500 border border-slate-950 flex items-center justify-center animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.8)] z-10" 
+                    title={`⚡ Sugestão da Série (${comic.preferredSeries.year || comic.preferredSeries.sourceLabel}) aguardando aprovação`}
+                  >
+                    <Zap className="w-2 h-2 text-slate-950 fill-slate-950" />
+                  </span>
                 )}
                 {specificTitle && (
                   <span className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-purple-400 border border-slate-950" title={`Título: ${specificTitle}`} />
@@ -3884,31 +3960,44 @@ function ComicRow({
       </div>
 
       {/* LINHA 2: OS 3 BOTÕES COM LARGURA IGUAL E FIXA ALINHADOS À DIREITA (EDITORA, TIPO, ENCERRAR) */}
-      <div className="flex items-center justify-end gap-1.5">
-        <button
-          onClick={onCyclePublisher}
-          className={`w-24 text-[11px] py-1 rounded-lg transition active:scale-95 text-center font-bold truncate ${getPublisherBadgeStyle(comicPublisher)}`}
-          title="Editora Original (Toque para alternar)"
-        >
-          {comicPublisher}
-        </button>
+      <div className="flex items-center justify-between gap-1.5 flex-wrap">
+        {comic.preferredSeries ? (
+          <span
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-950/80 border border-indigo-500/50 text-[10px] font-bold text-indigo-300 shadow-sm"
+            title={`Série Vinculada: ${comic.preferredSeries.sourceLabel || ''}${comic.preferredSeries.year ? ' (' + comic.preferredSeries.year + ')' : ''}`}
+          >
+            <Zap className="w-2.5 h-2.5 text-amber-400 fill-amber-400 animate-pulse shrink-0" />
+            <span className="truncate max-w-[130px] sm:max-w-[180px]">
+              ⚡ Série: {comic.preferredSeries.year || comic.preferredSeries.sourceLabel}
+            </span>
+          </span>
+        ) : <div />}
+        <div className="flex items-center justify-end gap-1.5 ml-auto">
+          <button
+            onClick={onCyclePublisher}
+            className={`w-24 text-[11px] py-1 rounded-lg transition active:scale-95 text-center font-bold truncate ${getPublisherBadgeStyle(comicPublisher)}`}
+            title="Editora Original (Toque para alternar)"
+          >
+            {comicPublisher}
+          </button>
 
-        <button
-          onClick={onCycleType}
-          className={`w-24 text-[11px] py-1 rounded-lg border transition active:scale-95 text-center font-bold truncate ${getTypeBadgeStyle(comicType)}`}
-          title="Tipo de Publicação (Toque para alternar)"
-        >
-          {comicType}
-        </button>
+          <button
+            onClick={onCycleType}
+            className={`w-24 text-[11px] py-1 rounded-lg border transition active:scale-95 text-center font-bold truncate ${getTypeBadgeStyle(comicType)}`}
+            title="Tipo de Publicação (Toque para alternar)"
+          >
+            {comicType}
+          </button>
 
-        <button
-          onClick={onToggleComplete}
-          className="w-24 text-[11px] py-1 rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-slate-700/80 hover:text-amber-300 transition font-bold flex items-center justify-center gap-1 shrink-0"
-          title="Encerrar minissérie/coleção no número atual"
-        >
-          <Flag className="w-3 h-3 text-amber-400 shrink-0" />
-          <span>Encerrar</span>
-        </button>
+          <button
+            onClick={onToggleComplete}
+            className="w-24 text-[11px] py-1 rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-slate-700/80 hover:text-amber-300 transition font-bold flex items-center justify-center gap-1 shrink-0"
+            title="Encerrar minissérie/coleção no número atual"
+          >
+            <Flag className="w-3 h-3 text-amber-400 shrink-0" />
+            <span>Encerrar</span>
+          </button>
+        </div>
       </div>
 
       {/* ÁREA DE INTERVALOS DE 10 EM 10 */}

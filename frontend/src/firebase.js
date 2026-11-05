@@ -158,27 +158,12 @@ export function saveToLocalStorage(data, userId = null) {
 
 /**
  * Assina atualizações em tempo real do Firestore isoladas por usuário
- * Suporta assinatura: subscribeComics(userId, onUpdate, onStatusChange) ou subscribeComics(onUpdate, onStatusChange)
  */
-export function subscribeComics(arg1, arg2, arg3) {
-  let userId = null;
-  let onUpdate = null;
-  let onStatusChange = null;
-
-  if (typeof arg1 === 'function') {
-    userId = auth?.currentUser?.uid || null;
-    onUpdate = arg1;
-    onStatusChange = arg2;
-  } else {
-    userId = arg1;
-    onUpdate = arg2;
-    onStatusChange = arg3;
-  }
-
+export function subscribeComics(userId, onUpdate, onStatusChange) {
   // Se não estiver inicializado ou sem usuário autenticado, opera no cache local
   if (!db || !isFirebaseInitialized || !userId) {
     onStatusChange?.({ status: 'local', message: 'Armazenamento Local Ativo' });
-    onUpdate?.(loadFromLocalStorage(userId));
+    onUpdate(loadFromLocalStorage(userId));
     return () => {};
   }
 
@@ -195,16 +180,16 @@ export function subscribeComics(arg1, arg2, arg3) {
       // Se o Firebase retornou dados remotos, sincroniza localmente
       if (remoteComics.length > 0) {
         saveToLocalStorage(remoteComics, userId);
-        onUpdate?.(remoteComics);
+        onUpdate(remoteComics);
         onStatusChange?.({ status: 'connected', message: 'Nuvem Conectada (Firestore Sincronizado)' });
       } else {
         // Se a subcoleção do usuário na nuvem estiver vazia, verifica se há dados locais para migrar
         const local = loadFromLocalStorage(userId);
         if (local.length > 0) {
           local.forEach(item => saveComic(userId, item));
-          onUpdate?.(local);
+          onUpdate(local);
         } else {
-          onUpdate?.([]);
+          onUpdate([]);
         }
         onStatusChange?.({ status: 'connected', message: 'Nuvem Conectada (Pronto)' });
       }
@@ -214,36 +199,22 @@ export function subscribeComics(arg1, arg2, arg3) {
         status: 'local-fallback', 
         message: 'Modo Offline/Local' 
       });
-      onUpdate?.(loadFromLocalStorage(userId));
+      onUpdate(loadFromLocalStorage(userId));
     });
 
     return unsubscribe;
   } catch (err) {
     console.warn('⚠️ Exceção ao conectar no Firestore:', err);
     onStatusChange?.({ status: 'local', message: 'Armazenamento Local Ativo' });
-    onUpdate?.(loadFromLocalStorage(userId));
+    onUpdate(loadFromLocalStorage(userId));
     return () => {};
   }
 }
 
 /**
  * Salva ou atualiza uma HQ tanto no Firestore quanto no LocalStorage do usuário
- * Suporta saveComic(userId, comic) ou saveComic(comic)
  */
-export async function saveComic(arg1, arg2) {
-  let userId = null;
-  let comic = null;
-
-  if (arg2 === undefined) {
-    userId = auth?.currentUser?.uid || null;
-    comic = arg1;
-  } else {
-    userId = arg1;
-    comic = arg2;
-  }
-
-  if (!comic) return [];
-
+export async function saveComic(userId, comic) {
   // 1. Salva no LocalStorage imediatamente
   const current = loadFromLocalStorage(userId);
   const index = current.findIndex(c => c.id === comic.id);
@@ -294,25 +265,13 @@ export async function saveComic(arg1, arg2) {
 
 /**
  * Exclui uma HQ do Firestore e do LocalStorage
- * Suporta deleteComic(userId, comicId) ou deleteComic(comicId)
  */
-export async function deleteComic(arg1, arg2) {
-  let userId = null;
-  let comicId = null;
-
-  if (arg2 === undefined) {
-    userId = auth?.currentUser?.uid || null;
-    comicId = arg1;
-  } else {
-    userId = arg1;
-    comicId = arg2;
-  }
-
+export async function deleteComic(userId, comicId) {
   const current = loadFromLocalStorage(userId);
   const updated = current.filter(c => c.id !== comicId);
   saveToLocalStorage(updated, userId);
 
-  if (db && isFirebaseInitialized && userId && comicId) {
+  if (db && isFirebaseInitialized && userId) {
     try {
       const docRef = doc(db, 'users', userId, 'comics', comicId);
       await deleteDoc(docRef);
@@ -326,22 +285,8 @@ export async function deleteComic(arg1, arg2) {
 
 /**
  * Salva a ordenação personalizada de todas as HQs do usuário
- * Suporta saveAllComicsOrder(userId, comicsList) ou saveAllComicsOrder(comicsList)
  */
-export async function saveAllComicsOrder(arg1, arg2) {
-  let userId = null;
-  let comicsList = null;
-
-  if (arg2 === undefined) {
-    userId = auth?.currentUser?.uid || null;
-    comicsList = arg1;
-  } else {
-    userId = arg1;
-    comicsList = arg2;
-  }
-
-  if (!comicsList) return [];
-
+export async function saveAllComicsOrder(userId, comicsList) {
   saveToLocalStorage(comicsList, userId);
 
   if (db && isFirebaseInitialized && userId) {
@@ -361,22 +306,8 @@ export async function saveAllComicsOrder(arg1, arg2) {
 
 /**
  * Salva múltiplas HQs de uma vez no LocalStorage e no Firestore
- * Suporta saveComicsBatch(userId, comicsToUpdate) ou saveComicsBatch(comicsToUpdate)
  */
-export async function saveComicsBatch(arg1, arg2) {
-  let userId = null;
-  let comicsToUpdate = null;
-
-  if (arg2 === undefined) {
-    userId = auth?.currentUser?.uid || null;
-    comicsToUpdate = arg1;
-  } else {
-    userId = arg1;
-    comicsToUpdate = arg2;
-  }
-
-  if (!comicsToUpdate || !comicsToUpdate.length) return [];
-
+export async function saveComicsBatch(userId, comicsToUpdate) {
   const current = loadFromLocalStorage(userId);
   const currentMap = new Map(current.map(c => [c.id, c]));
 
@@ -428,8 +359,7 @@ export async function saveComicsBatch(arg1, arg2) {
 /**
  * Zera permanentemente a coleção do usuário autenticado (Firestore e LocalStorage)
  */
-export async function clearUserCollection(arg1) {
-  const userId = arg1 || auth?.currentUser?.uid || null;
+export async function clearUserCollection(userId) {
   saveToLocalStorage([], userId);
 
   if (db && isFirebaseInitialized && userId) {

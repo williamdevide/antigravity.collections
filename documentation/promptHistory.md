@@ -326,6 +326,29 @@ Atualize o arquivo firestore.rules na raiz do projeto g:\antigravity\projetos\an
 3. Garantir regras seguras, livres de erros e compatíveis com Firestore Rules v2.
 ```
 
+### Prompt 22
+```text
+/agente-orquestrador /grill-me /goal em alguns casos quando estou escolhendo a imagem de capa ele pula para outra edição, ao cancelar todas as capas não aprovadas a porcentagem mantem em 100% e quando ja tenho capas de uma hq e ele deveria sugerir as outras não tem nenhuma indicação visual de que ele fez isso
+```
+
+### Resposta Grill-Me / Interação 33
+```text
+Pergunta: Como você prefere que a porcentagem de capas no cabeçalho seja calculada e se comporte ao cancelar ou rejeitar capas não aprovadas?
+Resposta do Usuário: (Recommended) Porcentagem de Capas Aprovadas / Fixadas: A porcentagem no cabeçalho passa a indicar quantas edições têm capa confirmada e aprovada (ex: 12/20 = 60%). Ao cancelar ou rejeitar capas, a porcentagem diminui proporcionalmente, mostrando o progresso real de capas fixadas.
+```
+
+### Resposta Grill-Me / Interação 34
+```text
+Pergunta: Como você prefere que seja a indicação visual de que as outras edições receberam sugestões automáticas da mesma série?
+Resposta do Usuário: (Recommended) Indicador Completo: Ponto pulsante âmbar/dourado com raio (⚡) na bolinha da edição na tela principal + Badge '⚡ Série Alinhada' no card da HQ + Banner explicativo no modal de detalhes mostrando a série de origem
+```
+
+### Resposta Grill-Me / Interação 35
+```text
+Pergunta: Ao selecionar ou trocar a capa de uma edição, como você prefere que a tela se comporte para evitar qualquer salto indesejado para outra edição?
+Resposta do Usuário: (Recommended) Travar Edição e Manter Foco Estável: Ao escolher, aprovar ou rejeitar uma capa (seja no Modal de Detalhes ou no Status de Capas), a tela NUNCA muda de edição nem a remove da visão enquanto o carrossel estiver aberto. O item permanece na tela com a nova capa selecionada para sua conferência.
+```
+
 
 
 

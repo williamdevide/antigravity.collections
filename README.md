@@ -1,9 +1,9 @@
 <div align="center">
 
-# 📚 HQs Collections `v1.9.0` - Mobile First Collection Manager
+# 📚 HQs Collections `v1.9.1` - Mobile First Collection Manager
 ### *Gerenciador Ágil de Coleções de Quadrinhos e Minisséries*
 
-[![Version](https://img.shields.io/badge/version-1.9.0-amber?style=for-the-badge&logo=semver&logoColor=white)](#)
+[![Version](https://img.shields.io/badge/version-1.9.1-amber?style=for-the-badge&logo=semver&logoColor=white)](#)
 [![Powered by Antigravity](https://img.shields.io/badge/Powered%20by-Google%20Antigravity-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://deepmind.google/technologies/antigravity/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
@@ -24,7 +24,14 @@
 ### 🎯 Overview
 **HQs Collections** (v1.9.0) is an ultra-fast, mobile-first web application designed for comic book readers and collectors to track monthly publications, collections, and miniseries in a single streamlined screen. Version 1.9.0 introduces **Drawer Navigation via Logo Tap**, full **User Authentication** (Firebase Auth with Google Single Sign-On and Email/Password), **My Profile Panel** with name updates, password change, and a protected "Clear My Collection" safety gate requiring the `ZERAR` security passphrase, a comprehensive **Visual Settings Panel** with 5 elegant color presets and free hex pickers for Consultation, Edit, and Cover modes, and a dedicated **Voice Input Module** powered by the Web Speech API (PT-BR) with semantic parsing and automatic Panini cover scraping.
 
-### ✨ Key Features in `v1.9.0`
+### ✨ Key Features & Improvements in `v1.9.1`
+- **Stable Edition Focus & Anti-Jump Lock:** Fixed the edition jumping issue when approving, rejecting, or browsing alternatives in the cover carousel. The active edition remains pinned and stable on screen.
+- **Accurate Fixed-Cover Progress Percentage:** Header cover progress is now calculated strictly from confirmed and fixed covers (`(fixedCount / totalIssues) * 100`). Rejecting or cancelling covers accurately updates the percentage downward rather than getting stuck at 100%.
+- **Comprehensive Visual Series Indicators:**
+  - Pulsing amber bolt (`⚡`) on edition balls with pending series suggestions across normal and completed collections.
+  - Distinctive `⚡ Série: [Year/Source]` badges on Comic Cards and Cover View cards.
+  - Dedicated series suggestion banner in the Edition Detail modal with quick 1-tap `✓` approval.
+  - Pulsing `⚡ Sugestão da Série` badges in the Cover Search Status panel.
 - **Hamburger Drawer Menu via Brand Logo:** Tapping the app logo or title opens a smooth sliding navigation drawer with user avatar, profile status, and quick shortcuts.
 - **Firebase Authentication & Multi-Tenancy:** Complete authentication suite supporting Google Sign-In (no password required), email/password login and registration, remembered email, and password recovery. Each user's comics are strictly isolated in Cloud Firestore subcollections (`/users/{userId}/comics`).
 - **My Profile Panel:** View account details, update display name, change account password, and access high-risk operations.
@@ -50,7 +57,14 @@ This application was architected and built using **Google Antigravity**, utilizi
 ### 🎯 Visão Geral
 O **HQs Collections** (v1.9.0) é uma aplicação web mobile-first ultra-rápida criada sob medida para colecionadores de quadrinhos organizarem edições mensais, coleções e minisséries em apenas uma tela. A versão 1.9.0 traz a nova **Gaveta Lateral de Navegação (Menu Hambúrguer)** acionada ao tocar no logotipo da aplicação, **Autenticação Completa com Firebase Auth** (Google e E-mail/Senha), painel **Meu Perfil** com alteração de dados e ação de segurança para zerar a coleção digitando `ZERAR`, tela de **Configurações Visuais** com 5 presets de cores e seletores livres de cor para os fundos dos modos Consulta, Edição e Capas, e **Módulo de Entrada por Voz** com Web Speech API em PT-BR para ditar e cadastrar HQs automaticamente.
 
-### ✨ Novidades da Versão `1.9.0`
+### ✨ Novidades e Melhorias da Versão `1.9.1`
+- **Trava de Foco e Estabilidade sem Saltos de Edição:** Correção definitiva do salto indesejado de edição ao escolher, aprovar, rejeitar ou alternar miniaturas no carrossel. A edição sob consulta permanece fixa e estável para revisão contínua.
+- **Cálculo Realista da Porcentagem de Capas (% Fixadas):** O medidor no cabeçalho e nos painéis agora calcula a proporção estrita de edições com capas fixadas oficialmente (`(fixedCount / totalIssues) * 100`). Ao rejeitar ou desvincular capas, a porcentagem se ajusta proporcionalmente, sem ficar presa em 100%.
+- **Indicadores Visuais Completos de Séries Alinhadas:**
+  - Ponto pulsante âmbar/dourado com raio (`⚡`) na bolinha da edição na tela principal (cards normais e concluídos) para edições com sugestão pendente da série.
+  - Badge `⚡ Série: [Ano/Fonte]` na Linha 2 dos cards da HQ e no Modo Consulta Capa.
+  - Banner explicativo de sugestão de série no Modal de Detalhes da edição com botão de confirmação rápida `✓`.
+  - Distintivo pulsante `⚡ Sugestão da Série` na tela detalhada de status de busca de capas.
 - **Menu Hambúrguer ao Tocar no Logo:** Toque no logo ou no título no cabeçalho para abrir a gaveta lateral com o perfil do colecionador, status de sincronização e atalhos rápidos.
 - **Autenticação Firebase & Isolamento Multi-Usuário:**
   - Login rápido com Conta Google (dispensa digitação de senha).
