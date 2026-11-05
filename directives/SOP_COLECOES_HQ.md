@@ -3,12 +3,15 @@
 ## 1. Visão Geral e Propósito
 Aplicação Web First Mobile para controle ágil de coleções de Histórias em Quadrinhos, Especiais, Minisséries e Coleções em tela única.
 * **Nome Oficial:** `HQs Collections`
-* **Versão:** `1.6.0`
+* **Versão:** `1.7.0`
 
 ## 2. Header & Navegação Mobile First
-* **Marca e Identidade:** Logotipo `BookOpen`, Título `HQs Collections`, versão SemVer (`v1.6.0`), badge `Mobile` e slogan `Controle Ágil de Coleções`.
+* **Marca e Identidade:** Logotipo `BookOpen`, Título `HQs Collections`, versão SemVer (`v1.7.0`), badge `Mobile` e slogan `Controle Ágil de Coleções`.
 * **Monitor de Capas no Header:** Objeto tátil composto estritamente pelo ícone e pela porcentagem (ex: `🖼️ 85%`), sem o texto "capas". Ao tocar nesse objeto, abre o **Modal Detalhado de Status da Busca de Capas**.
-* **Alternador de Modos:** Ícone único de alternância (Lápis para Edição / Olho para Consulta).
+* **Alternador Cíclico de 3 Modos:** Botão único no cabeçalho com ciclo de 3 toques:
+  - **Modo Consulta (Eye):** Exibe a lista completa de coleções com blocos de dezenas e dezenas expandidas.
+  - **Modo Edição (Pencil):** Permite preenchimento dos 4 estágios táteis e edição de títulos e configurações da HQ.
+  - **Modo Consulta Capa (ScanEye):** Exibe uma galeria em grade (2 colunas no mobile) focada nas capas e na última edição adquirida de cada coleção.
 * **Badge de Conexão e Estatísticas:** Status em tempo real (`Nuvem` / `Local`) e contagem total (`XX HQs • YY ed.`).
 
 ## 3. Sistema de 4 Estágios por Edição (Modo Edição)
@@ -56,3 +59,12 @@ Aplicação Web First Mobile para controle ágil de coleções de Histórias em 
 * Ao clicar no botão **Desvincular capa desta edição** (no modal de detalhes ou no painel de status), o sistema abre um **modal de alerta customizado** (`z-[70]`) com tema escuro e destaque em vermelho.
 * Exibe miniatura da capa a ser desvinculada, número da edição e nome da HQ com opções **Cancelar** e **Sim, Desvincular**.
 * Ao confirmar, a capa é desvinculada e o **carrossel de sugestões é imediatamente reaberto e recarregado**, permitindo selecionar e aprovar uma nova imagem instantaneamente.
+
+## 9. Modo Consulta Capa (Cards Compactos em Grade)
+* **Ativação:** Terceiro estado do botão cíclico do cabeçalho (ícone `ScanEye` com iluminação âmbar).
+* **Grade Compacta Responsiva:** 2 colunas no mobile (`grid-cols-2`), expandindo para 3 a 5 colunas em tablets e desktops.
+* **Composição do Card:**
+  * **Capa da Última Edição que Tenho:** Proporção 2:3 com moldura e cantos arredondados, exibindo a capa da maior edição marcada como adquirida (`owned` ou `read`). Caso a coleção não possua edições ainda, exibe elegante moldura com aviso *"Sem edições"*.
+  * **Linha 1:** Nome da HQ e número da última edição que tenho (ex: *"Wolverine #16"* ou *"Wolverine (Sem ed.)"*).
+  * **Linha 2:** Badges compactos com a **Editora** e o **Tipo de Publicação** (ex: `[Marvel] [Mensal]`).
+* **Interatividade ao Tocar:** Ao tocar no card, abre o **Modal de Detalhes daquela edição** exibindo a capa em tamanho ampliado, metadados e opções de curadoria. Suporta reordenação via Drag & Drop.

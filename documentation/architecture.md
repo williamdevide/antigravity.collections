@@ -1,7 +1,7 @@
-# 🏛️ Arquitetura do Sistema: HQs Collections `v1.6.0`
+# 🏛️ Arquitetura do Sistema: HQs Collections `v1.7.0`
 
 ## 1. Visão Geral
-O **HQs Collections** é um sistema projetado para colecionadores de quadrinhos com foco em extrema agilidade no ambiente mobile ("Mobile First"). A aplicação opera em **tela única**, minimizando cliques, eliminando navegações desnecessárias, agrupando edições em blocos táteis de 10 em 10, categorizando coleções por Tipo e Editora, permitindo ordenação personalizada com **Drag & Drop**, títulos específicos por fascículo, suporte a início em edições avançadas (`startFrom`), **ciclo interativo de 4 estágios com destaque em neon**, **scraper da Panini Brasil de alta precisão com suporte a Vol. N e resolução S300**, **carrossel condicional de sugestões de capas fechado após fixação**, **modal de alerta customizado de confirmação para desvinculação de capas** e **ações em lote (Aceitar Todos / Rejeitar Todos)**.
+O **HQs Collections** é um sistema projetado para colecionadores de quadrinhos com foco em extrema agilidade no ambiente mobile ("Mobile First"). A aplicação opera em **tela única**, minimizando cliques, eliminando navegações desnecessárias, agrupando edições em blocos táteis de 10 em 10, categorizando coleções por Tipo e Editora, permitindo ordenação personalizada com **Drag & Drop**, títulos específicos por fascículo, suporte a início em edições avançadas (`startFrom`), **ciclo interativo de 4 estágios com destaque em neon**, **alternador cíclico de 3 modos (Consulta / Edição / Consulta Capa)**, **grade compacta de cards em 2 colunas com a última edição adquirida**, **scraper da Panini Brasil de alta precisão com suporte a Vol. N e resolução S300**, **carrossel condicional de sugestões de capas** e **modal de alerta customizado de confirmação**.
 
 ---
 
@@ -12,10 +12,18 @@ flowchart TD
     User["📱 Usuário (Colecionador no Mobile / Desktop)"] --> UI["🖥️ Interface Web Mobile First (Vite + React)"]
 
     subgraph HeaderSection ["Cabeçalho e Navegação"]
-        UI --> Brand["Logotipo + Versão v1.6.0 + Badge Mobile + Slogan"]
+        UI --> Brand["Logotipo + Versão v1.7.0 + Badge Mobile + Slogan"]
         UI --> CoverProgressBtn["Botão Tátil [🖼️ XX%] (Apenas Ícone e Porcentagem)"]
-        UI --> ModeToggle["Alternador de Modo (Consulta 👁️ / Edição ✏️)"]
+        UI --> ModeToggle["Alternador Cíclico de 3 Modos: Consulta 👁️ ➔ Edição ✏️ ➔ Consulta Capa 🔍"]
         UI --> ConnectionBadge["Status Conexão [☁️ Nuvem / 💾 Local] + Contadores [XX HQs • YY ed.]"]
+    end
+
+    subgraph ViewsSection ["Modos de Visualização Principal"]
+        ModeToggle --> ModeConsulta["1. Modo Consulta: Lista com Dezenas Táteis em Blocos de 10"]
+        ModeToggle --> ModeEdicao["2. Modo Edição: Ciclo dos 4 Estágios Táteis e Título por Fascículo"]
+        ModeToggle --> ModeCapas["3. Modo Consulta Capa: Grade em 2 Colunas com Última Capa Adquirida"]
+        ModeCapas --> CompactCard["Card Compacto: Capa (2:3) + Nome/Última Edição (L1) + Editora/Tipo (L2)"]
+        CompactCard --> OpenDetailModal["Toque no Card -> Abre Modal de Detalhes da Edição"]
     end
 
     subgraph CoverModalSection ["Modal de Status de Capas & Carrossel de Alternativas"]

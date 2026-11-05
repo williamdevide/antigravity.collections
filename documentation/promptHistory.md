@@ -240,5 +240,29 @@ Pergunta: Ao confirmar a desvinculação da capa, como o sistema deve se comport
 Resposta do Usuário: (Recommended) Remover a capa fixada e reabrir imediatamente o carrossel de alternativas para escolher uma nova capa na hora
 ```
 
+### Prompt 18
+```text
+/agente-orquestrador /grill-me /goal agora na tela principal o botão com o olho (modo consulta) e lapis (modo edição) ganha uma terceira opção com um olho aberto (modo consulta capa): nesse modo ele exibe cards menores (talvez 2 colunas) com o nome da HQ e numero da ultima edição que tenho na linha 1, editora e tipo na linha 2, capa da ultima edição que eu tenho (por exemplo o ultimo wolverine que tenho é a 16)
+```
+
+### Resposta Grill-Me / Interação 23
+```text
+Pergunta: Caso você ainda não tenha nenhuma edição comprada daquela HQ, como ela deve aparecer no Modo Consulta Capa?
+Resposta do Usuário: (Recommended) Exibir a HQ com o aviso 'Sem edições' e uma moldura elegante indicando sem capa, mantendo todas as coleções visíveis no catálogo
+```
+
+### Resposta Grill-Me / Interação 24
+```text
+Pergunta: Ao tocar em um card de HQ no Modo Consulta Capa, qual ação você prefere que aconteça?
+Resposta do Usuário: (Recommended) Abrir o Modal de Detalhes daquela última edição (exibindo a capa em tamanho ampliado, metadados e opções de curadoria)
+```
+
+### Resposta Grill-Me / Interação 25
+```text
+Pergunta: Como você prefere a ordem do ciclo e a representação visual do botão de 3 modos no cabeçalho?
+Resposta do Usuário: (Recommended) Ciclo de 3 toques: Consulta [Eye] ➔ Edição [Pencil] ➔ Consulta Capa [ScanEye / Olho com destaque de Capa], com tooltip indicando o modo ativo
+```
+
+
 
 

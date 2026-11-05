@@ -1,9 +1,9 @@
 <div align="center">
 
-# 📚 HQs Collections `v1.6.0` - Mobile First Collection Manager
+# 📚 HQs Collections `v1.7.0` - Mobile First Collection Manager
 ### *Gerenciador Ágil de Coleções de Quadrinhos e Minisséries*
 
-[![Version](https://img.shields.io/badge/version-1.6.0-amber?style=for-the-badge&logo=semver&logoColor=white)](#)
+[![Version](https://img.shields.io/badge/version-1.7.0-amber?style=for-the-badge&logo=semver&logoColor=white)](#)
 [![Powered by Antigravity](https://img.shields.io/badge/Powered%20by-Google%20Antigravity-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://deepmind.google/technologies/antigravity/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
@@ -22,16 +22,21 @@
 ## 🇺🇸 English
 
 ### 🎯 Overview
-**HQs Collections** (v1.6.0) is an ultra-fast, mobile-first web application designed for comic book readers and collectors to track monthly publications, collections, and miniseries in a single streamlined screen. It features conditional cover suggestions carousel lifecycle (automatically hidden once a cover is officially fixed), a custom dark-mode confirmation alert dialog for unlinking covers, instant carousel reopening upon unlinking, high-precision Panini Brasil scraper with issue number/comic title matching, batch curatorship controls ("Accept All" / "Reject All"), and chronological volume ranking.
+**HQs Collections** (v1.7.0) is an ultra-fast, mobile-first web application designed for comic book readers and collectors to track monthly publications, collections, and miniseries in a single streamlined screen. It features a new 3-mode cyclic header toggle introducing the **Cover View Mode** (`ScanEye`), rendering a compact 2-column grid focused on the cover and number of the highest owned issue, conditional cover carousel lifecycle, a custom confirmation alert dialog for unlinking covers, and high-precision Panini Brasil scraper.
 
-### ✨ Key Features in `v1.6.0`
+### ✨ Key Features in `v1.7.0`
+- **Cover View Mode (`ScanEye`):** Dedicated compact 2-column grid view displaying the official cover of the highest owned issue of each comic collection.
+  - **Line 1:** Comic title and highest owned issue number (e.g. *Wolverine #16* or *(Sem ed.)*).
+  - **Line 2:** Compact Publisher and Format badges (e.g. *[Marvel] [Mensal]*).
+  - **Cover Display:** High-fidelity 2:3 comic aspect ratio artwork with issue badge and fixed status.
+- **3-Mode Header Cycle:** Smooth 3-state navigation button:
+  - `Eye`: Standard Consultation Mode (10-issue interactive blocks).
+  - `Pencil`: Edit Mode (4-stage status assignment and issue title setting).
+  - `ScanEye`: Cover View Mode (2-column compact catalog cards).
+- **Direct Card Interaction:** Tapping any compact card immediately opens the Issue Detail Modal for that edition.
 - **Conditional Carousel Lifecycle:** Once an official cover is approved and fixed to an issue, the suggestions carousel is cleanly hidden to keep the interface uncluttered.
-- **Custom Unlink Confirmation Alert:** Clicking "Desvincular capa desta edição" (or unlinking from the status dashboard) presents a dedicated dark-themed alert modal with warning badge, issue preview, and confirmation prompt.
-- **Instant Carousel Reopening on Unlink:** Confirming unlinking removes the fixed cover and immediately re-queries and displays the alternatives carousel for swift selection of a new image.
-- **Issue Detail Modal Integrated Carousel:** When opening the enlarged issue detail modal for unapproved editions, a horizontal carousel automatically loads all available candidates in the background.
-- **Panini Brasil Scraper Super-Optimization:** Strict comic title verification, native support for Brazilian publication naming conventions (`Vol. 16` = #16), and high-resolution image CDN normalization (`-S300-FWEBP`).
-- **Inline Multi-Cover Carousel on Rejection:** Rejecting a cover on the status screen automatically expands the issue row and queries for all matching occurrences.
-- **Batch Cover Actions ("Accept All" / "Reject All"):** Directly in the Cover Search Dashboard, collectors can approve or reject all pending covers at once with a single tap.
+- **Custom Unlink Confirmation Alert:** Dedicated dark-themed alert modal with warning badge, issue preview, and confirmation prompt before removing fixed covers.
+- **Instant Carousel Reopening on Unlink:** Confirming unlinking removes the fixed cover and immediately re-queries and displays the alternatives carousel.
 
 ### 🤖 Powered by Google Antigravity
 This application was architected and built using **Google Antigravity**, utilizing the 3-Layer Agentic Architecture:
@@ -44,15 +49,21 @@ This application was architected and built using **Google Antigravity**, utilizi
 ## 🇧🇷 Versão em Português (Brasil)
 
 ### 🎯 Visão Geral
-O **HQs Collections** (v1.6.0) é uma aplicação web mobile-first ultra-rápida criada sob medida para colecionadores de quadrinhos organizarem edições mensais, coleções e minisséries em apenas uma tela. O sistema emprega uma lógica inteligente de blocos de 10 edições sempre exibidas em linha única contínua, ciclo condicional de fechamento do carrossel ao fixar capa, modal de alerta customizado com confirmação para desvinculação, motor de busca Panini Brasil hiper-otimizado com suporte a Vol. N e resolução S300, e ações em lote de curadoria ("Aceitar Todos" e "Rejeitar Todos").
+O **HQs Collections** (v1.7.0) é uma aplicação web mobile-first ultra-rápida criada sob medida para colecionadores de quadrinhos organizarem edições mensais, coleções e minisséries em apenas uma tela. O sistema emprega uma lógica inteligente de blocos de 10 edições sempre exibidas em linha única contínua, alternador de 3 modos no cabeçalho com o novo **Modo Consulta Capa** em grade de 2 colunas, ciclo condicional de fechamento do carrossel ao fixar capa, modal de alerta customizado com confirmação para desvinculação e motor de busca Panini Brasil hiper-otimizado.
 
-### ✨ Novidades da Versão `1.6.0`
-- **Fechamento Automático do Carrossel ao Fixar:** Quando uma edição possui uma capa oficial fixada, o carrossel de sugestões é automaticamente ocultado, mantendo a visualização de detalhes limpa, elegante e sem distrações.
-- **Modal de Confirmação Customizado para Desvincular Capa:** Ao tocar em "Desvincular capa desta edição" (ou no botão de remoção do painel de capas), um modal de alerta estilizado em tema escuro com ícone de alerta vermelho solicita a confirmação explícita do colecionador com opções "Cancelar" e "Sim, Desvincular".
-- **Reabertura Imediata do Carrossel ao Desvincular:** Confirmada a desvinculação, a capa é removida e o carrossel de alternativas é **imediatamente recarregado e reaberto** para que o usuário escolha uma nova imagem sem etapas extras.
-- **Carrossel Integrado de Sugestões na Tela de Detalhes:** Para edições sem capa fixada, o modal de detalhes carrega automaticamente em segundo plano um carrossel horizontal de sugestões.
-- **Super-Otimização do Scraper Panini Brasil:** Validação estrita de título, tratamento de `Vol. 16` como edição Panini e resolução de imagem estável `-S300-FWEBP`.
-- **Ações em Lote no Painel de Capas ("Aceitar Todos" / "Rejeitar Todos"):** Curadoria em lote exclusiva para capas pendentes.
+### ✨ Novidades da Versão `1.7.0`
+- **Novo Modo Consulta Capa (`ScanEye`):** Visualização compacta em grade (2 colunas no mobile, responsivo para até 5 colunas em telas maiores) destacando a capa e informações da última edição adquirida.
+  - **Linha 1:** Nome da HQ e número da última edição que tenho (ex: *Wolverine #16* ou *Wolverine (Sem ed.)*).
+  - **Linha 2:** Badges compactos com a **Editora** e o **Tipo de Publicação** (ex: *[Marvel] [Mensal]*).
+  - **Capa da Última Edição:** Arte ampliada em proporção 2:3 com badge de numeração e status fixado.
+- **Ciclo de 3 Modos no Cabeçalho:** Botão único com ciclo contínuo:
+  - `Eye`: Modo Consulta tradicional com blocos táteis de 10 em 10 edições.
+  - `Pencil`: Modo Edição para preenchimento dos 4 estágios táteis e nomes de edições.
+  - `ScanEye`: Modo Consulta Capa para navegação visual rápida no catálogo de capas.
+- **Toque Interativo:** Ao tocar em qualquer card compacto, o sistema abre diretamente o Modal de Detalhes daquela edição.
+- **Fechamento Automático do Carrossel ao Fixar:** Quando uma edição possui uma capa oficial fixada, o carrossel de sugestões é automaticamente ocultado.
+- **Modal de Confirmação Customizado para Desvincular Capa:** Proteção explícita contra cliques acidentais com opções "Cancelar" e "Sim, Desvincular".
+- **Reabertura Imediata do Carrossel ao Desvincular:** Confirmada a desvinculação, a capa é removida e o carrossel de alternativas é **imediatamente recarregado e reaberto**.
 
 ### 🤖 Desenvolvido com Google Antigravity
 Projeto concebido e executado através do ecossistema **Google Antigravity**, operando na Arquitetura de 3 Camadas:

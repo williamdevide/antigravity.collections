@@ -19,6 +19,7 @@ import {
   ListFilter, 
   Eye, 
   EyeOff, 
+  ScanEye,
   SlidersHorizontal, 
   GripVertical, 
   ArrowDownAZ, 
@@ -55,8 +56,33 @@ const PUBLISHERS = ['Marvel', 'DC', 'Vertigo', 'Outras'];
 export default function App() {
   const [comics, setComics] = useState([]);
   
-  // Modo de Operação: 'consulta' (padrão) | 'edicao'
+  // Modo de Operação: 'consulta' (padrão) | 'edicao' | 'capas' (Modo Consulta Capa)
   const [appMode, setAppMode] = useState('consulta');
+
+  // Alternar ciclicamente entre os 3 modos: Consulta -> Edição -> Consulta Capa -> Consulta
+  const cycleAppMode = () => {
+    setAppMode(prev => {
+      if (prev === 'consulta') return 'edicao';
+      if (prev === 'edicao') return 'capas';
+      return 'consulta';
+    });
+  };
+
+  // Obter o número da última edição que o colecionador possui (owned ou read)
+  const getHighestOwnedIssue = (comic) => {
+    const ownedFromStates = Object.entries(comic.issueStates || {})
+      .filter(([_, state]) => state === 'owned' || state === 'read')
+      .map(([numStr]) => parseInt(numStr, 10))
+      .filter(n => !isNaN(n));
+    
+    const allOwned = Array.from(new Set([
+      ...(comic.ownedNumbers || []),
+      ...ownedFromStates
+    ]));
+
+    if (allOwned.length === 0) return null;
+    return Math.max(...allOwned);
+  };
 
   // Cadastro Rápido
   const [newComicName, setNewComicName] = useState('');
@@ -1247,12 +1273,18 @@ export default function App() {
 
   return (
     <div className={`min-h-screen transition-colors duration-300 flex flex-col font-sans ${
-      appMode === 'edicao' ? 'bg-[#0c1e38] text-slate-100' : 'bg-[#070B14] text-slate-100'
+      appMode === 'edicao' 
+        ? 'bg-[#0c1e38] text-slate-100' 
+        : appMode === 'capas'
+        ? 'bg-[#0b1220] text-slate-100'
+        : 'bg-[#070B14] text-slate-100'
     }`}>
       {/* HEADER MOBILE-FIRST COM VERSÃO, MODO E PROGRESSO DE CAPAS */}
       <header className={`sticky top-0 z-30 backdrop-blur-md border-b px-4 py-2.5 shadow-md transition-colors duration-300 ${
         appMode === 'edicao' 
           ? 'bg-[#0e274a]/95 border-cyan-500/40' 
+          : appMode === 'capas'
+          ? 'bg-[#141d30]/95 border-amber-500/40'
           : 'bg-[#0A0F1D]/95 border-slate-800/80'
       }`}>
         <div className="max-w-xl mx-auto flex items-center justify-between gap-2">
@@ -1261,6 +1293,8 @@ export default function App() {
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold shadow-lg transition shrink-0 ${
               appMode === 'edicao'
                 ? 'bg-gradient-to-tr from-cyan-400 to-blue-500 text-slate-950 shadow-cyan-500/30'
+                : appMode === 'capas'
+                ? 'bg-gradient-to-tr from-amber-400 to-orange-500 text-slate-950 shadow-amber-500/30'
                 : 'bg-gradient-to-tr from-amber-500 to-amber-300 text-slate-950 shadow-amber-500/20'
             }`}>
               <BookOpen className="w-5 h-5 text-slate-950" />
@@ -1304,20 +1338,36 @@ export default function App() {
               )}
             </button>
 
-            {/* Botão de Alternância de Modo (Consulta / Edição) - Somente Ícone */}
+            {/* Botão de Alternância de Modo (Consulta / Edição / Consulta Capa) - Somente Ícone */}
             <button
               type="button"
-              onClick={() => setAppMode(appMode === 'consulta' ? 'edicao' : 'consulta')}
-              className={`p-2 rounded-xl border text-xs font-bold transition flex items-center justify-center active:scale-95 shadow-sm ${
+              onClick={cycleAppMode}
+              className={`p-2 rounded-xl border text-xs font-bold transition flex items-center justify-center active:scale-95 shadow-sm cursor-pointer ${
                 appMode === 'edicao'
                   ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 border-cyan-300 shadow-cyan-500/30'
+                  : appMode === 'capas'
+                  ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-300 shadow-amber-500/30'
                   : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
               }`}
-              title={appMode === 'edicao' ? 'Modo Edição Ativo (Toque para voltar ao Modo Consulta)' : 'Modo Consulta Ativo (Toque para entrar no Modo Edição)'}
-              aria-label={appMode === 'edicao' ? 'Modo Edição' : 'Modo Consulta'}
+              title={
+                appMode === 'consulta'
+                  ? 'Modo Consulta Ativo (Toque para entrar no Modo Edição)'
+                  : appMode === 'edicao'
+                  ? 'Modo Edição Ativo (Toque para entrar no Modo Consulta Capa)'
+                  : 'Modo Consulta Capa Ativo (Toque para voltar ao Modo Consulta)'
+              }
+              aria-label={
+                appMode === 'consulta'
+                  ? 'Modo Consulta'
+                  : appMode === 'edicao'
+                  ? 'Modo Edição'
+                  : 'Modo Consulta Capa'
+              }
             >
               {appMode === 'edicao' ? (
                 <Pencil className="w-4 h-4 stroke-[2.5]" />
+              ) : appMode === 'capas' ? (
+                <ScanEye className="w-4 h-4 stroke-[2.5]" />
               ) : (
                 <Eye className="w-4 h-4 stroke-[2.5]" />
               )}
@@ -1684,6 +1734,99 @@ export default function App() {
                   ? 'Digite o nome do quadrinho acima e escolha o tipo/editora para começar!' 
                   : 'Tente alterar os filtros ou o termo de busca.'}
               </p>
+            </div>
+          ) : appMode === 'capas' ? (
+            /* MODO CONSULTA CAPA: GRID DE CARDS MENORES COM A CAPA DA ÚLTIMA EDIÇÃO QUE TENHO */
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 sm:gap-3">
+              {sortedAndFilteredComics.map((comic, index) => {
+                const lastIssueNum = getHighestOwnedIssue(comic);
+                const coverUrl = lastIssueNum 
+                  ? (comic.issueCovers?.[lastIssueNum] || comic.pendingCovers?.[lastIssueNum]?.coverUrl || null)
+                  : null;
+
+                return (
+                  <div
+                    key={comic.id}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, index)}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDrop={(e) => handleDrop(e, index)}
+                    onDragEnd={handleDragEnd}
+                    onClick={() => {
+                      const targetIssue = lastIssueNum || (comic.startFrom || 1);
+                      setViewingIssueDetail({ comic, issueNum: targetIssue });
+                    }}
+                    className={`bg-[#101726] border border-slate-800 hover:border-amber-400/60 rounded-2xl p-2 sm:p-2.5 flex flex-col justify-between shadow-lg hover:shadow-amber-500/10 transition-all duration-200 cursor-pointer group active:scale-[0.98] ${
+                      dragOverIndex === index ? 'ring-2 ring-amber-400' : ''
+                    } ${draggedIndex === index ? 'opacity-40 scale-[0.98]' : 'opacity-100'}`}
+                  >
+                    {/* CAPA DA ÚLTIMA EDIÇÃO (Proporção 2:3) */}
+                    <div className="w-full aspect-[2/3] rounded-xl overflow-hidden bg-slate-950 border border-slate-800/80 relative mb-2 shadow-inner flex items-center justify-center">
+                      {coverUrl ? (
+                        <>
+                          <img
+                            src={coverUrl}
+                            alt={`Capa ${comic.name} #${lastIssueNum}`}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            loading="lazy"
+                          />
+                          <div className="absolute top-1.5 right-1.5 bg-black/85 backdrop-blur-sm text-white font-mono font-black text-[11px] px-2 py-0.5 rounded-md border border-white/20 shadow-md">
+                            #{format2(lastIssueNum)}
+                          </div>
+                          {comic.issueCovers?.[lastIssueNum] && (
+                            <div className="absolute bottom-1.5 left-1.5 bg-emerald-600/90 backdrop-blur-sm text-white text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shadow">
+                              <Check className="w-2.5 h-2.5 stroke-[3]" /> Fixada
+                            </div>
+                          )}
+                        </>
+                      ) : lastIssueNum ? (
+                        <div className="flex flex-col items-center justify-center p-3 text-center text-slate-500">
+                          <ImageIcon className="w-8 h-8 text-slate-600 mb-1" />
+                          <span className="font-mono font-bold text-xs text-amber-400">#{format2(lastIssueNum)}</span>
+                          <span className="text-[9px] text-slate-500 mt-0.5">Sem Capa</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center p-3 text-center text-slate-600">
+                          <BookOpen className="w-8 h-8 text-slate-700 mb-1" />
+                          <span className="text-[10px] text-slate-500 font-semibold">Sem edições</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* TEXTOS EM 2 LINHAS */}
+                    <div className="space-y-1 text-left w-full overflow-hidden">
+                      {/* LINHA 1: NOME DA HQ E NÚMERO DA ÚLTIMA EDIÇÃO QUE TENHO */}
+                      <div className="flex items-center justify-between gap-1 w-full">
+                        <h4 
+                          className="font-bold text-xs text-white group-hover:text-amber-300 transition truncate leading-tight flex-1" 
+                          title={comic.name}
+                        >
+                          {comic.name}
+                        </h4>
+                        {lastIssueNum ? (
+                          <span className="font-mono font-bold text-xs text-amber-400 shrink-0">
+                            #{format2(lastIssueNum)}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-500 shrink-0 font-medium">
+                            (Sem ed.)
+                          </span>
+                        )}
+                      </div>
+
+                      {/* LINHA 2: EDITORA E TIPO */}
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold truncate ${getPublisherBadgeStyle(comic.publisher || 'Marvel')}`}>
+                          {comic.publisher || 'Marvel'}
+                        </span>
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded border font-semibold truncate ${getTypeBadgeStyle(comic.type || 'Mensal')}`}>
+                          {comic.type || 'Mensal'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             sortedAndFilteredComics.map((comic, index) => (

@@ -1,6 +1,9 @@
 /**
  * Versão e Nome do Sistema
  * Gerenciado automaticamente pelo Agente Orquestrador sob o padrão SemVer (MAJOR.MINOR.PATCH)
+ * v1.7.0: Novo Modo Consulta Capa com botão cíclico de 3 modos no header (Consulta [Eye] ➔ Edição [Pencil]
+ *         ➔ Consulta Capa [ScanEye]), exibindo galeria de cards compactos em 2 colunas com nome da HQ
+ *         e número da última edição que tenho na linha 1, editora e tipo na linha 2, e capa da última edição.
  * v1.6.0: Fechamento automático do carrossel ao fixar capa oficial na edição, modal de alerta customizado
  *         com confirmação para desvincular capas e reabertura imediata do carrossel de sugestões ao desvincular.
  * v1.5.0: Carrossel integrado de alternativas e sugestões de capas na tela de detalhes da edição
@@ -16,4 +19,4 @@
  *         fallback progressivo para edições mais antigas ao rejeitar uma capa.
  */
 export const APP_NAME = 'HQs Collections';
-export const APP_VERSION = '1.6.0';
+export const APP_VERSION = '1.7.0';
