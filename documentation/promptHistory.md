@@ -451,3 +451,10 @@ Requisitos Mandatórios para `firestore.rules`:
    - Certifique-se de que cada documento salvo em `/users/{userId}/comics/{comicId}` não possa ser criado por outro UID.
 5. Salve o arquivo em `g:\antigravity\projetos\antigravity.collections\firestore.rules` e retorne um resumo das regras aplicadas e validação de segurança.
 ```
+
+### Prompt 28
+```text
+/agente-orquestrador /grill-me /goal consegui logar com a conta google e com conta por email. aparece sem nenhuma hq cadastrada, mas quando tento incluir não acontece nada e não grava no banco.
+atualize com a versão correta o titulo da aba do navegador
+```
+

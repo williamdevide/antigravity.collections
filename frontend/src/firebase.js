@@ -131,10 +131,28 @@ export function getCurrentUser() {
 }
 
 /**
+ * Utilitários de Resolução de Usuário e Parâmetros (Polimorfismo Retrocompatível)
+ * Suporta chamadas tanto com (item) quanto com (userId, item)
+ */
+function resolveUserAndData(arg1, arg2) {
+  if (arg2 !== undefined) {
+    return {
+      userId: arg1 || auth?.currentUser?.uid || 'guest',
+      data: arg2
+    };
+  }
+  return {
+    userId: auth?.currentUser?.uid || 'guest',
+    data: arg1
+  };
+}
+
+/**
  * Utilitários de Chave de Armazenamento por Usuário (Isolamento Estrito)
  */
 function getUserStorageKey(userId) {
-  return userId ? `hq_tracker_collections_${userId}` : 'hq_tracker_collections_guest';
+  const effectiveId = userId || auth?.currentUser?.uid || 'guest';
+  return `hq_tracker_collections_${effectiveId}`;
 }
 
 /**
@@ -156,7 +174,7 @@ export function loadFromLocalStorage(userId = null) {
  */
 export function saveToLocalStorage(data, userId = null) {
   try {
-    localStorage.setItem(getUserStorageKey(userId), JSON.stringify(data));
+    localStorage.setItem(getUserStorageKey(userId), JSON.stringify(data || []));
   } catch (e) {
     console.error('Erro ao salvar no LocalStorage:', e);
   }
@@ -166,15 +184,17 @@ export function saveToLocalStorage(data, userId = null) {
  * Assina atualizações em tempo real do Firestore isoladas por usuário
  */
 export function subscribeComics(userId, onUpdate, onStatusChange) {
-  // Se não estiver inicializado ou sem usuário autenticado, opera no cache local do convidado
-  if (!db || !isFirebaseInitialized || !userId) {
+  const effectiveUser = userId || auth?.currentUser?.uid || 'guest';
+
+  // Se não estiver inicializado ou for visitante, opera no cache local do convidado
+  if (!db || !isFirebaseInitialized || !effectiveUser || effectiveUser === 'guest') {
     onStatusChange?.({ status: 'local', message: 'Armazenamento Local Convidado' });
-    onUpdate(loadFromLocalStorage(userId || 'guest'));
+    onUpdate(loadFromLocalStorage(effectiveUser || 'guest'));
     return () => {};
   }
 
-  // Coleção isolada na subcoleção do usuário: /users/{userId}/comics
-  const colRef = collection(db, 'users', userId, 'comics');
+  // Coleção isolada na subcoleção do usuário: /users/{effectiveUser}/comics
+  const colRef = collection(db, 'users', effectiveUser, 'comics');
 
   try {
     const unsubscribe = onSnapshot(colRef, (snapshot) => {
@@ -184,7 +204,7 @@ export function subscribeComics(userId, onUpdate, onStatusChange) {
       });
 
       // Sincroniza o cache local EXCLUSIVO deste userId
-      saveToLocalStorage(remoteComics, userId);
+      saveToLocalStorage(remoteComics, effectiveUser);
       onUpdate(remoteComics);
       onStatusChange?.({ status: 'connected', message: 'Nuvem Conectada (Firestore Sincronizado)' });
     }, (error) => {
@@ -193,22 +213,29 @@ export function subscribeComics(userId, onUpdate, onStatusChange) {
         status: 'local-fallback', 
         message: 'Modo Offline/Local' 
       });
-      onUpdate(loadFromLocalStorage(userId));
+      onUpdate(loadFromLocalStorage(effectiveUser));
     });
 
     return unsubscribe;
   } catch (err) {
     console.warn('⚠️ Exceção ao conectar no Firestore:', err);
     onStatusChange?.({ status: 'local', message: 'Armazenamento Local Ativo' });
-    onUpdate(loadFromLocalStorage(userId));
+    onUpdate(loadFromLocalStorage(effectiveUser));
     return () => {};
   }
 }
 
 /**
- * Salva ou atualiza uma HQ tanto no Firestore quanto no LocalStorage do usuário
+ * Salva ou atualiza uma HQ tanto no Firestore quanto no LocalStorage do usuário.
+ * Suporta polimorfismo: saveComic(comic) ou saveComic(userId, comic).
  */
-export async function saveComic(userId, comic) {
+export async function saveComic(arg1, arg2) {
+  const { userId, data: comic } = resolveUserAndData(arg1, arg2);
+  if (!comic || !comic.id) {
+    console.warn('⚠️ saveComic chamado sem HQ válida:', arg1, arg2);
+    return loadFromLocalStorage(userId);
+  }
+
   // 1. Salva no LocalStorage imediatamente
   const current = loadFromLocalStorage(userId);
   const index = current.findIndex(c => c.id === comic.id);
@@ -222,7 +249,7 @@ export async function saveComic(userId, comic) {
   saveToLocalStorage(updated, userId);
 
   // 2. Sincroniza com a subcoleção do usuário no Firestore se disponível
-  if (db && isFirebaseInitialized && userId) {
+  if (db && isFirebaseInitialized && userId && userId !== 'guest') {
     try {
       const docRef = doc(db, 'users', userId, 'comics', comic.id);
       await setDoc(docRef, {
@@ -258,14 +285,16 @@ export async function saveComic(userId, comic) {
 }
 
 /**
- * Exclui uma HQ do Firestore e do LocalStorage
+ * Exclui uma HQ do Firestore e do LocalStorage.
+ * Suporta polimorfismo: deleteComic(comicId) ou deleteComic(userId, comicId).
  */
-export async function deleteComic(userId, comicId) {
+export async function deleteComic(arg1, arg2) {
+  const { userId, data: comicId } = resolveUserAndData(arg1, arg2);
   const current = loadFromLocalStorage(userId);
   const updated = current.filter(c => c.id !== comicId);
   saveToLocalStorage(updated, userId);
 
-  if (db && isFirebaseInitialized && userId) {
+  if (db && isFirebaseInitialized && userId && userId !== 'guest') {
     try {
       const docRef = doc(db, 'users', userId, 'comics', comicId);
       await deleteDoc(docRef);
@@ -278,12 +307,16 @@ export async function deleteComic(userId, comicId) {
 }
 
 /**
- * Salva a ordenação personalizada de todas as HQs do usuário
+ * Salva a ordenação personalizada de todas as HQs do usuário.
+ * Suporta polimorfismo: saveAllComicsOrder(comicsList) ou saveAllComicsOrder(userId, comicsList).
  */
-export async function saveAllComicsOrder(userId, comicsList) {
+export async function saveAllComicsOrder(arg1, arg2) {
+  const { userId, data: comicsList } = resolveUserAndData(arg1, arg2);
+  if (!Array.isArray(comicsList)) return [];
+
   saveToLocalStorage(comicsList, userId);
 
-  if (db && isFirebaseInitialized && userId) {
+  if (db && isFirebaseInitialized && userId && userId !== 'guest') {
     try {
       const promises = comicsList.map((comic, idx) => {
         const docRef = doc(db, 'users', userId, 'comics', comic.id);
@@ -299,20 +332,26 @@ export async function saveAllComicsOrder(userId, comicsList) {
 }
 
 /**
- * Salva múltiplas HQs de uma vez no LocalStorage e no Firestore
+ * Salva múltiplas HQs de uma vez no LocalStorage e no Firestore.
+ * Suporta polimorfismo: saveComicsBatch(comicsToUpdate) ou saveComicsBatch(userId, comicsToUpdate).
  */
-export async function saveComicsBatch(userId, comicsToUpdate) {
+export async function saveComicsBatch(arg1, arg2) {
+  const { userId, data: comicsToUpdate } = resolveUserAndData(arg1, arg2);
+  if (!Array.isArray(comicsToUpdate)) return [];
+
   const current = loadFromLocalStorage(userId);
   const currentMap = new Map(current.map(c => [c.id, c]));
 
   comicsToUpdate.forEach(comic => {
-    currentMap.set(comic.id, comic);
+    if (comic && comic.id) {
+      currentMap.set(comic.id, comic);
+    }
   });
 
   const updated = Array.from(currentMap.values());
   saveToLocalStorage(updated, userId);
 
-  if (db && isFirebaseInitialized && userId) {
+  if (db && isFirebaseInitialized && userId && userId !== 'guest') {
     try {
       const promises = comicsToUpdate.map(comic => {
         const docRef = doc(db, 'users', userId, 'comics', comic.id);
@@ -353,12 +392,13 @@ export async function saveComicsBatch(userId, comicsToUpdate) {
 /**
  * Zera permanentemente a coleção do usuário autenticado (Firestore e LocalStorage)
  */
-export async function clearUserCollection(userId) {
-  saveToLocalStorage([], userId);
+export async function clearUserCollection(userId = null) {
+  const effectiveUser = userId || auth?.currentUser?.uid || 'guest';
+  saveToLocalStorage([], effectiveUser);
 
-  if (db && isFirebaseInitialized && userId) {
+  if (db && isFirebaseInitialized && effectiveUser && effectiveUser !== 'guest') {
     try {
-      const colRef = collection(db, 'users', userId, 'comics');
+      const colRef = collection(db, 'users', effectiveUser, 'comics');
       const snap = await getDocs(colRef);
       if (!snap.empty) {
         const batch = writeBatch(db);

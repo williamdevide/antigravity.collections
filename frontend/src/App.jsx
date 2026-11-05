@@ -210,6 +210,11 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Sincronização dinâmica do título da aba do navegador com a versão oficial do sistema
+  useEffect(() => {
+    document.title = `${APP_NAME} v${APP_VERSION} - Controle de Coleções`;
+  }, []);
+
   // Sincronização em tempo real (Firestore com fallback para LocalStorage estritamente isolado por usuário)
   useEffect(() => {
     if (authLoading) return;
@@ -603,41 +608,45 @@ export default function App() {
     const trimmed = newComicName.trim();
     if (!trimmed) return;
 
-    const nextPosition = comics.length > 0 
-      ? Math.max(...comics.map(c => typeof c.position === 'number' ? c.position : 0)) + 1 
-      : 0;
+    try {
+      const nextPosition = comics.length > 0 
+        ? Math.max(...comics.map(c => typeof c.position === 'number' ? c.position : 0)) + 1 
+        : 0;
 
-    const parsedStart = parseInt(newComicStartFrom, 10);
-    const startFrom = !isNaN(parsedStart) && parsedStart > 1 ? parsedStart : 1;
+      const parsedStart = parseInt(newComicStartFrom, 10);
+      const startFrom = !isNaN(parsedStart) && parsedStart > 1 ? parsedStart : 1;
 
-    const newComic = {
-      id: 'comic_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-      name: trimmed,
-      type: newComicType,
-      publisher: newComicPublisher,
-      startFrom,
-      showHiddenChunks: false,
-      ownedNumbers: [],
-      issueStates: {},
-      issueCovers: {},
-      pendingCovers: {},
-      searchedIssues: {},
-      issueTitles: {},
-      position: nextPosition,
-      isCompleted: false,
-      completedUntil: null,
-      expandedChunks: [],
-      startYear: '',
-      brazilPublisher: '',
-      mainHero: '',
-      createdAt: new Date().toISOString()
-    };
+      const newComic = {
+        id: 'comic_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        name: trimmed,
+        type: newComicType,
+        publisher: newComicPublisher,
+        startFrom,
+        showHiddenChunks: false,
+        ownedNumbers: [],
+        issueStates: {},
+        issueCovers: {},
+        pendingCovers: {},
+        searchedIssues: {},
+        issueTitles: {},
+        position: nextPosition,
+        isCompleted: false,
+        completedUntil: null,
+        expandedChunks: [],
+        startYear: '',
+        brazilPublisher: '',
+        mainHero: '',
+        createdAt: new Date().toISOString()
+      };
 
-    const updated = await saveComic(newComic);
-    setComics(updated);
-    setNewComicName('');
-    setNewComicStartFrom('');
-    inputRef.current?.focus();
+      const updated = await saveComic(newComic);
+      setComics(updated);
+      setNewComicName('');
+      setNewComicStartFrom('');
+      inputRef.current?.focus();
+    } catch (err) {
+      console.error('⚠️ Erro ao adicionar HQ:', err);
+    }
   };
 
   // Cadastro Detalhado de HQ
@@ -646,44 +655,48 @@ export default function App() {
     const trimmed = detailedName.trim();
     if (!trimmed) return;
 
-    const nextPosition = comics.length > 0 
-      ? Math.max(...comics.map(c => typeof c.position === 'number' ? c.position : 0)) + 1 
-      : 0;
+    try {
+      const nextPosition = comics.length > 0 
+        ? Math.max(...comics.map(c => typeof c.position === 'number' ? c.position : 0)) + 1 
+        : 0;
 
-    const parsedStart = parseInt(detailedStartFrom, 10);
-    const startFrom = !isNaN(parsedStart) && parsedStart > 1 ? parsedStart : 1;
+      const parsedStart = parseInt(detailedStartFrom, 10);
+      const startFrom = !isNaN(parsedStart) && parsedStart > 1 ? parsedStart : 1;
 
-    const newComic = {
-      id: 'comic_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-      name: trimmed,
-      type: detailedType,
-      publisher: detailedPublisher,
-      startFrom,
-      showHiddenChunks: false,
-      startYear: detailedStartYear.trim(),
-      brazilPublisher: detailedBrazilPublisher.trim(),
-      mainHero: detailedMainHero.trim(),
-      ownedNumbers: [],
-      issueStates: {},
-      issueCovers: {},
-      pendingCovers: {},
-      searchedIssues: {},
-      issueTitles: {},
-      position: nextPosition,
-      isCompleted: false,
-      completedUntil: null,
-      expandedChunks: [],
-      createdAt: new Date().toISOString()
-    };
+      const newComic = {
+        id: 'comic_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        name: trimmed,
+        type: detailedType,
+        publisher: detailedPublisher,
+        startFrom,
+        showHiddenChunks: false,
+        startYear: detailedStartYear.trim(),
+        brazilPublisher: detailedBrazilPublisher.trim(),
+        mainHero: detailedMainHero.trim(),
+        ownedNumbers: [],
+        issueStates: {},
+        issueCovers: {},
+        pendingCovers: {},
+        searchedIssues: {},
+        issueTitles: {},
+        position: nextPosition,
+        isCompleted: false,
+        completedUntil: null,
+        expandedChunks: [],
+        createdAt: new Date().toISOString()
+      };
 
-    const updated = await saveComic(newComic);
-    setComics(updated);
-    setShowDetailedAddModal(false);
-    setDetailedName('');
-    setDetailedStartYear('');
-    setDetailedBrazilPublisher('');
-    setDetailedMainHero('');
-    setDetailedStartFrom('1');
+      const updated = await saveComic(newComic);
+      setComics(updated);
+      setShowDetailedAddModal(false);
+      setDetailedName('');
+      setDetailedStartYear('');
+      setDetailedBrazilPublisher('');
+      setDetailedMainHero('');
+      setDetailedStartFrom('1');
+    } catch (err) {
+      console.error('⚠️ Erro ao cadastrar HQ detalhada:', err);
+    }
   };
 
   // Ciclo dos 4 Estágios por Edição (Modo Edição)
