@@ -9,6 +9,7 @@ import {
   Eye, 
   Pencil, 
   ScanEye, 
+  LayoutGrid,
   Sliders, 
   Sparkles,
   Smartphone
@@ -22,7 +23,8 @@ export const COLOR_PRESETS = [
     colors: {
       viewModeBg: '#070B14',
       editModeBg: '#0c1e38',
-      coversModeBg: '#0b1220'
+      coversModeBg: '#0b1220',
+      fullCoversModeBg: '#0b1424'
     }
   },
   {
@@ -32,7 +34,8 @@ export const COLOR_PRESETS = [
     colors: {
       viewModeBg: '#0a192f',
       editModeBg: '#112240',
-      coversModeBg: '#020c1b'
+      coversModeBg: '#020c1b',
+      fullCoversModeBg: '#051833'
     }
   },
   {
@@ -42,7 +45,8 @@ export const COLOR_PRESETS = [
     colors: {
       viewModeBg: '#130924',
       editModeBg: '#27104d',
-      coversModeBg: '#1e0836'
+      coversModeBg: '#1e0836',
+      fullCoversModeBg: '#180a2e'
     }
   },
   {
@@ -52,7 +56,8 @@ export const COLOR_PRESETS = [
     colors: {
       viewModeBg: '#090d16',
       editModeBg: '#16122c',
-      coversModeBg: '#0c192c'
+      coversModeBg: '#0c192c',
+      fullCoversModeBg: '#100e26'
     }
   },
   {
@@ -62,7 +67,8 @@ export const COLOR_PRESETS = [
     colors: {
       viewModeBg: '#121212',
       editModeBg: '#1e1e1e',
-      coversModeBg: '#181818'
+      coversModeBg: '#181818',
+      fullCoversModeBg: '#151515'
     }
   }
 ];
@@ -71,6 +77,7 @@ export const DEFAULT_USER_SETTINGS = {
   viewModeBg: '#070B14',
   editModeBg: '#0c1e38',
   coversModeBg: '#0b1220',
+  fullCoversModeBg: '#0b1424',
   density: 'normal',
   hapticFeedback: true
 };
@@ -201,7 +208,12 @@ export default function SettingsModal({
                     <div 
                       className="w-5 h-5 rounded-md border border-slate-700 shadow-sm" 
                       style={{ backgroundColor: preset.colors.coversModeBg }}
-                      title="Consulta Capas"
+                      title="Consulta Capa"
+                    />
+                    <div 
+                      className="w-5 h-5 rounded-md border border-slate-700 shadow-sm" 
+                      style={{ backgroundColor: preset.colors.fullCoversModeBg || preset.colors.coversModeBg }}
+                      title="Consulta Total com Capas"
                     />
                   </div>
                 </button>
@@ -294,6 +306,33 @@ export default function SettingsModal({
                   type="text"
                   value={settings.coversModeBg}
                   onChange={(e) => handleCustomColorChange('coversModeBg', e.target.value)}
+                  className="w-20 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-center font-mono text-[11px] text-white"
+                />
+              </div>
+            </div>
+
+            {/* Cor Modo Consulta Total com Capas */}
+            <div className="flex items-center justify-between gap-3 p-2 rounded-xl bg-slate-900/60 border border-slate-800">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-6 h-6 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0">
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <span className="font-bold text-white block">Consulta Total com Capas</span>
+                  <span className="text-[10px] text-slate-400 block">Fundo da grade completa de capas</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <input
+                  type="color"
+                  value={settings.fullCoversModeBg || '#0b1424'}
+                  onChange={(e) => handleCustomColorChange('fullCoversModeBg', e.target.value)}
+                  className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0 p-0"
+                />
+                <input
+                  type="text"
+                  value={settings.fullCoversModeBg || '#0b1424'}
+                  onChange={(e) => handleCustomColorChange('fullCoversModeBg', e.target.value)}
                   className="w-20 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-center font-mono text-[11px] text-white"
                 />
               </div>

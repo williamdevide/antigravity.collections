@@ -365,3 +365,32 @@ Resposta do Usuário: (Recommended) Roteamento Inteligente Multi-Universo + Fall
 Pergunta: Como o validador de capas deve se comportar ao buscar a Edição #01 de Graphic Novels, encadernados ou volumes únicos que não possuem números no título (como 'Vader's Little Princess' / 'A Princesinha de Vader')?
 Resposta do Usuário: (Recommended) Aceitar para a Edição #01 se não houver numeração conflitante: Se a edição cadastrada for a #01 (ou 1) e o livro/graphic novel encontrado trouxer o título da obra sem números explícitos (e sem 'Vol 2' ou '#2'), aceitar a capa como a edição única/volume 1 da publicação.
 ```
+
+### Prompt 24
+```text
+/agente-orquestrador /grill-me /goal vamos ter um quarto modo de visualização "consulta total com capas", ele exibe cada card como no modo consulta normal, mas ao inves de mostrar só os numeros ele mostra cada capa e as bordas como no modo consulta normal, dentro da capa, no canto inferior esquerdo de cada capa aparece o numero da edição
+```
+
+### Resposta Grill-Me / Interação 38
+```text
+Pergunta: No novo modo "Consulta Total com Capas", como você prefere que as edições e os blocos resumidos (dezenas) sejam exibidos dentro do card da HQ?
+Resposta do Usuário: (Recommended) Grade Adaptativa com Todas as Edições Abertas: Exibir diretamente todas as edições cadastradas em minicapas retangulares de HQ (proporção 2:3 vertical, 5 colunas no mobile / 10 no desktop) com a borda do estágio e o número no canto inferior esquerdo, mostrando a coleção completa de capas sem precisar expandir dezenas.
+```
+
+### Resposta Grill-Me / Interação 39
+```text
+Pergunta: Como devem ser exibidas as edições que ainda NÃO possuem capa oficial fixada no modo "Consulta Total com Capas"?
+Resposta do Usuário: (Recommended) Placeholder Temático com Borda do Estágio: Card retangular 2:3 com fundo sutil, borda do estágio da edição (amarelo para tenho, azul neon para já li, pink para quero comprar), ícone suave de gibi e, caso haja sugestão de capa pendente ou alinhada à série, exibe a imagem prévia translúcida com indicador de raio (⚡).
+```
+
+### Resposta Grill-Me / Interação 40
+```text
+Pergunta: Qual ícone e posicionamento você prefere para o 4º modo no alternador cíclico do cabeçalho?
+Resposta do Usuário: (Recommended) Ícone LayoutGrid (Grade de Capas) no 4º passo do ciclo: Consulta (Eye) ➔ Edição (Pencil) ➔ Consulta Capa (ScanEye) ➔ Consulta Total com Capas (LayoutGrid) ➔ Consulta, com seletor de cor de fundo dedicado nas Configurações.
+```
+
+### Resposta Grill-Me / Interação 41
+```text
+Pergunta: O que deve acontecer ao tocar em uma minicapa no modo "Consulta Total com Capas"?
+Resposta do Usuário: (Recommended) Abrir Modal de Detalhes da Edição: Ao tocar em qualquer capa, abre o modal de detalhes daquela edição com carrossel de imagens, metadados e opções de curadoria (igual ao modo consulta normal).
+```

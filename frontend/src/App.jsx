@@ -20,6 +20,7 @@ import {
   Eye, 
   EyeOff, 
   ScanEye,
+  LayoutGrid,
   SlidersHorizontal, 
   GripVertical, 
   ArrowDownAZ, 
@@ -82,14 +83,15 @@ const PUBLISHERS = ['Marvel', 'DC', 'Vertigo', 'Outras'];
 export default function App() {
   const [comics, setComics] = useState([]);
   
-  // Modo de Operação: 'consulta' (padrão) | 'edicao' | 'capas' (Modo Consulta Capa)
+  // Modo de Operação: 'consulta' (padrão) | 'edicao' | 'capas' (Modo Consulta Capa) | 'capas_total' (Modo Consulta Total com Capas)
   const [appMode, setAppMode] = useState('consulta');
 
-  // Alternar ciclicamente entre os 3 modos: Consulta -> Edição -> Consulta Capa -> Consulta
+  // Alternar ciclicamente entre os 4 modos: Consulta -> Edição -> Consulta Capa -> Consulta Total com Capas -> Consulta
   const cycleAppMode = () => {
     setAppMode(prev => {
       if (prev === 'consulta') return 'edicao';
       if (prev === 'edicao') return 'capas';
+      if (prev === 'capas') return 'capas_total';
       return 'consulta';
     });
   };
@@ -1603,6 +1605,7 @@ export default function App() {
   const activeBgColor = useMemo(() => {
     if (appMode === 'edicao') return userSettings.editModeBg || '#0c1e38';
     if (appMode === 'capas') return userSettings.coversModeBg || '#0b1220';
+    if (appMode === 'capas_total') return userSettings.fullCoversModeBg || '#0b1424';
     return userSettings.viewModeBg || '#070B14';
   }, [appMode, userSettings]);
 
@@ -1642,6 +1645,8 @@ export default function App() {
           ? 'bg-[#0e274a]/95 border-cyan-500/40' 
           : appMode === 'capas'
           ? 'bg-[#141d30]/95 border-amber-500/40'
+          : appMode === 'capas_total'
+          ? 'bg-[#160d2b]/95 border-indigo-500/40'
           : 'bg-[#0A0F1D]/95 border-slate-800/80'
       }`}>
         <div className="max-w-xl mx-auto flex items-center justify-between gap-2">
@@ -1657,6 +1662,8 @@ export default function App() {
                 ? 'bg-gradient-to-tr from-cyan-400 to-blue-500 text-slate-950 shadow-cyan-500/30'
                 : appMode === 'capas'
                 ? 'bg-gradient-to-tr from-amber-400 to-orange-500 text-slate-950 shadow-amber-500/30'
+                : appMode === 'capas_total'
+                ? 'bg-gradient-to-tr from-indigo-500 to-purple-500 text-white shadow-indigo-500/30'
                 : 'bg-gradient-to-tr from-amber-500 to-amber-300 text-slate-950 shadow-amber-500/20'
             }`}>
               <BookOpen className="w-5 h-5 text-slate-950" />
@@ -1706,7 +1713,7 @@ export default function App() {
               )}
             </button>
 
-            {/* Botão de Alternância de Modo (Consulta / Edição / Consulta Capa) - Somente Ícone */}
+            {/* Botão de Alternância de Modo (Consulta / Edição / Consulta Capa / Consulta Total com Capas) - Somente Ícone */}
             <button
               type="button"
               onClick={cycleAppMode}
@@ -1715,6 +1722,8 @@ export default function App() {
                   ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 border-cyan-300 shadow-cyan-500/30'
                   : appMode === 'capas'
                   ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-300 shadow-amber-500/30'
+                  : appMode === 'capas_total'
+                  ? 'bg-indigo-600 hover:bg-indigo-500 text-white border-indigo-400 shadow-indigo-600/30'
                   : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
               }`}
               title={
@@ -1722,20 +1731,26 @@ export default function App() {
                   ? 'Modo Consulta Ativo (Toque para entrar no Modo Edição)'
                   : appMode === 'edicao'
                   ? 'Modo Edição Ativo (Toque para entrar no Modo Consulta Capa)'
-                  : 'Modo Consulta Capa Ativo (Toque para voltar ao Modo Consulta)'
+                  : appMode === 'capas'
+                  ? 'Modo Consulta Capa Ativo (Toque para entrar no Modo Consulta Total com Capas)'
+                  : 'Modo Consulta Total com Capas Ativo (Toque para voltar ao Modo Consulta)'
               }
               aria-label={
                 appMode === 'consulta'
                   ? 'Modo Consulta'
                   : appMode === 'edicao'
                   ? 'Modo Edição'
-                  : 'Modo Consulta Capa'
+                  : appMode === 'capas'
+                  ? 'Modo Consulta Capa'
+                  : 'Modo Consulta Total com Capas'
               }
             >
               {appMode === 'edicao' ? (
                 <Pencil className="w-4 h-4 stroke-[2.5]" />
               ) : appMode === 'capas' ? (
                 <ScanEye className="w-4 h-4 stroke-[2.5]" />
+              ) : appMode === 'capas_total' ? (
+                <LayoutGrid className="w-4 h-4 stroke-[2.5]" />
               ) : (
                 <Eye className="w-4 h-4 stroke-[2.5]" />
               )}
@@ -3645,6 +3660,102 @@ function ComicRow({
     }
   };
 
+  // Renderizador de Minicapa para o Modo Consulta Total com Capas
+  const renderCoverIssueCard = (n) => {
+    const stage = getStage(n);
+    if (viewMode === 'owned' && stage !== 'owned' && stage !== 'read') return null;
+    if (viewMode === 'read' && stage !== 'read') return null;
+    if (viewMode === 'wishlist' && stage !== 'wishlist') return null;
+    if (viewMode === 'none' && stage !== 'none') return null;
+
+    const specificTitle = issueTitles[n];
+    const fixedCoverUrl = comic.issueCovers?.[n];
+    const pendingCoverUrl = comic.pendingCovers?.[n]?.coverUrl;
+    const hasPendingSeries = !fixedCoverUrl && pendingCoverUrl && comic.preferredSeries;
+    const coverUrl = fixedCoverUrl || pendingCoverUrl || null;
+
+    // Bordas e sombras de acordo com o estágio da edição (como no modo consulta normal)
+    let stageBorderClasses = '';
+    let stageBgClasses = '';
+    switch (stage) {
+      case 'owned':
+        // Comprei / Tenho: amarelo sólido
+        stageBorderClasses = 'border-2 border-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.4)]';
+        stageBgClasses = 'bg-amber-500/10';
+        break;
+      case 'read':
+        // Tenho e já li: amarelo com borda azul neon vibrante
+        stageBorderClasses = 'border-2 border-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.9)]';
+        stageBgClasses = 'bg-cyan-500/15';
+        break;
+      case 'wishlist':
+        // Quero comprar: desmarcado com borda pink neon
+        stageBorderClasses = 'border-2 border-pink-500 shadow-[0_0_10px_rgba(236,72,153,0.8)]';
+        stageBgClasses = 'bg-pink-500/10';
+        break;
+      case 'none':
+      default:
+        // Não tenho e não pretendo comprar: desmarcado original
+        stageBorderClasses = 'border border-slate-700/80 hover:border-slate-500';
+        stageBgClasses = 'bg-slate-950/70 opacity-60 hover:opacity-100';
+        break;
+    }
+
+    return (
+      <button
+        key={n}
+        type="button"
+        onClick={() => onViewIssueDetail(n)}
+        className={`group relative w-full aspect-[2/3] rounded-lg overflow-hidden transition-all duration-200 active:scale-95 cursor-pointer flex flex-col justify-between ${stageBorderClasses} ${stageBgClasses}`}
+        title={
+          specificTitle 
+            ? `Edição #${format2(n)}: ${specificTitle} [${stage === 'read' ? 'Tenho e Já Li' : stage === 'owned' ? 'Tenho' : stage === 'wishlist' ? 'Quero Comprar' : 'Não Pretendo'}]${hasPendingSeries ? ' [⚡ Sugestão da Série Disponível]' : ''}`
+            : `Edição #${format2(n)} [${stage === 'read' ? 'Tenho e Já Li' : stage === 'owned' ? 'Tenho' : stage === 'wishlist' ? 'Quero Comprar' : 'Não Pretendo'}]${hasPendingSeries ? ' [⚡ Sugestão da Série Disponível]' : ''}`
+        }
+      >
+        {/* Capa ou Placeholder Temático */}
+        {coverUrl ? (
+          <img
+            src={coverUrl}
+            alt={`Capa ${comic.name} #${format2(n)}`}
+            className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${!fixedCoverUrl && pendingCoverUrl ? 'opacity-70' : 'opacity-100'}`}
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center p-1 text-slate-500 bg-gradient-to-b from-slate-900/90 to-slate-950">
+            <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600 mb-0.5 group-hover:text-slate-400 transition" />
+            <span className="text-[8px] text-slate-500 font-mono">Sem Capa</span>
+          </div>
+        )}
+
+        {/* Indicadores no Topo: Ponto Verde de Capa Fixada ou Raio Pulsante de Sugestão da Série */}
+        <div className="absolute top-1 right-1 flex items-center gap-0.5 pointer-events-none z-10">
+          {fixedCoverUrl && (
+            <span className="w-2 h-2 rounded-full bg-emerald-400 border border-slate-950 shadow-sm" title="Capa oficial fixada" />
+          )}
+          {hasPendingSeries && (
+            <span 
+              className="w-3.5 h-3.5 rounded-full bg-amber-500 border border-slate-950 flex items-center justify-center animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.9)]" 
+              title={`⚡ Sugestão da Série (${comic.preferredSeries.year || comic.preferredSeries.sourceLabel}) aguardando aprovação`}
+            >
+              <Zap className="w-2 h-2 text-slate-950 fill-slate-950" />
+            </span>
+          )}
+          {specificTitle && !hasPendingSeries && !fixedCoverUrl && (
+            <span className="w-2 h-2 rounded-full bg-purple-400 border border-slate-950" title={`Título: ${specificTitle}`} />
+          )}
+        </div>
+
+        {/* Número da Edição no Canto Inferior Esquerdo da Capa (Requisito Estrito do Usuário) */}
+        <div className="absolute bottom-1 left-1 pointer-events-none z-10">
+          <span className="bg-slate-950/90 backdrop-blur-sm border border-slate-700/90 px-1.5 py-0.5 rounded text-[10px] sm:text-[11px] font-mono font-black text-amber-300 shadow-md leading-none flex items-center">
+            #{format2(n)}
+          </span>
+        </div>
+      </button>
+    );
+  };
+
   // Se estiver encerrada como minissérie/coleção
   if (comic.isCompleted && comic.completedUntil) {
     const endNum = comic.completedUntil;
@@ -3721,75 +3832,91 @@ function ComicRow({
           </div>
         </div>
 
-        {/* Resumo da Coleção */}
-        <div className="flex items-center flex-wrap gap-2 pt-1">
-          <button
-            onClick={() => onToggleChunkExpand('completed')}
-            className="flex items-center gap-1.5 bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-600/50 text-emerald-200 text-xs font-bold px-3 py-1.5 rounded-xl transition shadow-sm"
-          >
-            <span>{summaryLabel}</span>
-            <span className="text-[10px] text-emerald-400/80 font-normal">({countIssues} edições)</span>
-            {isExpanded ? <ChevronDown className="w-3 h-3 ml-1" /> : <ChevronRight className="w-3 h-3 ml-1" />}
-          </button>
-        </div>
-
-        {/* Edições expandidas em grid */}
-        {isExpanded && (
-          <div className="mt-2 pt-2 border-t border-slate-800/80 space-y-2">
-            <div className="grid grid-cols-10 gap-1 sm:gap-1.5">
-              {Array.from({ length: countIssues }, (_, i) => startFrom + i).map((n) => {
-                const stage = getStage(n);
-                if (viewMode === 'owned' && stage !== 'owned' && stage !== 'read') return null;
-                if (viewMode === 'read' && stage !== 'read') return null;
-                if (viewMode === 'wishlist' && stage !== 'wishlist') return null;
-                if (viewMode === 'none' && stage !== 'none') return null;
-
-                const specificTitle = issueTitles[n];
-                const hasCover = comic.issueCovers?.[n];
-                const hasPendingSeries = !hasCover && comic.pendingCovers?.[n] && comic.preferredSeries;
-
-                return (
-                  <button
-                    key={n}
-                    onClick={() => {
-                      if (appMode === 'edicao') {
-                        onCycleIssueState(n);
-                      } else {
-                        onViewIssueDetail(n);
-                      }
-                    }}
-                    onDoubleClick={() => {
-                      if (appMode === 'edicao') {
-                        onOpenIssueTitleModal(n);
-                      }
-                    }}
-                    className={`relative h-9 rounded-full text-xs font-bold flex items-center justify-center transition-all active:scale-90 ${getIssueClasses(n)}`}
-                    title={
-                      specificTitle 
-                        ? `Edição #${format2(n)}: ${specificTitle}${hasPendingSeries ? ' [⚡ Sugestão da Série Disponível]' : ''}` 
-                        : `Edição #${format2(n)}${hasPendingSeries ? ' [⚡ Sugestão da Série Disponível]' : ''}`
-                    }
-                  >
-                    {format2(n)}
-                    {hasCover && (
-                      <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-400 border border-slate-950" title="Capa fixada" />
-                    )}
-                    {hasPendingSeries && (
-                      <span 
-                        className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-amber-500 border border-slate-950 flex items-center justify-center animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.8)] z-10" 
-                        title={`⚡ Sugestão da Série (${comic.preferredSeries.year || comic.preferredSeries.sourceLabel}) aguardando aprovação`}
-                      >
-                        <Zap className="w-2 h-2 text-slate-950 fill-slate-950" />
-                      </span>
-                    )}
-                    {specificTitle && (
-                      <span className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-purple-400 border border-slate-950" title={`Título: ${specificTitle}`} />
-                    )}
-                  </button>
-                );
-              })}
+        {/* Resumo da Coleção ou Grade Direta de Capas */}
+        {appMode === 'capas_total' ? (
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between text-[11px] text-emerald-400/90 px-1 font-medium">
+              <span>{summaryLabel} • Todas as Capas ({countIssues} edições)</span>
+              <span className="text-[10px] text-slate-400">
+                Toque na capa para ver detalhes
+              </span>
+            </div>
+            <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-1.5 sm:gap-2">
+              {Array.from({ length: countIssues }, (_, i) => startFrom + i).map((n) => renderCoverIssueCard(n))}
             </div>
           </div>
+        ) : (
+          <>
+            <div className="flex items-center flex-wrap gap-2 pt-1">
+              <button
+                onClick={() => onToggleChunkExpand('completed')}
+                className="flex items-center gap-1.5 bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-600/50 text-emerald-200 text-xs font-bold px-3 py-1.5 rounded-xl transition shadow-sm"
+              >
+                <span>{summaryLabel}</span>
+                <span className="text-[10px] text-emerald-400/80 font-normal">({countIssues} edições)</span>
+                {isExpanded ? <ChevronDown className="w-3 h-3 ml-1" /> : <ChevronRight className="w-3 h-3 ml-1" />}
+              </button>
+            </div>
+
+            {/* Edições expandidas em grid */}
+            {isExpanded && (
+              <div className="mt-2 pt-2 border-t border-slate-800/80 space-y-2">
+                <div className="grid grid-cols-10 gap-1 sm:gap-1.5">
+                  {Array.from({ length: countIssues }, (_, i) => startFrom + i).map((n) => {
+                    const stage = getStage(n);
+                    if (viewMode === 'owned' && stage !== 'owned' && stage !== 'read') return null;
+                    if (viewMode === 'read' && stage !== 'read') return null;
+                    if (viewMode === 'wishlist' && stage !== 'wishlist') return null;
+                    if (viewMode === 'none' && stage !== 'none') return null;
+
+                    const specificTitle = issueTitles[n];
+                    const hasCover = comic.issueCovers?.[n];
+                    const hasPendingSeries = !hasCover && comic.pendingCovers?.[n] && comic.preferredSeries;
+
+                    return (
+                      <button
+                        key={n}
+                        onClick={() => {
+                          if (appMode === 'edicao') {
+                            onCycleIssueState(n);
+                          } else {
+                            onViewIssueDetail(n);
+                          }
+                        }}
+                        onDoubleClick={() => {
+                          if (appMode === 'edicao') {
+                            onOpenIssueTitleModal(n);
+                          }
+                        }}
+                        className={`relative h-9 rounded-full text-xs font-bold flex items-center justify-center transition-all active:scale-90 ${getIssueClasses(n)}`}
+                        title={
+                          specificTitle 
+                            ? `Edição #${format2(n)}: ${specificTitle}${hasPendingSeries ? ' [⚡ Sugestão da Série Disponível]' : ''}` 
+                            : `Edição #${format2(n)}${hasPendingSeries ? ' [⚡ Sugestão da Série Disponível]' : ''}`
+                        }
+                      >
+                        {format2(n)}
+                        {hasCover && (
+                          <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-400 border border-slate-950" title="Capa fixada" />
+                        )}
+                        {hasPendingSeries && (
+                          <span 
+                            className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-amber-500 border border-slate-950 flex items-center justify-center animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.8)] z-10" 
+                            title={`⚡ Sugestão da Série (${comic.preferredSeries.year || comic.preferredSeries.sourceLabel}) aguardando aprovação`}
+                          >
+                            <Zap className="w-2 h-2 text-slate-950 fill-slate-950" />
+                          </span>
+                        )}
+                        {specificTitle && (
+                          <span className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-purple-400 border border-slate-950" title={`Título: ${specificTitle}`} />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     );
@@ -3805,6 +3932,13 @@ function ComicRow({
     } else {
       currentChunkLimit = Math.max(currentChunkLimit, Math.ceil(highestOwned / 10) * 10);
     }
+  }
+
+  // Edições ativas para o Modo Consulta Total com Capas
+  const allOngoingIssues = [];
+  const minOngoingIssue = (hasHiddenPriorChunks && comic.showHiddenChunks) ? 1 : startFrom;
+  for (let n = minOngoingIssue; n <= currentChunkLimit; n++) {
+    allOngoingIssues.push(n);
   }
 
   const normalChunkStarts = [];
@@ -4000,42 +4134,68 @@ function ComicRow({
         </div>
       </div>
 
-      {/* ÁREA DE INTERVALOS DE 10 EM 10 */}
-      <div className="space-y-2.5">
-        {hasHiddenPriorChunks && (
-          <div>
-            {!comic.showHiddenChunks ? (
+      {/* ÁREA DE INTERVALOS DE 10 EM 10 OU GRADE TOTAL DE CAPAS */}
+      {appMode === 'capas_total' ? (
+        <div className="space-y-2 pt-1">
+          {hasHiddenPriorChunks && (
+            <div className="flex items-center justify-between px-1 text-[11px]">
               <button
+                type="button"
                 onClick={onToggleHiddenChunks}
-                className="w-full flex items-center justify-between px-3 py-1.5 rounded-xl bg-slate-950/70 hover:bg-slate-900 border border-slate-800/80 text-slate-400 hover:text-slate-200 text-xs font-medium transition shadow-sm"
+                className="text-[10px] text-amber-400/90 hover:text-amber-300 flex items-center gap-1 font-medium underline cursor-pointer"
               >
-                <span className="flex items-center gap-1.5">
-                  <Eye className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Edições 01..{format2(initialChunkStart - 1)}</span>
-                </span>
-                <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-md font-normal">
-                  Ocultas (Início nº {startFrom}) • Toque para ver
-                </span>
+                {comic.showHiddenChunks ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                {comic.showHiddenChunks ? 'Ocultar edições anteriores' : `Ver edições anteriores (01..${format2(initialChunkStart - 1)})`}
               </button>
-            ) : (
-              <div className="space-y-2 p-2 rounded-xl bg-slate-950/50 border border-dashed border-slate-700/80">
-                <div className="flex items-center justify-between text-[11px] text-amber-400 font-medium px-1">
-                  <span>Edições Anteriores (01 a {format2(initialChunkStart - 1)})</span>
-                  <button
-                    onClick={onToggleHiddenChunks}
-                    className="text-[10px] text-slate-400 hover:text-white flex items-center gap-1 underline"
-                  >
-                    <EyeOff className="w-3 h-3" /> Recolher anteriores
-                  </button>
-                </div>
-                {priorChunkStarts.map((chunkStart) => renderChunkBlock(chunkStart))}
-              </div>
-            )}
+            </div>
+          )}
+          <div className="flex items-center justify-between text-[11px] text-slate-400 px-1 font-medium">
+            <span>Todas as Capas ({allOngoingIssues.length} edições)</span>
+            <span className="text-[10px] text-slate-400">
+              Toque na capa para ver detalhes
+            </span>
           </div>
-        )}
+          <div className="grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-1.5 sm:gap-2">
+            {allOngoingIssues.map((num) => renderCoverIssueCard(num))}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2.5">
+          {hasHiddenPriorChunks && (
+            <div>
+              {!comic.showHiddenChunks ? (
+                <button
+                  onClick={onToggleHiddenChunks}
+                  className="w-full flex items-center justify-between px-3 py-1.5 rounded-xl bg-slate-950/70 hover:bg-slate-900 border border-slate-800/80 text-slate-400 hover:text-slate-200 text-xs font-medium transition shadow-sm"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Eye className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Edições 01..{format2(initialChunkStart - 1)}</span>
+                  </span>
+                  <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-md font-normal">
+                    Ocultas (Início nº {startFrom}) • Toque para ver
+                  </span>
+                </button>
+              ) : (
+                <div className="space-y-2 p-2 rounded-xl bg-slate-950/50 border border-dashed border-slate-700/80">
+                  <div className="flex items-center justify-between text-[11px] text-amber-400 font-medium px-1">
+                    <span>Edições Anteriores (01 a {format2(initialChunkStart - 1)})</span>
+                    <button
+                      onClick={onToggleHiddenChunks}
+                      className="text-[10px] text-slate-400 hover:text-white flex items-center gap-1 underline"
+                    >
+                      <EyeOff className="w-3 h-3" /> Recolher anteriores
+                    </button>
+                  </div>
+                  {priorChunkStarts.map((chunkStart) => renderChunkBlock(chunkStart))}
+                </div>
+              )}
+            </div>
+          )}
 
-        {normalChunkStarts.map((chunkStart) => renderChunkBlock(chunkStart))}
-      </div>
+          {normalChunkStarts.map((chunkStart) => renderChunkBlock(chunkStart))}
+        </div>
+      )}
     </div>
   );
 }

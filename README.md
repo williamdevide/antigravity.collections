@@ -1,9 +1,9 @@
 <div align="center">
 
-# 📚 HQs Collections `v1.9.2` - Mobile First Collection Manager
+# 📚 HQs Collections `v1.10.0` - Mobile First Collection Manager
 ### *Gerenciador Ágil de Coleções de Quadrinhos e Minisséries*
 
-[![Version](https://img.shields.io/badge/version-1.9.2-amber?style=for-the-badge&logo=semver&logoColor=white)](#)
+[![Version](https://img.shields.io/badge/version-1.10.0-amber?style=for-the-badge&logo=semver&logoColor=white)](#)
 [![Powered by Antigravity](https://img.shields.io/badge/Powered%20by-Google%20Antigravity-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://deepmind.google/technologies/antigravity/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
@@ -24,7 +24,13 @@
 ### 🎯 Overview
 **HQs Collections** (v1.9.0) is an ultra-fast, mobile-first web application designed for comic book readers and collectors to track monthly publications, collections, and miniseries in a single streamlined screen. Version 1.9.0 introduces **Drawer Navigation via Logo Tap**, full **User Authentication** (Firebase Auth with Google Single Sign-On and Email/Password), **My Profile Panel** with name updates, password change, and a protected "Clear My Collection" safety gate requiring the `ZERAR` security passphrase, a comprehensive **Visual Settings Panel** with 5 elegant color presets and free hex pickers for Consultation, Edit, and Cover modes, and a dedicated **Voice Input Module** powered by the Web Speech API (PT-BR) with semantic parsing and automatic Panini cover scraping.
 
-### ✨ Key Features & Improvements in `v1.9.2`
+### ✨ Key Features & Improvements in `v1.10.0`
+- **4th Viewing Mode: "Full Cover View" (`LayoutGrid`):** Direct 4-mode cyclic toggle in the header:
+  - `view`: Standard Consultation (numbers and collapsible decades)
+  - `edit`: Edition Mode (tactile stages and comic editing)
+  - `covers`: Cover View (compact 2-column grid showing highest owned cover)
+  - `covers_total`: **Full Cover Consultation View** — Displays comic cards with an adaptive grid of all issues in vertical 2:3 comic book covers (5 columns mobile / 10 desktop), stage borders (owned yellow, read cyan neon, wishlist pink neon, unowned dark), and the issue number pinned to the lower-left corner inside each cover (`#{format2(n)}`).
+- **Dedicated Background Color for Full Cover View:** Customized in the Settings Drawer with preset palettes and free hex color pickers.
 - **Multi-Wiki & Non-Panini Universe Scraper:** Intelligent routing for comics outside Panini across major comic universes:
   - **Star Wars:** Wookieepedia (`starwars.fandom.com`)
   - **Marvel:** Marvel Database (`marvel.fandom.com`)
@@ -66,7 +72,13 @@ This application was architected and built using **Google Antigravity**, utilizi
 ### 🎯 Visão Geral
 O **HQs Collections** (v1.9.0) é uma aplicação web mobile-first ultra-rápida criada sob medida para colecionadores de quadrinhos organizarem edições mensais, coleções e minisséries em apenas uma tela. A versão 1.9.0 traz a nova **Gaveta Lateral de Navegação (Menu Hambúrguer)** acionada ao tocar no logotipo da aplicação, **Autenticação Completa com Firebase Auth** (Google e E-mail/Senha), painel **Meu Perfil** com alteração de dados e ação de segurança para zerar a coleção digitando `ZERAR`, tela de **Configurações Visuais** com 5 presets de cores e seletores livres de cor para os fundos dos modos Consulta, Edição e Capas, e **Módulo de Entrada por Voz** com Web Speech API em PT-BR para ditar e cadastrar HQs automaticamente.
 
-### ✨ Novidades e Melhorias da Versão `1.9.2`
+### ✨ Novidades e Melhorias da Versão `1.10.0`
+- **4º Modo de Visualização: "Consulta Total com Capas" (`LayoutGrid`):** Alternador cíclico no cabeçalho em 4 passos:
+  - `consulta`: Modo Consulta tradicional (com bolinhas e blocos de dezenas resumidas `01..10`)
+  - `edicao`: Modo Edição (preenchimento dos 4 estágios táteis e edição de cards)
+  - `capas`: Modo Consulta Capa (galeria de cards menores com a capa da última edição que tenho)
+  - `capas_total`: **Modo Consulta Total com Capas** — Cada card de HQ é exibido com a grade adaptativa completa de todas as edições em formato de minicapas verticais na proporção 2:3 de gibi (5 colunas no mobile / 10 no desktop), com as bordas dos estágios (amarelo tenho, azul neon já li, pink neon quero comprar, escuro não pretendo) e o **número da edição fixado no canto inferior esquerdo** de cada capa (`#{format2(n)}`).
+- **Seletor de Fundo Dedicado para Consulta Total:** Ajuste livre de cor e suporte aos 5 presets prontos no painel de Configurações da gaveta lateral.
 - **Scraper Multi-Wiki & Universos Fora da Panini:** Roteamento inteligente para HQs e graphic novels de outras editoras e universos:
   - **Star Wars:** Wookieepedia (`starwars.fandom.com`)
   - **Marvel:** Marvel Database (`marvel.fandom.com`)

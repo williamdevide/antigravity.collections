@@ -1,6 +1,17 @@
 /**
  * Versão e Nome do Sistema
  * Gerenciado automaticamente pelo Agente Orquestrador sob o padrão SemVer (MAJOR.MINOR.PATCH)
+ * v1.10.0: Quarto Modo de Visualização "Consulta Total com Capas" (appMode === 'capas_total') com
+ *          botão cíclico de 4 modos no header (Consulta [Eye] ➔ Edição [Pencil] ➔ Consulta Capa [ScanEye]
+ *          ➔ Consulta Total com Capas [LayoutGrid]), exibindo cada card de HQ com grade adaptativa completa
+ *          de minicapas verticais na proporção 2:3 de gibi (5 colunas mobile / 10 desktop), bordas dos estágios
+ *          (amarelo tenho, ciano neon já li, pink neon quero comprar, escuro não pretendo), número da edição
+ *          fixado no canto inferior esquerdo de cada capa (#{format2(n)}) e seletor de cor de fundo dedicado.
+ * v1.9.2: Scraper Multi-Wiki Fandom (Star Wars/Wookieepedia, Marvel, DC, Image, Dark Horse, Disney),
+ *          dicionário de tradução de títulos PT-BR/EN, suporte a graphic novels/volumes únicos na edição #01
+ *          e busca bibliográfica global na Open Library.
+ * v1.9.1: Trava de foco estrito sem saltos de edição no carrossel de capas, cálculo realista da
+ *          porcentagem de capas (% Fixadas) e indicadores visuais completos de séries alinhadas (⚡).
  * v1.9.0: Menu Hambúrguer ao tocar na marca/logo com gaveta lateral elegante, Autenticação de Usuários
  *         (Firebase Auth com Google e E-mail/Senha, persistência de login e recuperação de senha),
  *         Painel Meu Perfil com atualização de nome de exibição, alteração de senha e ação de segurança
@@ -30,4 +41,4 @@
  *         fallback progressivo para edições mais antigas ao rejeitar uma capa.
  */
 export const APP_NAME = 'HQs Collections';
-export const APP_VERSION = '1.9.0';
+export const APP_VERSION = '1.10.0';

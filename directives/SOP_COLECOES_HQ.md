@@ -3,21 +3,22 @@
 ## 1. Visão Geral e Propósito
 Aplicação Web First Mobile para controle ágil de coleções de Histórias em Quadrinhos, Especiais, Minisséries e Coleções em tela única.
 * **Nome Oficial:** `HQs Collections`
-* **Versão:** `1.9.2`
+* **Versão:** `1.10.0`
 
 ## 2. Header, Menu Hambúrguer & Navegação Mobile First
 * **Marca e Identidade com Menu Hambúrguer Integrado:** Ao tocar em qualquer ponto do logotipo (`BookOpen`), título ou versão no cabeçalho, uma elegante **Gaveta Lateral (Drawer Menu)** desliza da esquerda com efeito de desfoque de fundo (backdrop-blur).
 * **Opções da Gaveta Lateral:**
   - **Meu Perfil:** Informações da conta, atualização de nome, troca de senha e ação de risco "Zerar Minha Coleção".
   - **Entrada por Voz:** Interface tátil e auditiva para ditar comandos e cadastrar HQs automaticamente.
-  - **Configurações Visuais:** Personalização livre de cores de fundo (Modos Consulta, Edição e Capas) e 5 presets prontos.
+  - **Configurações Visuais:** Personalização livre de cores de fundo (Modos Consulta, Edição, Consulta Capa e Consulta Total com Capas) e 5 presets prontos.
   - **Status de Busca de Capas:** Acesso direto ao painel com porcentagem e curadoria de capas da Panini.
   - **Sair da Conta:** Desconexão segura do Firebase Auth com limpeza de sessão.
 * **Monitor de Capas no Header:** Objeto tátil composto estritamente pelo ícone e pela porcentagem (ex: `🖼️ 85%`), sem o texto "capas". Ao tocar nesse objeto, abre o **Modal Detalhado de Status da Busca de Capas**.
-* **Alternador Cíclico de 3 Modos:** Botão único no cabeçalho com ciclo de 3 toques:
+* **Alternador Cíclico de 4 Modos:** Botão único no cabeçalho com ciclo de 4 toques:
   - **Modo Consulta (Eye):** Exibe a lista completa de coleções com blocos de dezenas e dezenas expandidas.
   - **Modo Edição (Pencil):** Permite preenchimento dos 4 estágios táteis e edição de títulos e configurações da HQ.
   - **Modo Consulta Capa (ScanEye):** Exibe uma galeria em grade (2 colunas no mobile) focada nas capas e na última edição adquirida de cada coleção.
+  - **Modo Consulta Total com Capas (LayoutGrid):** Exibe os cards normais de HQ contendo a grade adaptativa completa de todas as edições em minicapas verticais (proporção 2:3 de gibi, 5 colunas no mobile / 10 no desktop), bordas fiéis dos estágios e o número da edição fixado no canto inferior esquerdo (#{format2(n)}).
 * **Badge de Conexão e Estatísticas:** Status em tempo real (`Nuvem` / `Local`) e contagem total (`XX HQs • YY ed.`).
 
 ## 3. Sistema de 4 Estágios por Edição (Modo Edição)
@@ -112,12 +113,12 @@ Aplicação Web First Mobile para controle ágil de coleções de Histórias em 
 
 ## 13. Configurações Visuais e Paletas de Cores
 * **5 Presets Elegantes (1-Clique):**
-  - **Dark Slate (Padrão):** Fundo original de alto contraste (`#070B14`, `#0c1e38`, `#0b1220`).
-  - **Dark Navy (Oceano):** Tons azuis náuticos profundos (`#0a192f`, `#112240`, `#020c1b`).
-  - **Deep Purple (Galáxia):** Ambientação cósmica violeta e lilás (`#130924`, `#27104d`, `#1e0836`).
-  - **Cyberpunk (Neon):** Base escura de alto realce para bordas neon (`#090d16`, `#16122c`, `#0c192c`).
-  - **Charcoal (Minimalista):** Tons neutros de cinza grafite e preto puro (`#121212`, `#1e1e1e`, `#181818`).
-* **Seletores Livres de Cor:** Controles com seletor nativo `<input type="color">` e código hexadecimal para customizar individualmente os fundos dos Modos Consulta, Edição e Consulta Capa.
+  - **Dark Slate (Padrão):** Fundo original de alto contraste (`#070B14`, `#0c1e38`, `#0b1220`, `#0b1424`).
+  - **Dark Navy (Oceano):** Tons azuis náuticos profundos (`#0a192f`, `#112240`, `#020c1b`, `#051833`).
+  - **Deep Purple (Galáxia):** Ambientação cósmica violeta e lilás (`#130924`, `#27104d`, `#1e0836`, `#180a2e`).
+  - **Cyberpunk (Neon):** Base escura de alto realce para bordas neon (`#090d16`, `#16122c`, `#0c192c`, `#100e26`).
+  - **Charcoal (Minimalista):** Tons neutros de cinza grafite e preto puro (`#121212`, `#1e1e1e`, `#181818`, `#151515`).
+* **Seletores Livres de Cor:** Controles com seletor nativo `<input type="color">` e código hexadecimal para customizar individualmente os fundos dos Modos Consulta, Edição, Consulta Capa e Consulta Total com Capas.
 * **Preferências de Interface:** Ajustes de densidade de cards (Compacto / Normal / Amplo) e feedback tátil (vibração).
 
 ## 14. Entrada por Voz Inteligente (Web Speech API PT-BR)
