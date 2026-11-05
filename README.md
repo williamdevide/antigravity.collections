@@ -1,9 +1,9 @@
 <div align="center">
 
-# 📚 HQs Collections `v1.9.1` - Mobile First Collection Manager
+# 📚 HQs Collections `v1.9.2` - Mobile First Collection Manager
 ### *Gerenciador Ágil de Coleções de Quadrinhos e Minisséries*
 
-[![Version](https://img.shields.io/badge/version-1.9.1-amber?style=for-the-badge&logo=semver&logoColor=white)](#)
+[![Version](https://img.shields.io/badge/version-1.9.2-amber?style=for-the-badge&logo=semver&logoColor=white)](#)
 [![Powered by Antigravity](https://img.shields.io/badge/Powered%20by-Google%20Antigravity-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://deepmind.google/technologies/antigravity/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
@@ -24,7 +24,16 @@
 ### 🎯 Overview
 **HQs Collections** (v1.9.0) is an ultra-fast, mobile-first web application designed for comic book readers and collectors to track monthly publications, collections, and miniseries in a single streamlined screen. Version 1.9.0 introduces **Drawer Navigation via Logo Tap**, full **User Authentication** (Firebase Auth with Google Single Sign-On and Email/Password), **My Profile Panel** with name updates, password change, and a protected "Clear My Collection" safety gate requiring the `ZERAR` security passphrase, a comprehensive **Visual Settings Panel** with 5 elegant color presets and free hex pickers for Consultation, Edit, and Cover modes, and a dedicated **Voice Input Module** powered by the Web Speech API (PT-BR) with semantic parsing and automatic Panini cover scraping.
 
-### ✨ Key Features & Improvements in `v1.9.1`
+### ✨ Key Features & Improvements in `v1.9.2`
+- **Multi-Wiki & Non-Panini Universe Scraper:** Intelligent routing for comics outside Panini across major comic universes:
+  - **Star Wars:** Wookieepedia (`starwars.fandom.com`)
+  - **Marvel:** Marvel Database (`marvel.fandom.com`)
+  - **DC Comics:** DC Database (`dc.fandom.com`)
+  - **Image Comics:** Image Database (`imagecomics.fandom.com`)
+  - **Dark Horse:** Dark Horse Database (`darkhorse.fandom.com`)
+  - **Disney:** Disney Wiki (`disney.fandom.com`)
+- **Graphic Novels & Volume Único Support:** Graphic novels, one-shots, and books without explicit issue numbers in their title (e.g. *"Vader's Little Princess"* / *"A Princesinha de Vader"*) are automatically validated for issue #01 without requiring trailing digits.
+- **Bilingual Title Resolution & Open Library:** Automatic Portuguese-to-English title translation table and global fallback to Open Library (`openlibrary.org`) with high-resolution covers (`covers.openlibrary.org/b/id/...-L.jpg`).
 - **Stable Edition Focus & Anti-Jump Lock:** Fixed the edition jumping issue when approving, rejecting, or browsing alternatives in the cover carousel. The active edition remains pinned and stable on screen.
 - **Accurate Fixed-Cover Progress Percentage:** Header cover progress is now calculated strictly from confirmed and fixed covers (`(fixedCount / totalIssues) * 100`). Rejecting or cancelling covers accurately updates the percentage downward rather than getting stuck at 100%.
 - **Comprehensive Visual Series Indicators:**
@@ -57,7 +66,16 @@ This application was architected and built using **Google Antigravity**, utilizi
 ### 🎯 Visão Geral
 O **HQs Collections** (v1.9.0) é uma aplicação web mobile-first ultra-rápida criada sob medida para colecionadores de quadrinhos organizarem edições mensais, coleções e minisséries em apenas uma tela. A versão 1.9.0 traz a nova **Gaveta Lateral de Navegação (Menu Hambúrguer)** acionada ao tocar no logotipo da aplicação, **Autenticação Completa com Firebase Auth** (Google e E-mail/Senha), painel **Meu Perfil** com alteração de dados e ação de segurança para zerar a coleção digitando `ZERAR`, tela de **Configurações Visuais** com 5 presets de cores e seletores livres de cor para os fundos dos modos Consulta, Edição e Capas, e **Módulo de Entrada por Voz** com Web Speech API em PT-BR para ditar e cadastrar HQs automaticamente.
 
-### ✨ Novidades e Melhorias da Versão `1.9.1`
+### ✨ Novidades e Melhorias da Versão `1.9.2`
+- **Scraper Multi-Wiki & Universos Fora da Panini:** Roteamento inteligente para HQs e graphic novels de outras editoras e universos:
+  - **Star Wars:** Wookieepedia (`starwars.fandom.com`)
+  - **Marvel:** Marvel Database (`marvel.fandom.com`)
+  - **DC Comics:** DC Database (`dc.fandom.com`)
+  - **Image Comics:** Image Database (`imagecomics.fandom.com`)
+  - **Dark Horse:** Dark Horse Database (`darkhorse.fandom.com`)
+  - **Disney:** Disney Wiki (`disney.fandom.com`)
+- **Suporte a Graphic Novels e Volumes Únicos:** Obras sem numeração explícita no título (como *"A Princesinha de Vader"* / *"Vader's Little Princess"*) são validadas automaticamente para a edição #01 sem rejeição indevida.
+- **Resolução Bilíngue de Títulos & Open Library:** Mapeamento inteligente de títulos em português para inglês e fallback global para a Open Library (`openlibrary.org`) com capas oficiais em alta resolução.
 - **Trava de Foco e Estabilidade sem Saltos de Edição:** Correção definitiva do salto indesejado de edição ao escolher, aprovar, rejeitar ou alternar miniaturas no carrossel. A edição sob consulta permanece fixa e estável para revisão contínua.
 - **Cálculo Realista da Porcentagem de Capas (% Fixadas):** O medidor no cabeçalho e nos painéis agora calcula a proporção estrita de edições com capas fixadas oficialmente (`(fixedCount / totalIssues) * 100`). Ao rejeitar ou desvincular capas, a porcentagem se ajusta proporcionalmente, sem ficar presa em 100%.
 - **Indicadores Visuais Completos de Séries Alinhadas:**

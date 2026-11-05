@@ -349,13 +349,19 @@ Pergunta: Ao selecionar ou trocar a capa de uma edição, como você prefere que
 Resposta do Usuário: (Recommended) Travar Edição e Manter Foco Estável: Ao escolher, aprovar ou rejeitar uma capa (seja no Modal de Detalhes ou no Status de Capas), a tela NUNCA muda de edição nem a remove da visão enquanto o carrossel estiver aberto. O item permanece na tela com a nova capa selecionada para sua conferência.
 ```
 
+### Prompt 23
+```text
+/agente-orquestrador /grill-me /goal verifique se o scrapper fora da panini tambem esta funcionando (testei com Starwars a princesinha de vader que não tem na panini, e não apareceu a capa correta)
+```
 
+### Resposta Grill-Me / Interação 36
+```text
+Pergunta: Como você prefere que o scraper selecione e priorize as fontes de busca fora da Panini para HQs e graphic novels de outras editoras (como Star Wars, Aleph, Image, etc.)?
+Resposta do Usuário: (Recommended) Roteamento Inteligente Multi-Universo + Fallback Global: Detecta pelo título ou editora o universo temático (Star Wars/Wookieepedia, Marvel, DC, Image, Dark Horse, Disney) e, se não encontrar na wiki principal, faz fallback automático para Open Library e demais wikis pesquisando tanto o título em português quanto o equivalente em inglês.
+```
 
-
-
-
-
-
-
-
-
+### Resposta Grill-Me / Interação 37
+```text
+Pergunta: Como o validador de capas deve se comportar ao buscar a Edição #01 de Graphic Novels, encadernados ou volumes únicos que não possuem números no título (como 'Vader's Little Princess' / 'A Princesinha de Vader')?
+Resposta do Usuário: (Recommended) Aceitar para a Edição #01 se não houver numeração conflitante: Se a edição cadastrada for a #01 (ou 1) e o livro/graphic novel encontrado trouxer o título da obra sem números explícitos (e sem 'Vol 2' ou '#2'), aceitar a capa como a edição única/volume 1 da publicação.
+```

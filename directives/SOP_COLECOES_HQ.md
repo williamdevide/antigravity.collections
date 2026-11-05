@@ -3,7 +3,7 @@
 ## 1. Visão Geral e Propósito
 Aplicação Web First Mobile para controle ágil de coleções de Histórias em Quadrinhos, Especiais, Minisséries e Coleções em tela única.
 * **Nome Oficial:** `HQs Collections`
-* **Versão:** `1.9.1`
+* **Versão:** `1.9.2`
 
 ## 2. Header, Menu Hambúrguer & Navegação Mobile First
 * **Marca e Identidade com Menu Hambúrguer Integrado:** Ao tocar em qualquer ponto do logotipo (`BookOpen`), título ou versão no cabeçalho, uma elegante **Gaveta Lateral (Drawer Menu)** desliza da esquerda com efeito de desfoque de fundo (backdrop-blur).
@@ -27,9 +27,21 @@ Aplicação Web First Mobile para controle ágil de coleções de Histórias em 
 * **Estágio 3 (Desmarcado com Borda Pink Neon):** Quero Comprar / Lista de Desejos (`wishlist`).
 * Ciclo ao clicar no Modo Edição: `none ➔ owned ➔ read ➔ wishlist ➔ none`.
 
-## 4. Scraper Panini Brasil & Web em Segundo Plano
+## 4. Scraper Multi-Fontes (Panini Brasil, Multi-Wiki Fandom & Open Library)
 * **Busca Forçada no panini.com.br:** O scraper executa buscas automatizadas no catálogo oficial da Panini Brasil utilizando curl/serverless e fallback com proxy de cliente para contornar bloqueios de CDN/Fastly e capturar capas originais de alta resolução sem erros 302 do Cloudfront (-S300-FWEBP).
-* **Validação Estrita do Título e Edição:** Função `matchIssueNumber` valida estritamente tanto o nome da HQ quanto o número da edição alvo (ex: `#16` ou `Vol. 16` no padrão editorial brasileiro da Panini), impedindo que títulos alheios (ex: Deadpool) interfiram ou que anos de 4 dígitos sejam confundidos com o fascículo.
+* **Roteamento Inteligente Multi-Wiki (Fora da Panini):**
+  - Para títulos de outras editoras ou selos (como Star Wars/Aleph, Dark Horse, Image, Disney, etc.), o robô identifica o universo temático e roteia para as wikis Fandom correspondentes:
+    - **Star Wars:** Wookieepedia (`starwars.fandom.com`)
+    - **Marvel:** Marvel Database (`marvel.fandom.com`)
+    - **DC Comics:** DC Database (`dc.fandom.com`)
+    - **Image Comics:** Image Database (`imagecomics.fandom.com`)
+    - **Dark Horse:** Dark Horse Database (`darkhorse.fandom.com`)
+    - **Disney:** Disney Wiki (`disney.fandom.com`)
+  - **Tabela Bilíngue de Tradução de Títulos:** Mapeia títulos em português para seus nomes originais em inglês (ex: *"A Princesinha de Vader"* ➔ *"Vader's Little Princess"*, *"Guerra Civil"* ➔ *"Civil War"*), consultando ambas as variantes nas wikis e Open Library.
+* **Suporte a Graphic Novels / Volumes Únicos / One-Shots:**
+  - Para publicações sem numeração explícita no título (como *"A Princesinha de Vader"*), a edição cadastrada como #01 (ou 1) é aceita automaticamente caso o resultado corresponda à obra e não traga indicador conflitante de outro volume (ex: '#2' ou 'Vol 2').
+* **Busca Global Open Library:** Fallback automatizado para títulos literários e quadrinhos encadernados internacionais via `openlibrary.org/search.json`, recuperando capas em alta resolução (`covers.openlibrary.org/b/id/...-L.jpg`).
+* **Validação Estrita do Título e Edição:** Função `matchIssueNumber` valida estritamente tanto o nome da HQ quanto o número da edição alvo (ex: `#16` ou `Vol. 16` no padrão editorial brasileiro da Panini), impedindo que títulos alheios interfiram ou que anos de 4 dígitos sejam confundidos com o fascículo.
 * **Ordenação Cronológica Estrita (Mais Recentes Primeiro):** A busca prioriza sempre as publicações mais novas (2025/2026, maiores volumes na Fandom como Vol 8 > Vol 7 > Vol 6...).
 * **Unicidade por Coleção:** Uma URL de capa já atribuída a uma edição é bloqueada para qualquer outro fascículo da mesma HQ.
 * **Fallback Progressivo por Rejeição:** Ao rejeitar uma capa, o sistema descarta a imagem atual e busca automaticamente a próxima alternativa mais antiga disponível.

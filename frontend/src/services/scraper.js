@@ -15,12 +15,17 @@ export function matchIssueNumber(title, comicOrIssue, maybeIssue) {
   const normTitle = title.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const normComic = comicName ? comicName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
 
-  // 1. Validar que o produto pertence à HQ pesquisada
+  // 1. Validar que o produto pertence à HQ pesquisada (evita títulos totalmente divergentes como Deadpool para Wolverine)
   if (normComic) {
-    const comicWords = normComic.split(/\s+/).filter(w => w.length > 2);
-    const hasComicTitle = comicWords.length === 0 || comicWords.every(w => normTitle.includes(w));
-    if (!hasComicTitle) {
-      return false;
+    const stopWords = new Set(['star', 'wars', 'starwars', 'the', 'hq', 'revista', 'livro', 'edicao', 'especial', 'volume', 'comic', 'comics', 'marvel', 'dc', 'de', 'da', 'do', 'das', 'dos', 'a', 'o', 'as', 'os', 'e', 'em', 'para', 'com']);
+    const comicWords = normComic.split(/[^a-z0-9]+/).filter(w => w.length > 2 && !stopWords.has(w));
+    if (comicWords.length > 0) {
+      const engMapped = getEnglishTitle(normComic).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const engWords = engMapped.split(/[^a-z0-9]+/).filter(w => w.length > 2 && !stopWords.has(w));
+      const hasMatch = comicWords.some(w => normTitle.includes(w)) || engWords.some(w => normTitle.includes(w));
+      if (!hasMatch) {
+        return false;
+      }
     }
   }
 
@@ -34,7 +39,13 @@ export function matchIssueNumber(title, comicOrIssue, maybeIssue) {
     return pageIssue === num;
   }
 
-  // 4. Extrair números avulsos (desconsiderando Vol/Volume)
+  // 4. Padrão Panini Brasil: "Wolverine (2022) Vol. 16" onde "Vol. 16" é a própria edição
+  const volMatch = withoutYears.match(/\bvol(?:ume|\.)?\s*(\d+)\b/i);
+  if (volMatch && parseInt(volMatch[1], 10) === num) {
+    return true;
+  }
+
+  // 5. Extrair números avulsos (desconsiderando Vol/Volume)
   const withoutVol = withoutYears.replace(/\bvol(?:ume|\.)?\s*\d+\b/gi, ' ');
   const standaloneNumbers = [...withoutVol.matchAll(/\b0*(\d+)\b/g)].map(m => parseInt(m[1], 10));
 
@@ -42,19 +53,36 @@ export function matchIssueNumber(title, comicOrIssue, maybeIssue) {
     return standaloneNumbers.includes(num);
   }
 
-  // 5. Padrão Panini Brasil: "Wolverine (2022) Vol. 16" onde "Vol. 16" é a própria edição
-  const volMatch = withoutYears.match(/\bvol(?:ume|\.)?\s*(\d+)\b/i);
-  if (volMatch && parseInt(volMatch[1], 10) === num) {
+  // 6. Suporte a Edição #01 para Graphic Novels, Encadernados e Volumes Únicos:
+  // Se a edição buscada for 1 (ou 01) e o título encontrado não contiver numeração explícita ou volume conflitante (como Vol. 2),
+  // aceita a capa como a edição única/volume 1 da publicação (ex: "Vader's Little Princess", "A Princesinha de Vader", "Watchmen")
+  if (num === 1 && standaloneNumbers.length === 0 && !volMatch) {
     return true;
   }
 
   return false;
 }
 
-const TITLE_MAP = {
+export const TITLE_MAP = {
+  // Star Wars & Jeffrey Brown
+  'star wars a princesinha de vader': "Vader's Little Princess",
+  'starwars a princesinha de vader': "Vader's Little Princess",
+  'a princesinha de vader': "Vader's Little Princess",
+  'princesinha de vader': "Vader's Little Princess",
+  'star wars darth vader e filho': 'Darth Vader and Son',
+  'starwars darth vader e filho': 'Darth Vader and Son',
+  'darth vader e filho': 'Darth Vader and Son',
+  'boa noite darth vader': 'Goodnight Darth Vader',
+  'doutora aphra': 'Doctor Aphra',
+  'star wars doutora aphra': 'Star Wars: Doctor Aphra',
+  'imperio despedacado': 'Shattered Empire',
+  'star wars imperio despedacado': 'Star Wars: Shattered Empire',
+
+  // Marvel
   'homem-aranha': 'Spider-Man',
   'homem aranha': 'Spider-Man',
   'o espetacular homem-aranha': 'The Amazing Spider-Man',
+  'o espetacular homem aranha': 'The Amazing Spider-Man',
   'vingadores': 'Avengers',
   'os vingadores': 'Avengers',
   'homem de ferro': 'Iron Man',
@@ -62,22 +90,159 @@ const TITLE_MAP = {
   'capitão américa': 'Captain America',
   'quarteto fantastico': 'Fantastic Four',
   'quarteto fantástico': 'Fantastic Four',
+  'demolidor': 'Daredevil',
+  'novissima wolverine': 'All-New Wolverine',
+  'novíssima wolverine': 'All-New Wolverine',
+  'justiceiro': 'The Punisher',
+  'o justiceiro': 'The Punisher',
+  'gaviao arqueiro': 'Hawkeye',
+  'gavião arqueiro': 'Hawkeye',
+  'viuva negra': 'Black Widow',
+  'viúva negra': 'Black Widow',
+  'feiticeira escarlate': 'Scarlet Witch',
+  'pantera negra': 'Black Panther',
+  'cavaleiro da lua': 'Moon Knight',
+  'motoqueiro fantasma': 'Ghost Rider',
+  'guerra civil': 'Civil War',
+  'guerras secretas': 'Secret Wars',
+  'guerra secreta': 'Secret War',
+  'desafio infinito': 'Infinity Gauntlet',
+  'guerra infinita': 'Infinity War',
+  'cruzada infinita': 'Infinity Crusade',
+  'dinastia m': 'House of M',
+  'velho logan': 'Old Man Logan',
+
+  // DC Comics
   'liga da justica': 'Justice League',
   'liga da justiça': 'Justice League',
-  'demolidor': 'Daredevil',
   'mulher-maravilha': 'Wonder Woman',
   'mulher maravilha': 'Wonder Woman',
   'arqueiro verde': 'Green Arrow',
   'lanterna verde': 'Green Lantern',
-  'novissima wolverine': 'All-New Wolverine',
-  'novíssima wolverine': 'All-New Wolverine',
-  'justiceiro': 'The Punisher',
-  'o justiceiro': 'The Punisher'
+  'a piada mortal': 'Batman: The Killing Joke',
+  'o cavaleiro das trevas': 'Batman: The Dark Knight Returns',
+  'cavaleiro das trevas': 'Batman: The Dark Knight Returns',
+  'ano um': 'Batman: Year One',
+  'o longo dia das bruxas': 'Batman: The Long Halloween',
+  'a morte do superman': 'The Death of Superman',
+  'o retorno do superman': 'The Return of Superman',
+  'reino do amanha': 'Kingdom Come',
+  'reino do amanhã': 'Kingdom Come',
+  'ponto de ignicao': 'Flashpoint',
+  'ponto de ignição': 'Flashpoint',
+  'crise nas infinitas terras': 'Crisis on Infinite Earths',
+  'crise infinita': 'Infinite Crisis',
+  'crise final': 'Final Crisis',
+  'asilo arkham': 'Arkham Asylum',
+
+  // Image & Outros
+  'mortos-vivos': 'The Walking Dead',
+  'os mortos vivos': 'The Walking Dead',
+  'invencivel': 'Invincible',
+  'invencível': 'Invincible',
+  'tartarugas ninja': 'Teenage Mutant Ninja Turtles',
+  'as tartarugas ninja': 'Teenage Mutant Ninja Turtles',
+  'tio patinhas': 'Uncle Scrooge',
+  'pato donald': 'Donald Duck'
 };
 
-function getEnglishTitle(title) {
-  const normalized = title.trim().toLowerCase();
-  return TITLE_MAP[normalized] || title;
+export function getEnglishTitle(title) {
+  if (!title) return '';
+  const norm = title.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[:\-]/g, ' ').replace(/\s+/g, ' ');
+  if (TITLE_MAP[norm]) return TITLE_MAP[norm];
+  for (const [k, v] of Object.entries(TITLE_MAP)) {
+    if (norm.includes(k)) return v;
+  }
+  return title;
+}
+
+export function getRelevantWikis(title, publisher) {
+  const normTitle = (title || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const normPub = (publisher || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const wikis = [];
+
+  if (normTitle.includes('star') || normTitle.includes('wars') || normTitle.includes('vader') || 
+      normTitle.includes('jedi') || normTitle.includes('sith') || normTitle.includes('yoda') || 
+      normTitle.includes('mandalorian') || normTitle.includes('aphra') || normPub.includes('star')) {
+    wikis.push('starwars');
+  }
+
+  if (normPub.includes('dc') || normPub.includes('vertigo') || normTitle.includes('batman') || 
+      normTitle.includes('superman') || normTitle.includes('coringa') || normTitle.includes('joker') || 
+      normTitle.includes('flash') || normTitle.includes('lantern') || normTitle.includes('mulher-maravilha') || 
+      normTitle.includes('wonder woman') || normTitle.includes('justica') || normTitle.includes('justice')) {
+    wikis.push('dc');
+  }
+
+  if (normPub.includes('image') || normTitle.includes('spawn') || normTitle.includes('invincible') || 
+      normTitle.includes('invencivel') || normTitle.includes('walking dead') || normTitle.includes('saga')) {
+    wikis.push('imagecomics');
+  }
+
+  if (normPub.includes('dark horse') || normTitle.includes('hellboy') || normTitle.includes('sin city') || 
+      normTitle.includes('conan') || normTitle.includes('umbrella')) {
+    wikis.push('darkhorse');
+  }
+
+  if (normPub.includes('disney') || normPub.includes('abril') || normTitle.includes('patinhas') || 
+      normTitle.includes('donald') || normTitle.includes('mickey') || normTitle.includes('ducktales')) {
+    wikis.push('disney');
+  }
+
+  if (normPub.includes('marvel') || normTitle.includes('aranha') || normTitle.includes('spider') || 
+      normTitle.includes('wolverine') || normTitle.includes('x-men') || normTitle.includes('vingadores') || 
+      normTitle.includes('avengers') || normTitle.includes('hulk') || normTitle.includes('thor') || 
+      normTitle.includes('ferro') || normTitle.includes('capitao')) {
+    wikis.push('marvel');
+  }
+
+  if (!wikis.includes('starwars')) wikis.push('starwars');
+  if (!wikis.includes('marvel')) wikis.push('marvel');
+  if (!wikis.includes('dc')) wikis.push('dc');
+  if (!wikis.includes('imagecomics')) wikis.push('imagecomics');
+  if (!wikis.includes('darkhorse')) wikis.push('darkhorse');
+
+  return wikis;
+}
+
+export function getWikiLabel(wiki) {
+  switch (wiki) {
+    case 'starwars': return 'Star Wars Fandom (Wookieepedia)';
+    case 'marvel': return 'Marvel Fandom';
+    case 'dc': return 'DC Fandom';
+    case 'imagecomics': return 'Image Comics Fandom';
+    case 'darkhorse': return 'Dark Horse Fandom';
+    case 'disney': return 'Disney Fandom';
+    default: return `${wiki.toUpperCase()} Fandom`;
+  }
+}
+
+export function scoreCandidate(candidate, cleanTitle, issueNum, prefSeries) {
+  const normCandidate = (candidate.title || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const normComic = (cleanTitle || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const engMapped = getEnglishTitle(cleanTitle).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  let score = (candidate.volume ? candidate.volume * 10000 : (candidate.source?.includes('Panini') ? 90000 : 0)) + (candidate.year || 1990);
+
+  if (normCandidate === engMapped || normCandidate === normComic) {
+    score += 500000;
+  } else if (normCandidate.includes(engMapped) || engMapped.includes(normCandidate)) {
+    score += 350000;
+  }
+
+  if ((normComic.includes('princesinha') || engMapped.includes('princess')) && normCandidate.includes('princess')) {
+    score += 200000;
+  }
+  if ((normComic.includes('filho') || engMapped.includes('son')) && normCandidate.includes('son')) {
+    score += 200000;
+  }
+
+  const itemSrc = (candidate.source || '').toLowerCase();
+  if (prefSeries?.source && itemSrc.includes(prefSeries.source.toLowerCase())) score += 300000;
+  if (prefSeries?.year && candidate.year === prefSeries.year) score += 400000;
+  if (prefSeries?.volume && candidate.volume === prefSeries.volume) score += 350000;
+
+  return score;
 }
 
 /**
@@ -276,154 +441,186 @@ export async function searchIssueCover(comic, issueNum, rejectedUrls = []) {
     // Prosseguir para Fandom
   }
 
-  // 4. Busca direta no Fandom MediaWiki (CORS liberado com origin=*)
+  // 4. Busca direta no Fandom MediaWiki (Multi-Wiki inteligente)
   try {
-    const wiki = publisher.toLowerCase().includes('dc') || publisher.toLowerCase().includes('vertigo') ? 'dc' : 'marvel';
-    const engTitle = getEnglishTitle(title);
-
-    const getFandomRank = (vol, yr) => {
-      let r = (vol * 10000) + yr;
-      if (prefSeries?.volume && vol === prefSeries.volume) r += 400000;
-      if (prefSeries?.year && yr === prefSeries.year) r += 300000;
-      return r;
-    };
-
-    // Passo A: Consultar diretamente os volumes de 10 a 1 em lote (Titles API)
-    const directTitles = [];
-    for (let v = 10; v >= 1; v--) {
-      directTitles.push(`${engTitle.replace(/\s+/g, '_')}_Vol_${v}_${issue}`);
-    }
-    if (engTitle !== title) {
-      for (let v = 10; v >= 1; v--) {
-        directTitles.push(`${title.replace(/\s+/g, '_')}_Vol_${v}_${issue}`);
-      }
-    }
-
-    const titlesUrl = `https://${wiki}.fandom.com/api.php?action=query&format=json&titles=${encodeURIComponent(directTitles.join('|'))}&prop=pageimages|info&piprop=original|thumbnail&pithumbsize=600&origin=*`;
-    const titlesResp = await fetch(titlesUrl);
-    if (titlesResp.ok) {
-      const titlesData = await titlesResp.json();
-      if (titlesData.query && titlesData.query.pages) {
-        const pages = Object.values(titlesData.query.pages).filter(p => !p.missing);
-        const candidates = [];
-
-        for (const p of pages) {
-          const url = p.original?.source || p.thumbnail?.source;
-          if (!url || rejectedUrls.includes(url)) continue;
-          if (!matchIssueNumber(p.title, title, issueNum)) continue;
-
-          const volMatch = p.title.match(/\bVol(?:ume|\.)?\s*(\d+)\b/i);
-          const vol = volMatch ? parseInt(volMatch[1], 10) : 1;
-          const cbYearMatch = url.match(/[?&]cb=(20[0-2][0-9]|19[5-9][0-9])/);
-          const yr = cbYearMatch ? parseInt(cbYearMatch[1], 10) : 2020;
-
-          candidates.push({
-            coverUrl: url,
-            title: p.title,
-            year: yr,
-            volume: vol,
-            rank: getFandomRank(vol, yr),
-            source: `${wiki.toUpperCase()} Fandom (Vol ${vol})`
-          });
-        }
-
-        candidates.sort((a, b) => b.rank - a.rank);
-        if (candidates.length > 0) {
-          return {
-            found: true,
-            coverUrl: candidates[0].coverUrl,
-            source: candidates[0].source,
-            year: candidates[0].year,
-            title: candidates[0].title
-          };
-        }
-      }
-    }
-
-    // Passo B: Fallback para busca genérica do Fandom com gsrlimit=30
-    const searchQuery = `${engTitle} ${issue}`;
-    const fandomUrl = `https://${wiki}.fandom.com/api.php?action=query&format=json&generator=search&gsrsearch=${encodeURIComponent(searchQuery)}&gsrlimit=30&prop=pageimages|extracts|info&piprop=original|thumbnail&pithumbsize=600&origin=*`;
-
-    const fResp = await fetch(fandomUrl);
-    if (fResp.ok) {
-      const fData = await fResp.json();
-      if (fData.query && fData.query.pages) {
-        const pages = Object.values(fData.query.pages);
-        const candidates = [];
-
-        for (const p of pages) {
-          const url = p.original?.source || p.thumbnail?.source;
-          if (!url || rejectedUrls.includes(url)) continue;
-
-          // Validação estrita de número de edição e título da HQ
-          if (!matchIssueNumber(p.title, title, issueNum)) continue;
-
-          const volMatch = p.title.match(/\bVol(?:ume|\.)?\s*(\d+)\b/i);
-          const vol = volMatch ? parseInt(volMatch[1], 10) : 1;
-          const cbYearMatch = url.match(/[?&]cb=(20[0-2][0-9]|19[5-9][0-9])/);
-          const textYearMatch = (p.title + ' ' + (p.extract || '')).match(/\b(20[0-2][0-9]|19[5-9][0-9])\b/);
-          const yr = cbYearMatch ? parseInt(cbYearMatch[1], 10) : (textYearMatch ? parseInt(textYearMatch[1], 10) : 1990);
-
-          candidates.push({
-            coverUrl: url,
-            title: p.title,
-            year: yr,
-            volume: vol,
-            rank: getFandomRank(vol, yr),
-            source: `${wiki.toUpperCase()} Fandom`
-          });
-        }
-
-        candidates.sort((a, b) => b.rank - a.rank);
-        if (candidates.length > 0) {
-          return {
-            found: true,
-            coverUrl: candidates[0].coverUrl,
-            source: candidates[0].source,
-            year: candidates[0].year,
-            title: candidates[0].title
-          };
-        }
-      }
+    const fandomResult = await searchFandomClient(title, issueNum, publisher, rejectedUrls, prefSeries, false);
+    if (fandomResult && fandomResult.coverUrl) {
+      return {
+        found: true,
+        coverUrl: fandomResult.coverUrl,
+        source: fandomResult.source,
+        year: fandomResult.year,
+        title: fandomResult.title
+      };
     }
   } catch (err) {
-    console.warn('Fandom client fetch error:', err.message);
+    console.warn('Fandom client fetch error:', err);
   }
 
   // 5. Fallback no OpenLibrary
   try {
-    const olUrl = `https://openlibrary.org/search.json?title=${encodeURIComponent(title)}&limit=15`;
-    const olResp = await fetch(olUrl);
-    if (olResp.ok) {
-      const olData = await olResp.json();
-      if (olData.docs && olData.docs.length > 0) {
-        const withCovers = olData.docs
-          .filter(d => d.cover_i)
-          .map(d => ({
-            coverUrl: `https://covers.openlibrary.org/b/id/${d.cover_i}-L.jpg`,
-            title: d.title,
-            year: d.first_publish_year || 1995,
-            source: 'Open Library'
-          }))
-          .filter(c => matchIssueNumber(c.title, title, issueNum) && !rejectedUrls.includes(c.coverUrl));
-
-        withCovers.sort((a, b) => b.year - a.year);
-        if (withCovers.length > 0) {
-          return {
-            found: true,
-            coverUrl: withCovers[0].coverUrl,
-            source: withCovers[0].source,
-            year: withCovers[0].year,
-            title: withCovers[0].title
-          };
-        }
-      }
+    const olResult = await searchOpenLibraryClient(title, issueNum, rejectedUrls, prefSeries, false);
+    if (olResult && olResult.coverUrl) {
+      return {
+        found: true,
+        coverUrl: olResult.coverUrl,
+        source: olResult.source,
+        year: olResult.year,
+        title: olResult.title
+      };
     }
   } catch (err) {
-    console.warn('OpenLibrary client fetch error:', err.message);
+    console.warn('OpenLibrary client fetch error:', err);
   }
 
   return { found: false, message: 'Nenhuma capa encontrada.' };
+}
+
+export async function searchFandomClient(title, issueNum, publisher, rejectedUrls = [], prefSeries = null, returnAll = false) {
+  const cleanTitle = String(title).trim();
+  const engTitle = getEnglishTitle(cleanTitle);
+  const issueStr = String(issueNum);
+  const wikis = getRelevantWikis(cleanTitle, publisher);
+
+  const allCandidates = [];
+  const seenUrls = new Set();
+
+  for (const wiki of wikis) {
+    const wikiLabel = getWikiLabel(wiki);
+
+    // Passo A: Consultar diretamente títulos de volumes (Titles API)
+    const directTitles = [];
+    for (let v = 10; v >= 1; v--) {
+      directTitles.push(`${engTitle.replace(/\s+/g, '_')}_Vol_${v}_${issueStr}`);
+    }
+    if (engTitle !== cleanTitle) {
+      for (let v = 10; v >= 1; v--) {
+        directTitles.push(`${cleanTitle.replace(/\s+/g, '_')}_Vol_${v}_${issueStr}`);
+      }
+    }
+    if (issueStr === '1') {
+      directTitles.push(engTitle.replace(/\s+/g, '_'));
+      if (engTitle !== cleanTitle) directTitles.push(cleanTitle.replace(/\s+/g, '_'));
+    }
+
+    try {
+      const titlesUrl = `https://${wiki}.fandom.com/api.php?action=query&format=json&titles=${encodeURIComponent(directTitles.join('|'))}&prop=pageimages|info&piprop=original|thumbnail&pithumbsize=600&origin=*`;
+      const titlesResp = await fetch(titlesUrl);
+      if (titlesResp.ok) {
+        const titlesData = await titlesResp.json();
+        if (titlesData.query?.pages) {
+          const pages = Object.values(titlesData.query.pages).filter(p => !p.missing);
+          for (const p of pages) {
+            const url = p.original?.source || p.thumbnail?.source;
+            if (!url || rejectedUrls.includes(url) || seenUrls.has(url)) continue;
+            if (!matchIssueNumber(p.title, cleanTitle, issueNum)) continue;
+
+            const volMatch = p.title.match(/\bVol(?:ume|\.)?\s*(\d+)\b/i);
+            const vol = volMatch ? parseInt(volMatch[1], 10) : 1;
+            const cbYearMatch = url.match(/[?&]cb=(20[0-2][0-9]|19[5-9][0-9])/);
+            const yr = cbYearMatch ? parseInt(cbYearMatch[1], 10) : 2020;
+
+            seenUrls.add(url);
+            allCandidates.push({
+              title: p.title,
+              coverUrl: url,
+              year: yr,
+              volume: vol,
+              source: wikiLabel
+            });
+          }
+        }
+      }
+    } catch {}
+
+    // Passo B: Generator search
+    const queries = [`${engTitle} ${issueStr}`];
+    if (engTitle !== cleanTitle) queries.push(`${cleanTitle} ${issueStr}`);
+    if (issueStr === '1') {
+      queries.push(engTitle);
+      if (engTitle !== cleanTitle) queries.push(cleanTitle);
+    }
+
+    for (const q of queries) {
+      try {
+        const fandomUrl = `https://${wiki}.fandom.com/api.php?action=query&format=json&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrlimit=12&prop=pageimages|extracts|info&piprop=original|thumbnail&pithumbsize=600&origin=*`;
+        const fResp = await fetch(fandomUrl);
+        if (fResp.ok) {
+          const fData = await fResp.json();
+          if (fData.query?.pages) {
+            const pages = Object.values(fData.query.pages);
+            for (const p of pages) {
+              const url = p.original?.source || p.thumbnail?.source;
+              if (!url || rejectedUrls.includes(url) || seenUrls.has(url)) continue;
+              if (!matchIssueNumber(p.title, cleanTitle, issueNum)) continue;
+
+              const volMatch = p.title.match(/\bVol(?:ume|\.)?\s*(\d+)\b/i);
+              const vol = volMatch ? parseInt(volMatch[1], 10) : 1;
+              const cbYearMatch = url.match(/[?&]cb=(20[0-2][0-9]|19[5-9][0-9])/);
+              const textYearMatch = (p.title + ' ' + (p.extract || '')).match(/\b(20[0-2][0-9]|19[5-9][0-9])\b/);
+              const yr = cbYearMatch ? parseInt(cbYearMatch[1], 10) : (textYearMatch ? parseInt(textYearMatch[1], 10) : 2015);
+
+              seenUrls.add(url);
+              allCandidates.push({
+                title: p.title,
+                coverUrl: url,
+                year: yr,
+                volume: vol,
+                source: wikiLabel
+              });
+            }
+          }
+        }
+      } catch {}
+    }
+
+    // Se já encontramos candidatos na wiki principal relevante e não precisamos de todos, encerra busca
+    if (allCandidates.length > 0 && !returnAll) {
+      break;
+    }
+  }
+
+  allCandidates.sort((a, b) => scoreCandidate(b, cleanTitle, issueNum, prefSeries) - scoreCandidate(a, cleanTitle, issueNum, prefSeries));
+  return returnAll ? allCandidates : (allCandidates[0] || null);
+}
+
+export async function searchOpenLibraryClient(title, issueNum, rejectedUrls = [], prefSeries = null, returnAll = false) {
+  const cleanTitle = String(title).trim();
+  const engTitle = getEnglishTitle(cleanTitle);
+  const queries = [cleanTitle];
+  if (engTitle && engTitle !== cleanTitle) queries.push(engTitle);
+
+  const candidates = [];
+  const seenUrls = new Set();
+
+  for (const q of queries) {
+    try {
+      const olUrl = `https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=10`;
+      const olResp = await fetch(olUrl);
+      if (olResp.ok) {
+        const olData = await olResp.json();
+        if (olData.docs?.length > 0) {
+          for (const d of olData.docs) {
+            if (!d.cover_i) continue;
+            const coverUrl = `https://covers.openlibrary.org/b/id/${d.cover_i}-L.jpg`;
+            if (rejectedUrls.includes(coverUrl) || seenUrls.has(coverUrl)) continue;
+            if (!matchIssueNumber(d.title, cleanTitle, issueNum)) continue;
+
+            seenUrls.add(coverUrl);
+            candidates.push({
+              title: d.title,
+              coverUrl,
+              year: d.first_publish_year || 2015,
+              source: 'Open Library'
+            });
+          }
+        }
+      }
+    } catch {}
+  }
+
+  candidates.sort((a, b) => scoreCandidate(b, cleanTitle, issueNum, prefSeries) - scoreCandidate(a, cleanTitle, issueNum, prefSeries));
+  return returnAll ? candidates : (candidates[0] || null);
 }
 
 /**
@@ -487,78 +684,25 @@ export async function searchAllIssueCovers(comic, issueNum, rejectedUrls = []) {
     // Prosseguir para fallback no cliente
   }
 
-  // 3. Fallback no cliente: Combinar Panini Client-Side e Fandom MediaWiki
+  // 3. Fallback no cliente: Combinar Panini Client-Side, Fandom Multi-Wiki e OpenLibrary
   try {
-    const [paniniCandidates, fandomCandidates] = await Promise.all([
+    const [paniniCandidates, fandomCandidates, olCandidates] = await Promise.all([
       searchPaniniClientSide(title, issueNum, rejectedUrls, true, prefSeries?.year).catch(() => []),
-      (async () => {
-        const wiki = publisher.toLowerCase().includes('dc') || publisher.toLowerCase().includes('vertigo') ? 'dc' : 'marvel';
-        const engTitle = getEnglishTitle(title);
-        const directTitles = [];
-        for (let v = 10; v >= 1; v--) {
-          directTitles.push(`${engTitle.replace(/\s+/g, '_')}_Vol_${v}_${issue}`);
-        }
-        if (engTitle !== title) {
-          for (let v = 10; v >= 1; v--) {
-            directTitles.push(`${title.replace(/\s+/g, '_')}_Vol_${v}_${issue}`);
-          }
-        }
-
-        const titlesUrl = `https://${wiki}.fandom.com/api.php?action=query&format=json&titles=${encodeURIComponent(directTitles.join('|'))}&prop=pageimages|info&piprop=original|thumbnail&pithumbsize=600&origin=*`;
-        const titlesResp = await fetch(titlesUrl);
-        if (titlesResp.ok) {
-          const titlesData = await titlesResp.json();
-          if (titlesData.query && titlesData.query.pages) {
-            const pages = Object.values(titlesData.query.pages).filter(p => !p.missing);
-            const found = [];
-
-            for (const p of pages) {
-              const url = p.original?.source || p.thumbnail?.source;
-              if (!url || rejectedUrls.includes(url)) continue;
-              if (!matchIssueNumber(p.title, title, issueNum)) continue;
-
-              const volMatch = p.title.match(/\bVol(?:ume|\.)?\s*(\d+)\b/i);
-              const vol = volMatch ? parseInt(volMatch[1], 10) : 1;
-              const cbYearMatch = url.match(/[?&]cb=(20[0-2][0-9]|19[5-9][0-9])/);
-              const yr = cbYearMatch ? parseInt(cbYearMatch[1], 10) : 2020;
-
-              found.push({
-                coverUrl: url,
-                title: p.title,
-                year: yr,
-                volume: vol,
-                rank: (vol * 10000) + yr,
-                source: `${wiki.toUpperCase()} Fandom (Vol ${vol})`
-              });
-            }
-
-            return found;
-          }
-        }
-        return [];
-      })().catch(() => [])
+      searchFandomClient(title, issueNum, publisher, rejectedUrls, prefSeries, true).catch(() => []),
+      searchOpenLibraryClient(title, issueNum, rejectedUrls, prefSeries, true).catch(() => [])
     ]);
 
     const seenUrls = new Set();
     const combined = [];
 
-    for (const item of [...(paniniCandidates || []), ...(fandomCandidates || [])]) {
+    for (const item of [...(paniniCandidates || []), ...(fandomCandidates || []), ...(olCandidates || [])]) {
       if (item && item.coverUrl && !seenUrls.has(item.coverUrl) && !rejectedUrls.includes(item.coverUrl)) {
         seenUrls.add(item.coverUrl);
         combined.push(item);
       }
     }
 
-    const getCandidateScore = (item) => {
-      let score = (item.volume ? item.volume * 10000 : (item.source?.includes('Panini') ? 90000 : 0)) + (item.year || 1990);
-      const itemSrc = (item.source || '').toLowerCase();
-      if (prefSeries?.source && itemSrc.includes(prefSeries.source.toLowerCase())) score += 300000;
-      if (prefSeries?.year && item.year === prefSeries.year) score += 400000;
-      if (prefSeries?.volume && item.volume === prefSeries.volume) score += 350000;
-      return score;
-    };
-
-    combined.sort((a, b) => getCandidateScore(b) - getCandidateScore(a));
+    combined.sort((a, b) => scoreCandidate(b, title, issueNum, prefSeries) - scoreCandidate(a, title, issueNum, prefSeries));
 
     if (combined.length > 0) {
       return {
