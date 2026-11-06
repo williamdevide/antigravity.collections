@@ -553,3 +553,9 @@ quero que quando cadastre uma nova hq (seja pelo isbn ou não) tente buscar  o r
 também quero que na hora de buscar as capas na internet (fora do site da panini) de preferencia por juntar as outras informações como titulo da edição, editora de venda, heroi principal.
 ```
 
+### Prompt 42
+```text
+/agente-orquestrador /grill-me /goal quando entra na tela principal quero que a div de inclusão esteja escondida em um botão com metade da largura da exibição, com os dizeres Adicionar HQ +, e ao lado um segundo botão Filtrar HQ (icone de funil) ocupando a outra metade. ao clicar neles expande a area de inclusão ou de filtro. quero tambem que o ultimo filtro preenchido e o ultimo modo de exibição sejam guardados e sejam utilizados como modo e filtro inicial da proxima vez que eu abrir o sistema.
+percebi que quando clico para confirmar uma capa (se por exemplo faço rapidamente 5 confirmações de capas), dali a uns 5 a 10 segundos ele reabre o card detalhado de cada uma daquelas hqs, como se estive acabando de carregar a foto. não quero mais que isso ocorra (entenda o porque esta acontecendo)
+```
+

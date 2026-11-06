@@ -1,9 +1,9 @@
 <div align="center">
 
-# 📚 HQs Collections `v1.14.0` - Mobile First Collection Manager
+# 📚 HQs Collections `v1.15.0` - Mobile First Collection Manager
 ### *Gerenciador Ágil de Coleções de Quadrinhos e Minisséries*
 
-[![Version](https://img.shields.io/badge/version-1.14.0-amber?style=for-the-badge&logo=semver&logoColor=white)](#)
+[![Version](https://img.shields.io/badge/version-1.15.0-amber?style=for-the-badge&logo=semver&logoColor=white)](#)
 [![Powered by Antigravity](https://img.shields.io/badge/Powered%20by-Google%20Antigravity-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://deepmind.google/technologies/antigravity/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
@@ -22,9 +22,13 @@
 ## 🇺🇸 English
 
 ### 🎯 Overview
-**HQs Collections** (v1.14.0) is an ultra-fast, mobile-first web application designed for comic book readers and collectors to track monthly publications, collections, and miniseries in a single streamlined screen.
+**HQs Collections** (v1.15.0) is an ultra-fast, mobile-first web application designed for comic book readers and collectors to track monthly publications, collections, and miniseries in a single streamlined screen.
 
-### ✨ Key Features & Improvements in `v1.14.0`
+### ✨ Key Features & Improvements in `v1.15.0`
+- **Dual 50/50 Toggle Control Buttons ('Adicionar HQ +' & 'Filtrar HQ'):** The comic addition form and filter controls are now hidden by default on the main screen behind two equal-width (50% each) buttons, providing a clutter-free view of the collection catalogue that seamlessly expands on demand.
+- **Session Persistence for Display Mode and Filters:** The last chosen display mode (`consulta`, `edicao`, `capas`, or `capas_total`) and active filters (search text, publication type, publisher, progress status, collection view mode, and sort order) are automatically persisted in `localStorage` and restored upon reopening the application.
+- **Active Filter Summary & Quick Clear:** When the filter area is collapsed, an active filter indicator badge and an informative summary banner with a 1-click "Limpar" button alert the collector that filters are currently active.
+- **Elimination of Delayed Issue Detail Modal Reopening Bug:** Fixed the asynchronous race condition where approving covers rapidly caused the Edition Detail modal to reopen unexpectedly 5-10 seconds later, by utilizing functional state updaters (`setViewingIssueDetail(prev => ...)`) that safely abort when the user has already closed the modal.
 - **Horizontal Carousel Navigation Arrows (PC / Desktop):** Left and right chevron buttons (`ChevronLeft` / `ChevronRight`) added to both the Edition Detail Modal alternative suggestions and the Cover Search Status panel, providing mouse users on PC smooth, instant horizontal scrolling without needing touch swipe.
 - **Automatic Online Metadata & Synopsis Enrichment:** When creating a comic (quick name entry or detailed registration), the system automatically queries Google Books and Open Library in the background to discover missing Start Year, Brazilian Publisher, Original Publisher, Main Hero, and book/comic Synopsis without interrupting the workflow.
 - **Description / Synopsis Dedicated Field:** Added full support for comic synopses and descriptions across the data model, displayed in the Edition Detail Modal, editable in the Edit Collection Modal (with a 1-click "Buscar na Web" assistant), and pre-filled in the Detailed Add Modal.
@@ -83,9 +87,13 @@ This application was architected and built using **Google Antigravity**, utilizi
 ## 🇧🇷 Versão em Português (Brasil)
 
 ### 🎯 Visão Geral
-O **HQs Collections** (v1.14.0) é uma aplicação web mobile-first ultra-rápida criada sob medida para colecionadores de quadrinhos organizarem edições mensais, coleções e minisséries em apenas uma tela.
+O **HQs Collections** (v1.15.0) é uma aplicação web mobile-first ultra-rápida criada sob medida para colecionadores de quadrinhos organizarem edições mensais, coleções e minisséries em apenas uma tela.
 
-### ✨ Novidades e Melhorias da Versão `1.14.0`
+### ✨ Novidades e Melhorias da Versão `1.15.0`
+- **Botões Duplos em Grade 50/50 ("Adicionar HQ +" e "Filtrar HQ"):** Na tela principal, a área de inclusão de novas HQs e o painel de filtros agora ficam recolhidos por padrão atrás de dois botões de meia largura cada. Ao tocar em "Adicionar HQ +" ou "Filtrar HQ" (com ícone de funil), a respectiva área se expande suavemente, mantendo a listagem de HQs limpa e visualmente desobstruída.
+- **Persistência Completa do Último Modo de Exibição e Filtros:** O último modo de exibição ativo (Consulta, Edição, Consulta Capa ou Consulta Total) e todos os critérios de filtro utilizados (termo de busca, tipo de publicação, editora, status da coleção, modo de visualização e ordenação) são gravados automaticamente no `localStorage` e restaurados fielmente na inicialização do app.
+- **Barra Resumo de Filtros e Limpeza Rápida:** Caso a área de filtros esteja recolhida mas haja algum filtro ativo herdado ou configurado, o botão "Filtrar HQ" exibe uma tag "Ativo" e uma barra resumo contextual surge com o resumo dos critérios e um botão de 1 clique "Limpar" para restaurar a visualização completa.
+- **Correção Definitiva do Bug de Reabertura Tardia do Modal de Detalhes:** Resolvido o problema em que aprovar várias capas em sequência fazia com que, 5 a 10 segundos depois, o card detalhado de cada HQ reabrisse sozinho. O uso de atualizadores de estado funcionais seguros (`setViewingIssueDetail(prev => ...)`) impede que closures assíncronas obsoletas de segundo plano forcem a reabertura de modais que o usuário já fechou.
 - **Setas de Navegação Horizontal no Carrossel de Sugestões (PC / Desktop):** Botões laterais com setas (`ChevronLeft` / `ChevronRight`) tanto no Modal de Detalhes da Edição quanto no Painel de Status de Capas, permitindo rolar as capas horizontalmente com facilidade no computador via mouse sem depender de gestos táteis.
 - **Busca e Enriquecimento Automático de Metadados na Web:** Ao cadastrar qualquer HQ (seja pelo cadastro rápido ou pela inclusão detalhada), o sistema consulta Google Books e Open Library em segundo plano para identificar automaticamente o Ano de Início, Editora de Venda no Brasil, Herói Principal e a Sinopse completa da obra.
 - **Campo de Descrição / Sinopse Dedicado:** A Sinopse/Descrição agora é integrada ao modelo de dados de cada HQ, exibida no Card Detalhado da Edição, visualizável e editável no Modal de Edição (com botão de busca assistida "Buscar na Web") e pré-preenchida no cadastro detalhado via ISBN ou busca.

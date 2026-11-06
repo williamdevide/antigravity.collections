@@ -18,6 +18,7 @@ import {
   Layers, 
   Building2, 
   ListFilter, 
+  Filter, 
   Eye, 
   EyeOff, 
   ScanEye,
@@ -94,7 +95,27 @@ export default function App() {
   const [comics, setComics] = useState([]);
   
   // Modo de Operação: 'consulta' (padrão) | 'edicao' | 'capas' (Modo Consulta Capa) | 'capas_total' (Modo Consulta Total com Capas)
-  const [appMode, setAppMode] = useState('consulta');
+  // Persistência automática do último modo de exibição selecionado
+  const [appMode, setAppMode] = useState(() => {
+    try {
+      const savedMode = localStorage.getItem('hq_collections_app_mode');
+      if (['consulta', 'edicao', 'capas', 'capas_total'].includes(savedMode)) {
+        return savedMode;
+      }
+    } catch (e) {
+      console.warn('Erro ao restaurar appMode:', e);
+    }
+    return 'consulta';
+  });
+
+  // Salvar appMode no localStorage sempre que alterado
+  useEffect(() => {
+    try {
+      localStorage.setItem('hq_collections_app_mode', appMode);
+    } catch (e) {
+      console.warn('Erro ao salvar appMode:', e);
+    }
+  }, [appMode]);
 
   // Alternar ciclicamente entre os 4 modos: Consulta -> Edição -> Consulta Capa -> Consulta Total com Capas -> Consulta
   const cycleAppMode = () => {
@@ -153,16 +174,71 @@ export default function App() {
   const [splashProgress, setSplashProgress] = useState(20);
   const [splashMessage, setSplashMessage] = useState('Inicializando HQ Collections...');
 
-  // Ordenação
-  const [sortOrder, setSortOrder] = useState('A-Z'); // 'A-Z' | 'Z-A' | 'hero' | 'personal'
+  // Ordenação persistida
+  const [sortOrder, setSortOrder] = useState(() => {
+    try {
+      return localStorage.getItem('hq_collections_sort_order') || 'A-Z';
+    } catch {
+      return 'A-Z';
+    }
+  });
 
-  // Filtros
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState('Todos'); // 'Todos' | 'Mensal' | 'Especial' | 'Minissérie' | 'Coleção'
-  const [filterPublisher, setFilterPublisher] = useState('Todas'); // 'Todas' | 'Marvel' | 'DC' | 'Vertigo' | 'Outras'
-  const [filterStatus, setFilterStatus] = useState('Todos'); // 'Todos' | 'Em Andamento' | 'Encerrados'
-  const [viewMode, setViewMode] = useState('all'); // 'all' | 'owned' | 'read' | 'wishlist' | 'none'
+  // Filtros persistidos (busca por texto, tipo, editora, status e modo de coleção)
+  const [searchQuery, setSearchQuery] = useState(() => {
+    try {
+      return localStorage.getItem('hq_collections_filter_search') || '';
+    } catch {
+      return '';
+    }
+  });
+  const [filterType, setFilterType] = useState(() => {
+    try {
+      return localStorage.getItem('hq_collections_filter_type') || 'Todos';
+    } catch {
+      return 'Todos';
+    }
+  });
+  const [filterPublisher, setFilterPublisher] = useState(() => {
+    try {
+      return localStorage.getItem('hq_collections_filter_publisher') || 'Todas';
+    } catch {
+      return 'Todas';
+    }
+  });
+  const [filterStatus, setFilterStatus] = useState(() => {
+    try {
+      return localStorage.getItem('hq_collections_filter_status') || 'Todos';
+    } catch {
+      return 'Todos';
+    }
+  });
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      return localStorage.getItem('hq_collections_filter_view_mode') || 'all';
+    } catch {
+      return 'all';
+    }
+  });
   const [showFilters, setShowFilters] = useState(false);
+
+  // Persistir filtros automaticamente no localStorage sempre que alterados
+  useEffect(() => {
+    try {
+      localStorage.setItem('hq_collections_sort_order', sortOrder);
+      localStorage.setItem('hq_collections_filter_search', searchQuery);
+      localStorage.setItem('hq_collections_filter_type', filterType);
+      localStorage.setItem('hq_collections_filter_publisher', filterPublisher);
+      localStorage.setItem('hq_collections_filter_status', filterStatus);
+      localStorage.setItem('hq_collections_filter_view_mode', viewMode);
+    } catch (e) {
+      console.warn('Erro ao salvar filtros no localStorage:', e);
+    }
+  }, [sortOrder, searchQuery, filterType, filterPublisher, filterStatus, viewMode]);
+
+  // Controle de Expansão dos Paineis: Inclusão ("Adicionar HQ +") e Filtro ("Filtrar HQ")
+  // Iniciam escondidos por padrão conforme solicitado
+  const [isAddFormExpanded, setIsAddFormExpanded] = useState(false);
+  const [isFilterExpanded, setIsFilterExpanded] = useState(false);
 
   // Status de Conexão
   const [connectionStatus, setConnectionStatus] = useState({ status: 'connecting', message: 'Conectando...' });
@@ -991,10 +1067,11 @@ export default function App() {
     const updated = await saveComic(updatedComic);
     setComics(updated);
 
-    // Se estiver visualizando detalhes, atualiza também a visualização
-    if (viewingIssueDetail && viewingIssueDetail.comic.id === comic.id && viewingIssueDetail.issueNum === num) {
-      setViewingIssueDetail({ comic: updatedComic, issueNum: num });
-    }
+    // Se estiver visualizando detalhes, atualiza apenas se o modal ainda estiver aberto para esta edição
+    setViewingIssueDetail(prev => {
+      if (!prev || prev.comic?.id !== comic.id || prev.issueNum !== num) return prev;
+      return { comic: updatedComic, issueNum: num };
+    });
   };
 
   // Propagação inteligente de sugestões de capas da mesma série para as outras edições
@@ -1085,12 +1162,13 @@ export default function App() {
       const saved = await saveComic(currentComicState);
       setComics(saved);
 
-      if (viewingIssueDetail && viewingIssueDetail.comic.id === targetComic.id) {
+      // Atualiza o modal de detalhes apenas se ele continuar aberto para a mesma HQ
+      // Evita reabrir o modal tardiamente caso o usuário já o tenha fechado
+      setViewingIssueDetail(prev => {
+        if (!prev || prev.comic?.id !== targetComic.id) return prev;
         const fresh = saved.find(c => c.id === targetComic.id);
-        if (fresh) {
-          setViewingIssueDetail({ comic: fresh, issueNum: viewingIssueDetail.issueNum });
-        }
-      }
+        return fresh ? { comic: fresh, issueNum: prev.issueNum } : prev;
+      });
 
       setSeriesToast({
         message: `Capas da série alinhadas com sucesso!`,
@@ -1156,9 +1234,10 @@ export default function App() {
     const updated = await saveComic(updatedComic);
     setComics(updated);
 
-    if (viewingIssueDetail && viewingIssueDetail.comic.id === comicId) {
-      setViewingIssueDetail({ comic: updatedComic, issueNum: viewingIssueDetail.issueNum });
-    }
+    setViewingIssueDetail(prev => {
+      if (!prev || prev.comic?.id !== comicId) return prev;
+      return { comic: updatedComic, issueNum: prev.issueNum };
+    });
 
     // Auxilia na escolha de capas para as outras edições da mesma HQ
     propagateSeriesSuggestions(updatedComic, preferredSeries);
@@ -1215,9 +1294,10 @@ export default function App() {
     const updated = await saveComic(updatedComic);
     setComics(updated);
 
-    if (viewingIssueDetail && viewingIssueDetail.comic.id === comicId) {
-      setViewingIssueDetail({ comic: updatedComic, issueNum: viewingIssueDetail.issueNum });
-    }
+    setViewingIssueDetail(prev => {
+      if (!prev || prev.comic?.id !== comicId) return prev;
+      return { comic: updatedComic, issueNum: prev.issueNum };
+    });
   };
 
   // Anexar imagem a partir de um arquivo salvo no dispositivo
@@ -1355,9 +1435,10 @@ export default function App() {
     const updated = await saveComic(updatedComic);
     setComics(updated);
 
-    if (viewingIssueDetail && viewingIssueDetail.comic.id === comicId) {
-      setViewingIssueDetail({ comic: updatedComic, issueNum: viewingIssueDetail.issueNum });
-    }
+    setViewingIssueDetail(prev => {
+      if (!prev || prev.comic?.id !== comicId) return prev;
+      return { comic: updatedComic, issueNum: prev.issueNum };
+    });
 
     // Abre imediatamente o carrossel na própria linha buscando todas as ocorrências encontradas
     handleOpenAlternatives(updatedComic, issueNum, rejectedUrl ? [rejectedUrl] : []);
@@ -1459,9 +1540,10 @@ export default function App() {
     const saved = await saveComic(nextComic);
     setComics(saved);
 
-    if (viewingIssueDetail && viewingIssueDetail.comic.id === comicId) {
-      setViewingIssueDetail({ comic: nextComic, issueNum: viewingIssueDetail.issueNum });
-    }
+    setViewingIssueDetail(prev => {
+      if (!prev || prev.comic?.id !== comicId) return prev;
+      return { comic: nextComic, issueNum: prev.issueNum };
+    });
   };
 
   // Solicitar confirmação para desvincular capa fixada (abre modal de alerta customizado)
@@ -1494,9 +1576,10 @@ export default function App() {
     const updated = await saveComic(updatedComic);
     setComics(updated);
 
-    if (viewingIssueDetail && viewingIssueDetail.comic.id === comicId) {
-      setViewingIssueDetail({ comic: updatedComic, issueNum: viewingIssueDetail.issueNum });
-    }
+    setViewingIssueDetail(prev => {
+      if (!prev || prev.comic?.id !== comicId) return prev;
+      return { comic: updatedComic, issueNum: prev.issueNum };
+    });
 
     // Reabre imediatamente o carrossel de alternativas para escolher uma nova capa na hora
     await loadAlternatives(updatedComic, issueNum, unlinkedCoverUrl ? [unlinkedCoverUrl] : []);
@@ -1544,12 +1627,11 @@ export default function App() {
         const saved = await saveComicsBatch(changedComics);
         setComics(saved);
 
-        if (viewingIssueDetail && pendingByComic.has(viewingIssueDetail.comic.id)) {
-          const fresh = saved.find(c => c.id === viewingIssueDetail.comic.id);
-          if (fresh) {
-            setViewingIssueDetail({ comic: fresh, issueNum: viewingIssueDetail.issueNum });
-          }
-        }
+        setViewingIssueDetail(prev => {
+          if (!prev || !pendingByComic.has(prev.comic?.id)) return prev;
+          const fresh = saved.find(c => c.id === prev.comic.id);
+          return fresh ? { comic: fresh, issueNum: prev.issueNum } : prev;
+        });
       }
     } catch (err) {
       console.error('Erro ao aprovar todas as capas pendentes:', err);
@@ -1611,12 +1693,11 @@ export default function App() {
         const saved = await saveComicsBatch(changedComics);
         setComics(saved);
 
-        if (viewingIssueDetail && pendingByComic.has(viewingIssueDetail.comic.id)) {
-          const fresh = saved.find(c => c.id === viewingIssueDetail.comic.id);
-          if (fresh) {
-            setViewingIssueDetail({ comic: fresh, issueNum: viewingIssueDetail.issueNum });
-          }
-        }
+        setViewingIssueDetail(prev => {
+          if (!prev || !pendingByComic.has(prev.comic?.id)) return prev;
+          const fresh = saved.find(c => c.id === prev.comic.id);
+          return fresh ? { comic: fresh, issueNum: prev.issueNum } : prev;
+        });
 
         // Buscar sequencialmente a próxima alternativa cronológica para cada edição rejeitada
         setTimeout(async () => {
@@ -1699,7 +1780,10 @@ export default function App() {
         const updatedComic = { ...comic, pendingCovers: updatedPending };
         const updated = await saveComic(updatedComic);
         setComics(updated);
-        setViewingIssueDetail({ comic: updatedComic, issueNum });
+        setViewingIssueDetail(prev => {
+          if (!prev || prev.comic?.id !== comic.id) return prev;
+          return { comic: updatedComic, issueNum };
+        });
       } else {
         alert('Nenhuma capa localizada nos servidores para esta edição.');
       }
@@ -2067,7 +2151,7 @@ export default function App() {
     }
   };
 
-  const hasActiveFilters = filterType !== 'Todos' || filterPublisher !== 'Todas' || filterStatus !== 'Todos' || viewMode !== 'all';
+  const hasActiveFilters = filterType !== 'Todos' || filterPublisher !== 'Todas' || filterStatus !== 'Todos' || viewMode !== 'all' || Boolean(searchQuery.trim());
 
   // Limites de edições navegáveis para uma HQ no modal de detalhes
   const getComicMinNavigableIssue = (comic) => {
@@ -2446,12 +2530,85 @@ export default function App() {
           </aside>
         )}
         
-        {/* BARRA DE ADICIONAR NOVO TÍTULO COM TIPO, EDITORA, INÍCIO E BOTÃO DETALHADO */}
-        <section className={`p-3 rounded-2xl border shadow-xl space-y-2.5 transition ${
-          appMode === 'edicao' 
-            ? 'bg-[#132c50] border-cyan-700/50' 
-            : 'bg-[#12192B] border-slate-700/70'
-        }`}>
+        {/* BOTÕES DE CONTROLE PRINCIPAL: ADICIONAR HQ + e FILTRAR HQ (50% de largura cada) */}
+        <div className="grid grid-cols-2 gap-2 w-full">
+          {/* Botão 1: Adicionar HQ + */}
+          <button
+            type="button"
+            onClick={() => setIsAddFormExpanded(prev => !prev)}
+            className={`w-full py-2.5 px-3 rounded-xl border font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-[0.98] cursor-pointer ${
+              isAddFormExpanded
+                ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-amber-500/25 ring-1 ring-amber-400'
+                : 'bg-[#12192B] hover:bg-slate-800 text-amber-400 border-slate-700/80 hover:border-amber-500/50'
+            }`}
+            title={isAddFormExpanded ? 'Ocultar formulário de inclusão' : 'Expandir formulário para adicionar nova HQ'}
+          >
+            <Plus className={`w-4 h-4 stroke-[3] transition-transform duration-200 ${isAddFormExpanded ? 'rotate-45' : ''}`} />
+            <span>Adicionar HQ +</span>
+          </button>
+
+          {/* Botão 2: Filtrar HQ (com ícone de funil) */}
+          <button
+            type="button"
+            onClick={() => setIsFilterExpanded(prev => !prev)}
+            className={`w-full py-2.5 px-3 rounded-xl border font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-[0.98] cursor-pointer relative ${
+              isFilterExpanded
+                ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-amber-500/25 ring-1 ring-amber-400'
+                : hasActiveFilters
+                ? 'bg-[#12192B] text-amber-400 border-amber-500/60 shadow-amber-500/10'
+                : 'bg-[#12192B] hover:bg-slate-800 text-slate-300 border-slate-700/80 hover:border-slate-600'
+            }`}
+            title={isFilterExpanded ? 'Ocultar painel de filtros e busca' : 'Expandir painel de filtros, busca e ordenação'}
+          >
+            <Filter className="w-4 h-4 stroke-[2.5]" />
+            <span>Filtrar HQ</span>
+            {hasActiveFilters && (
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ml-1 ${
+                isFilterExpanded ? 'bg-slate-950 text-amber-400' : 'bg-amber-500 text-slate-950'
+              }`}>
+                Ativo
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* BARRA RESUMO DE FILTRO ATIVO QUANDO A ÁREA DE FILTRO ESTÁ RECOLHIDA */}
+        {!isFilterExpanded && hasActiveFilters && (
+          <div className="flex items-center justify-between bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-xl text-xs text-amber-300 animate-fadeIn">
+            <div className="flex items-center gap-1.5 truncate">
+              <Filter className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="truncate">
+                Filtro ativo: {searchQuery.trim() ? `"${searchQuery}" • ` : ''}
+                {filterType !== 'Todos' ? `${filterType} • ` : ''}
+                {filterPublisher !== 'Todas' ? `${filterPublisher} • ` : ''}
+                {filterStatus !== 'Todos' ? `${filterStatus} • ` : ''}
+                {viewMode !== 'all' ? `Exibição (${viewMode})` : ''}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setFilterType('Todos');
+                setFilterPublisher('Todas');
+                setFilterStatus('Todos');
+                setViewMode('all');
+              }}
+              className="text-[11px] font-bold text-amber-400 hover:text-white bg-amber-500/20 hover:bg-amber-500/30 px-2 py-0.5 rounded-lg shrink-0 transition cursor-pointer"
+              title="Limpar todos os filtros"
+            >
+              Limpar
+            </button>
+          </div>
+        )}
+        
+        {/* BARRA DE ADICIONAR NOVO TÍTULO COM TIPO, EDITORA, INÍCIO E BOTÃO DETALHADO (EXPANSÍVEL) */}
+        {isAddFormExpanded && (
+          <section className={`p-3 rounded-2xl border shadow-xl space-y-2.5 transition animate-fadeIn ${
+            appMode === 'edicao' 
+              ? 'bg-[#132c50] border-cyan-700/50' 
+              : 'bg-[#12192B] border-slate-700/70'
+          }`}>
           <form onSubmit={handleAddComic} className="space-y-2">
             <div className="flex gap-1.5">
               <input
@@ -2535,9 +2692,11 @@ export default function App() {
             </div>
           </form>
         </section>
+        )}
 
-        {/* CONTROLES: ORDENAÇÃO + BUSCA + FILTROS */}
-        <section className="space-y-2">
+        {/* CONTROLES: ORDENAÇÃO + BUSCA + FILTROS (EXPANSÍVEL) */}
+        {isFilterExpanded && (
+        <section className="space-y-2 animate-fadeIn">
           {/* BARRA DE ORDENAÇÃO (A-Z / Z-A / HERÓI / USUÁRIO) */}
           <div className="flex items-center justify-between bg-[#0F1626] p-1.5 rounded-xl border border-slate-800 text-xs gap-1.5">
             <span className="text-[11px] font-semibold text-slate-400 pl-1 shrink-0">Ordenar por:</span>
@@ -2780,6 +2939,7 @@ export default function App() {
             </div>
           )}
         </section>
+        )}
 
         {/* LISTAGEM DE QUADRINHOS */}
         <section className="space-y-3 pb-8">

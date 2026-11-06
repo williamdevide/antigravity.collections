@@ -1,6 +1,14 @@
 /**
  * Versão e Nome do Sistema
  * Gerenciado automaticamente pelo Agente Orquestrador sob o padrão SemVer (MAJOR.MINOR.PATCH)
+ * v1.15.0: Botões duplos de controle em grade 50/50 na tela principal ('Adicionar HQ +' e 'Filtrar HQ' com ícone de funil)
+ *          com áreas de inclusão e de filtros recolhidas por padrão em acordeão expansível para visão limpa do catálogo;
+ *          persistência completa de sessão no localStorage do último modo de exibição (Consulta / Edição / Consulta Capa /
+ *          Consulta Total) e dos filtros configurados (termo de busca, tipo, editora, status, ordenação e modo de coleção),
+ *          com restauração automática na abertura do app e barra resumo informativa com botão rápido de limpar quando recolhido;
+ *          e correção definitiva do bug de reabertura indesejada do Modal de Detalhes da Edição 5 a 10 segundos após
+ *          confirmações sucessivas de capas, utilizando updaters funcionais seguros (setViewingIssueDetail(prev => ...))
+ *          que impedem closures assíncronas obsoletas de forçar a reabertura de modais já fechados pelo usuário.
  * v1.14.0: Setas de navegação horizontal (esquerda e direita) nos carrosséis de sugestões de capas
  *          (otimizado para navegação fluida com mouse no PC no Modal de Detalhes da Edição e no Painel de Status de Capas);
  *          busca e enriquecimento automático na web de metadados da HQ (Ano de Início, Editora de Venda no Brasil,
@@ -97,4 +105,4 @@
  *         fallback progressivo para edições mais antigas ao rejeitar uma capa.
  */
 export const APP_NAME = 'HQ Collections';
-export const APP_VERSION = '1.14.0';
+export const APP_VERSION = '1.15.0';
