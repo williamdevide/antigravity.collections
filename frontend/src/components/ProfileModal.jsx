@@ -14,7 +14,7 @@ import {
   ShieldCheck,
   Sparkles
 } from 'lucide-react';
-import { updateUserProfile, changeUserPassword } from '../firebase';
+import { updateUserProfile, changeUserPassword, setAuthPersistence, isKeepLoggedIn } from '../firebase';
 
 export default function ProfileModal({ 
   isOpen, 
@@ -40,6 +40,15 @@ export default function ProfileModal({
 
   // Copiar UID
   const [copiedUid, setCopiedUid] = useState(false);
+
+  // Manter usuário conectado
+  const [keepLoggedIn, setKeepLoggedIn] = useState(() => isKeepLoggedIn());
+
+  const handleToggleKeepLoggedIn = async (e) => {
+    const checked = e.target.checked;
+    setKeepLoggedIn(checked);
+    await setAuthPersistence(checked);
+  };
 
   const handleCopyUid = () => {
     if (!currentUser?.uid) return;
@@ -249,6 +258,29 @@ export default function ProfileModal({
             </div>
           </form>
         )}
+
+        {/* Sessão e Conexão Contínua */}
+        <div className="p-3.5 bg-slate-900/70 rounded-2xl border border-slate-800 space-y-1.5">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold text-white flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-amber-400" />
+                <span>Manter usuário conectado</span>
+              </p>
+              <p className="text-[11px] text-slate-400 leading-tight">
+                Permanece logado ao fechar o navegador. Ao reabrir o sistema, entra direto na sua conta.
+              </p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                checked={keepLoggedIn}
+                onChange={handleToggleKeepLoggedIn}
+                className="w-4 h-4 rounded border-slate-700 text-amber-500 focus:ring-amber-500 bg-slate-950"
+              />
+            </label>
+          </div>
+        </div>
 
         {/* Zona de Perigo: Zerar Minha Coleção */}
         <div className="border border-rose-500/40 bg-rose-500/5 rounded-2xl p-4 space-y-2.5">

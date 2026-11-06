@@ -30,7 +30,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'online',
     timestamp: new Date().toISOString(),
-    service: 'HQ Tracker API (Backend Express)',
+    service: 'HQ Collections API (Backend Express)',
     environment: process.env.NODE_ENV || 'development'
   });
 });
@@ -714,7 +714,7 @@ function searchOpenLibrary(title, issueNum, rejectedUrls = [], returnAll = false
       https.get({
         hostname: 'openlibrary.org',
         path: olPath,
-        headers: { 'User-Agent': 'HQTrackerBot/1.0' }
+        headers: { 'User-Agent': 'HQCollectionsBot/1.0' }
       }, (resp) => {
         let body = '';
         resp.on('data', c => body += c);
@@ -885,5 +885,5 @@ app.get('/api/scrape-cover', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 [Backend Express] HQ Tracker API rodando na porta ${PORT}`);
+  console.log(`🚀 [Backend Express] HQ Collections API rodando na porta ${PORT}`);
 });

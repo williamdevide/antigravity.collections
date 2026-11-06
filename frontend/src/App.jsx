@@ -45,7 +45,9 @@ import {
   Settings,
   Mic,
   LogOut,
-  Zap
+  Zap,
+  Camera,
+  ScanBarcode
 } from 'lucide-react';
 import { 
   subscribeComics, 
@@ -70,12 +72,15 @@ import {
 import { APP_NAME, APP_VERSION } from './version';
 import { searchIssueCover, searchAllIssueCovers } from './services/scraper';
 import { parseVoiceComicCommand } from './services/voiceParser';
+import { cleanISBN, searchComicByISBN } from './services/isbnService';
 import AuthScreen from './components/AuthScreen';
 import DrawerMenu from './components/DrawerMenu';
 import ProfileModal from './components/ProfileModal';
 import ClearCollectionModal from './components/ClearCollectionModal';
 import SettingsModal, { DEFAULT_USER_SETTINGS } from './components/SettingsModal';
 import VoiceInputModal from './components/VoiceInputModal';
+import SplashScreen from './components/SplashScreen';
+import BarcodeScannerModal from './components/BarcodeScannerModal';
 
 const COMIC_TYPES = ['Mensal', 'Especial', 'Minissérie', 'Coleção'];
 const PUBLISHERS = ['Marvel', 'DC', 'Vertigo', 'Outras'];
@@ -128,8 +133,19 @@ export default function App() {
   const [detailedBrazilPublisher, setDetailedBrazilPublisher] = useState('');
   const [detailedMainHero, setDetailedMainHero] = useState('');
 
+  // Recursos de Busca por ISBN e Escaneamento por Câmera
+  const [isbnInput, setIsbnInput] = useState('');
+  const [isSearchingIsbn, setIsSearchingIsbn] = useState(false);
+  const [isbnFeedback, setIsbnFeedback] = useState(null); // { type: 'success' | 'error', message: '' }
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+
+  // Tela de Splash e Barra de Progresso de Carregamento
+  const [isCollectionLoaded, setIsCollectionLoaded] = useState(false);
+  const [splashProgress, setSplashProgress] = useState(20);
+  const [splashMessage, setSplashMessage] = useState('Inicializando HQ Collections...');
+
   // Ordenação
-  const [sortOrder, setSortOrder] = useState('A-Z'); // 'A-Z' | 'Z-A' | 'personal'
+  const [sortOrder, setSortOrder] = useState('A-Z'); // 'A-Z' | 'Z-A' | 'hero' | 'personal'
 
   // Filtros
   const [searchQuery, setSearchQuery] = useState('');
@@ -206,6 +222,13 @@ export default function App() {
     const unsubscribe = onAuthChange((user) => {
       setCurrentUser(user);
       setAuthLoading(false);
+      if (!user) {
+        setSplashProgress(100);
+        setIsCollectionLoaded(true);
+      } else {
+        setSplashProgress(45);
+        setSplashMessage(`Autenticado como ${user.displayName || user.email}. Carregando coleções...`);
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -223,6 +246,7 @@ export default function App() {
     setComics([]);
 
     if (!currentUser && !guestMode) {
+      setIsCollectionLoaded(true);
       return;
     }
 
@@ -234,10 +258,18 @@ export default function App() {
       setUserSettings(DEFAULT_USER_SETTINGS);
     }
 
+    setSplashProgress(75);
+    setSplashMessage('Baixando sua coleção do banco de dados em tempo real...');
+
     const unsubscribe = subscribeComics(
       userId,
       (updatedComics) => {
         setComics(updatedComics);
+        setSplashProgress(100);
+        setSplashMessage('Coleções sincronizadas com sucesso!');
+        setTimeout(() => {
+          setIsCollectionLoaded(true);
+        }, 350);
       },
       (status) => {
         setConnectionStatus(status);
@@ -253,6 +285,7 @@ export default function App() {
       setCurrentUser(null);
       setGuestMode(false);
       setComics([]);
+      setIsCollectionLoaded(true);
       setUserSettings(DEFAULT_USER_SETTINGS);
       setShowDrawerMenu(false);
       setShowProfileModal(false);
@@ -694,9 +727,136 @@ export default function App() {
       setDetailedBrazilPublisher('');
       setDetailedMainHero('');
       setDetailedStartFrom('1');
+      setIsbnInput('');
+      setIsbnFeedback(null);
     } catch (err) {
       console.error('⚠️ Erro ao cadastrar HQ detalhada:', err);
     }
+  };
+
+  // Busca na Internet por ISBN e Auto-Criação / Atualização de "Tenho"
+  const handleSearchISBN = async (codeToSearch) => {
+    const raw = codeToSearch || isbnInput;
+    const clean = cleanISBN(raw);
+    if (!clean || (clean.length !== 10 && clean.length !== 13)) {
+      setIsbnFeedback({ type: 'error', message: 'Informe um ISBN válido com 10 ou 13 dígitos.' });
+      return;
+    }
+
+    setIsSearchingIsbn(true);
+    setIsbnFeedback(null);
+
+    try {
+      const data = await searchComicByISBN(clean);
+      if (!data) {
+        setIsbnFeedback({ type: 'error', message: 'Nenhuma HQ encontrada para o ISBN pesquisado.' });
+        setIsSearchingIsbn(false);
+        return;
+      }
+
+      // Preenche os campos do formulário detalhado
+      const title = data.title || '';
+      const year = data.year || '';
+      const publisherBR = data.publisher || '';
+      const originalPublisher = data.originalPublisher || 'Marvel';
+      const hero = data.mainHero || '';
+      const issueNum = data.issueNumber || 1;
+
+      setDetailedName(title);
+      if (year) setDetailedStartYear(year);
+      if (publisherBR) setDetailedBrazilPublisher(publisherBR);
+      if (originalPublisher) setDetailedPublisher(originalPublisher);
+      if (hero) setDetailedMainHero(hero);
+      setDetailedStartFrom(String(issueNum));
+
+      // Verifica se é a primeira HQ daquele título na coleção do usuário
+      const existingComic = comics.find(c => c.name.trim().toLowerCase() === title.trim().toLowerCase());
+
+      if (!existingComic) {
+        // Primeira HQ do título: cria o card e preenche "Tenho" daquele número
+        const nextPosition = comics.length > 0 
+          ? Math.max(...comics.map(c => typeof c.position === 'number' ? c.position : 0)) + 1 
+          : 0;
+
+        const newComic = {
+          id: 'comic_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+          name: title,
+          type: detailedType,
+          publisher: originalPublisher,
+          startFrom: 1,
+          showHiddenChunks: false,
+          startYear: year,
+          brazilPublisher: publisherBR,
+          mainHero: hero,
+          ownedNumbers: [issueNum],
+          issueStates: { [issueNum]: 'owned' },
+          issueCovers: data.coverUrl ? { [issueNum]: data.coverUrl } : {},
+          pendingCovers: {},
+          searchedIssues: {},
+          issueTitles: {},
+          position: nextPosition,
+          isCompleted: false,
+          completedUntil: null,
+          expandedChunks: [],
+          createdAt: new Date().toISOString()
+        };
+
+        const updated = await saveComic(newComic);
+        setComics(updated);
+        setIsbnFeedback({ 
+          type: 'success', 
+          message: `Nova HQ "${title}" criada com sucesso! Edição #${issueNum} marcada como "Tenho".` 
+        });
+
+        setTimeout(() => {
+          setShowDetailedAddModal(false);
+          setIsbnInput('');
+          setIsbnFeedback(null);
+        }, 1600);
+      } else {
+        // Já existe um card com esse título: marca a edição encontrada como Tenho
+        const currentStates = existingComic.issueStates || {};
+        const currentOwned = existingComic.ownedNumbers || [];
+        const newStates = { ...currentStates, [issueNum]: 'owned' };
+        const newOwned = Array.from(new Set([...currentOwned, issueNum]));
+        const covers = { ...(existingComic.issueCovers || {}) };
+        if (data.coverUrl && !covers[issueNum]) {
+          covers[issueNum] = data.coverUrl;
+        }
+
+        const updatedComic = {
+          ...existingComic,
+          issueStates: newStates,
+          ownedNumbers: newOwned,
+          issueCovers: covers
+        };
+
+        const updated = await saveComic(updatedComic);
+        setComics(updated);
+        setIsbnFeedback({ 
+          type: 'success', 
+          message: `HQ existente localizada! Edição #${issueNum} marcada como "Tenho" em "${existingComic.name}".` 
+        });
+
+        setTimeout(() => {
+          setShowDetailedAddModal(false);
+          setIsbnInput('');
+          setIsbnFeedback(null);
+        }, 1600);
+      }
+    } catch (err) {
+      console.warn('Erro ao consultar ISBN:', err);
+      setIsbnFeedback({ type: 'error', message: err.message || 'Erro ao consultar serviço de ISBN.' });
+    } finally {
+      setIsSearchingIsbn(false);
+    }
+  };
+
+  // Callback de sucesso ao escanear código de barras via câmera
+  const handleBarcodeScanned = (decodedText) => {
+    setShowBarcodeScanner(false);
+    setIsbnInput(decodedText);
+    handleSearchISBN(decodedText);
   };
 
   // Ciclo dos 4 Estágios por Edição (Modo Edição)
@@ -1573,6 +1733,19 @@ export default function App() {
     });
 
     return filtered.sort((a, b) => {
+      if (sortOrder === 'hero') {
+        const heroA = (a.mainHero || '').trim();
+        const heroB = (b.mainHero || '').trim();
+        if (heroA && heroB) {
+          const comp = heroA.localeCompare(heroB, 'pt-BR', { sensitivity: 'base' });
+          if (comp !== 0) return comp;
+        } else if (heroA && !heroB) {
+          return -1;
+        } else if (!heroA && heroB) {
+          return 1;
+        }
+        return a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' });
+      }
       if (sortOrder === 'A-Z') {
         return a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' });
       }
@@ -1632,19 +1805,14 @@ export default function App() {
     return userSettings.viewModeBg || '#070B14';
   }, [appMode, userSettings]);
 
-  // Tela de Carregamento Inicial de Autenticação
-  if (authLoading) {
+  // Tela de Abertura / Splash Screen animada enquanto a base da coleção carrega
+  if (!isCollectionLoaded) {
     return (
-      <div className="min-h-screen bg-[#070B14] flex flex-col items-center justify-center text-white p-4 font-sans">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 text-slate-950 flex items-center justify-center mb-4 shadow-xl shadow-amber-500/20 animate-pulse">
-          <BookOpen className="w-8 h-8" />
-        </div>
-        <div className="flex items-center gap-2 text-amber-400 mb-2">
-          <Loader2 className="w-5 h-5 animate-spin" />
-          <span className="font-bold text-sm font-mono">Iniciando HQ Tracker...</span>
-        </div>
-        <p className="text-xs text-slate-500">Conectando aos serviços seguros do Firebase</p>
-      </div>
+      <SplashScreen 
+        progress={splashProgress}
+        statusMessage={splashMessage}
+        isComplete={splashProgress >= 100}
+      />
     );
   }
 
@@ -1652,7 +1820,10 @@ export default function App() {
   if (!currentUser && !guestMode) {
     return (
       <AuthScreen 
-        onGuestLogin={() => setGuestMode(true)}
+        onGuestLogin={() => {
+          setGuestMode(true);
+          setIsCollectionLoaded(false);
+        }}
       />
     );
   }
@@ -1960,6 +2131,19 @@ export default function App() {
               >
                 <ArrowDownZA className="w-3.5 h-3.5" />
                 <span>Z-A</span>
+              </button>
+
+              <button
+                onClick={() => setSortOrder('hero')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${
+                  sortOrder === 'hero'
+                    ? 'bg-amber-500 text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+                title="Ordenar por Personagem Principal e Título"
+              >
+                <Shield className="w-3.5 h-3.5" />
+                <span>Personagem</span>
               </button>
 
               <button
@@ -2335,6 +2519,62 @@ export default function App() {
               </button>
             </div>
 
+            {/* BUSCA RÁPIDA POR ISBN / CÓDIGO DE BARRAS COM CÂMERA */}
+            <div className="bg-slate-900/90 border border-amber-500/40 rounded-xl p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                  <ScanBarcode className="w-3.5 h-3.5" /> Busca por ISBN
+                </label>
+                <span className="text-[10px] text-slate-400">BrasilAPI • Google Books</span>
+              </div>
+
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  value={isbnInput}
+                  onChange={(e) => setIsbnInput(e.target.value)}
+                  placeholder="ISBN (10 ou 13 dígitos)"
+                  className="flex-1 bg-slate-950 text-white px-3 py-1.5 rounded-lg border border-slate-700 text-xs focus:outline-none focus:border-amber-400 font-mono"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSearchISBN();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => handleSearchISBN()}
+                  disabled={isSearchingIsbn || !isbnInput.trim()}
+                  className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-bold text-xs flex items-center gap-1 transition shrink-0 shadow-sm"
+                  title="Consultar dados da HQ via ISBN"
+                >
+                  {isSearchingIsbn ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+                  <span>Buscar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBarcodeScanner(true)}
+                  className="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1 transition shrink-0 shadow-sm"
+                  title="Escanear código de barras com a câmera do celular"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Câmera</span>
+                </button>
+              </div>
+
+              {isbnFeedback && (
+                <div className={`text-[11px] p-2 rounded-lg flex items-center gap-1.5 ${
+                  isbnFeedback.type === 'success' 
+                    ? 'bg-emerald-950/70 border border-emerald-500/40 text-emerald-300' 
+                    : 'bg-red-950/70 border border-red-500/40 text-red-300'
+                }`}>
+                  {isbnFeedback.type === 'success' ? <CheckCircle className="w-3.5 h-3.5 shrink-0" /> : <AlertTriangle className="w-3.5 h-3.5 shrink-0" />}
+                  <span>{isbnFeedback.message}</span>
+                </div>
+              )}
+            </div>
+
             <form onSubmit={handleDetailedAddSubmit} className="space-y-3">
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-300">Nome da HQ *</label>
@@ -2447,6 +2687,13 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* MODAL DE LEITURA DE CÓDIGO DE BARRAS / ISBN POR CÂMERA */}
+      <BarcodeScannerModal 
+        isOpen={showBarcodeScanner}
+        onClose={() => setShowBarcodeScanner(false)}
+        onScanSuccess={handleBarcodeScanned}
+      />
 
       {/* MODAL DE CONSULTA DE DETALHES DA EDIÇÃO COM CAPA AMPLIADA E APROVAÇÃO (V VERDE) */}
       {viewingIssueDetail && (
@@ -3789,8 +4036,26 @@ function ComicRow({
       : `01..${format2(endNum)}`;
 
     return (
-      <div className={`border rounded-2xl p-3 sm:p-3.5 shadow-md transition space-y-2.5 ${getCardThemeClasses(comicType)}`}>
-        {/* LINHA 1: SOMENTE O TÍTULO */}
+      <div className={`border rounded-2xl shadow-md transition overflow-hidden flex flex-row ${getCardThemeClasses(comicType)}`}>
+        {/* Lombada vertical do Personagem Principal (-90°) */}
+        {comic.mainHero ? (
+          <div 
+            className="w-7 sm:w-8 bg-slate-950/85 border-r border-slate-800/80 flex items-center justify-center shrink-0 select-none overflow-hidden relative"
+            title={`Personagem Principal: ${comic.mainHero}`}
+          >
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <span 
+                className="text-[10px] font-black uppercase tracking-widest text-amber-400 whitespace-nowrap truncate max-w-[130px] sm:max-w-[160px]"
+                style={{ transform: 'rotate(-90deg)' }}
+              >
+                {comic.mainHero}
+              </span>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="flex-1 p-3 sm:p-3.5 space-y-2.5 min-w-0">
+          {/* LINHA 1: SOMENTE O TÍTULO */}
         <div className="flex items-center gap-1.5 min-w-0">
           <div className="flex items-center gap-0.5 text-slate-500 shrink-0">
             <span className="cursor-grab active:cursor-grabbing p-1 hover:text-white" title="Arraste para reordenar">
@@ -3883,7 +4148,15 @@ function ComicRow({
 
             {/* Edições expandidas em grid */}
             {isExpanded && (
-              <div className="mt-2 pt-2 border-t border-slate-800/80 space-y-2">
+              <div 
+                onClick={(e) => {
+                  if (!e.target.closest('button')) {
+                    onToggleChunkExpand('completed');
+                  }
+                }}
+                className="mt-2 pt-2 border-t border-slate-800/80 space-y-2 cursor-pointer hover:border-slate-700 transition"
+                title="Toque nesta área (fora das bolinhas) para recolher a minissérie"
+              >
                 <div className="grid grid-cols-10 gap-1 sm:gap-1.5">
                   {Array.from({ length: countIssues }, (_, i) => startFrom + i).map((n) => {
                     const stage = getStage(n);
@@ -3941,6 +4214,7 @@ function ComicRow({
             )}
           </>
         )}
+        </div>
       </div>
     );
   }
@@ -3981,26 +4255,44 @@ function ComicRow({
     const chunkEnd = chunkStart + 9;
     const chunkNumbers = Array.from({ length: 10 }, (_, i) => chunkStart + i);
     
-    const ownedCountInChunk = chunkNumbers.filter(n => {
-      const s = getStage(n);
-      return s === 'owned' || s === 'read';
-    }).length;
+    const readCount = chunkNumbers.filter(n => getStage(n) === 'read').length;
+    const wishlistCount = chunkNumbers.filter(n => getStage(n) === 'wishlist').length;
+    const ownedOnlyCount = chunkNumbers.filter(n => getStage(n) === 'owned').length;
+    const acquiredCount = readCount + ownedOnlyCount;
 
-    const isChunkComplete = ownedCountInChunk === 10;
+    const isAllRead = readCount === 10;
+    const isAllWishlist = wishlistCount === 10;
+    const isAllOwned = acquiredCount === 10;
+
+    const isChunkComplete = isAllRead || isAllWishlist || isAllOwned;
     const isManuallyExpanded = expandedChunksSet.has(chunkStart);
 
     // Se estiver 100% completo e não foi expandido: resume como 01..10
     if (isChunkComplete && !isManuallyExpanded) {
+      let badgeStyle = 'bg-amber-500 text-slate-950 font-black border border-amber-400 shadow-md shadow-amber-500/30';
+      let icon = <Check className="w-3.5 h-3.5 stroke-[3] text-slate-950" />;
+      let badgeTitle = 'Todas as edições adquiridas (Tenho) - Toque para expandir';
+
+      if (isAllRead) {
+        badgeStyle = 'bg-slate-900/90 text-cyan-300 font-black border-2 border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.85)]';
+        icon = <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 stroke-[2.5]" />;
+        badgeTitle = 'Todas as edições lidas (Borda Azul Neon) - Toque para expandir';
+      } else if (isAllWishlist) {
+        badgeStyle = 'bg-slate-900/90 text-pink-300 font-bold border-2 border-pink-500 shadow-[0_0_15px_rgba(236,72,153,0.85)]';
+        icon = <Bookmark className="w-3.5 h-3.5 text-pink-400 stroke-[2.5]" />;
+        badgeTitle = 'Todas as edições como Desejo (Borda Pink Neon) - Toque para expandir';
+      }
+
       return (
         <div key={chunkStart} className="inline-block mr-2 mb-1">
           <button
             onClick={() => onToggleChunkExpand(chunkStart)}
-            className="flex items-center gap-1.5 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 text-xs font-bold px-3 py-1.5 rounded-xl transition shadow-sm active:scale-95"
-            title="Clique para expandir e alterar números"
+            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl transition shadow-sm active:scale-95 ${badgeStyle}`}
+            title={badgeTitle}
           >
-            <Check className="w-3.5 h-3.5 stroke-[3] text-amber-400" />
+            {icon}
             <span>{format2(chunkStart)}..{format2(chunkEnd)}</span>
-            <ChevronRight className="w-3 h-3 text-amber-400/60" />
+            <ChevronRight className="w-3 h-3 opacity-70" />
           </button>
         </div>
       );
@@ -4017,11 +4309,32 @@ function ComicRow({
     });
 
     return (
-      <div key={chunkStart} className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-2.5 space-y-1.5">
-        <div className="flex items-center justify-between text-[11px] text-slate-400 px-1 font-medium">
-          <span>Edições {format2(chunkStart)} a {format2(chunkEnd)}</span>
+      <div 
+        key={chunkStart} 
+        onClick={(e) => {
+          // Importante: se clicar na div (mas NÃO nas bolinhas), volta para a visão 01..10
+          if (isChunkComplete && !e.target.closest('button')) {
+            onToggleChunkExpand(chunkStart);
+          }
+        }}
+        className={`rounded-xl p-2.5 space-y-1.5 transition ${
+          isChunkComplete 
+            ? 'cursor-pointer bg-slate-950/70 border border-slate-700/80 hover:border-slate-500' 
+            : 'bg-slate-950/60 border border-slate-800/80'
+        }`}
+        title={isChunkComplete ? "Clique nesta área (fora das bolinhas) para recolher de volta para 01..10" : undefined}
+      >
+        <div className="flex items-center justify-between text-[11px] text-slate-400 px-1 font-medium select-none">
+          <span className="flex items-center gap-1.5">
+            <span>Edições {format2(chunkStart)} a {format2(chunkEnd)}</span>
+            {isChunkComplete && (
+              <span className="text-[10px] text-amber-400/80">
+                (Toque fora das bolinhas para recolher)
+              </span>
+            )}
+          </span>
           <span className="text-amber-400 text-[10px]">
-            {ownedCountInChunk > 0 ? `${ownedCountInChunk}/10 adquiridas` : 'Disponíveis'}
+            {isAllRead ? '10/10 lidas' : isAllWishlist ? '10/10 desejadas' : `${acquiredCount}/10 adquiridas`}
           </span>
         </div>
 
@@ -4091,8 +4404,26 @@ function ComicRow({
   };
 
   return (
-    <div className={`border rounded-2xl p-3 sm:p-3.5 shadow-md transition space-y-2.5 ${getCardThemeClasses(comicType)}`}>
-      {/* LINHA 1: SOMENTE O TÍTULO */}
+    <div className={`border rounded-2xl shadow-md transition overflow-hidden flex flex-row ${getCardThemeClasses(comicType)}`}>
+      {/* Lombada vertical do Personagem Principal (-90°) */}
+      {comic.mainHero ? (
+        <div 
+          className="w-7 sm:w-8 bg-slate-950/85 border-r border-slate-800/80 flex items-center justify-center shrink-0 select-none overflow-hidden relative"
+          title={`Personagem Principal: ${comic.mainHero}`}
+        >
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <span 
+              className="text-[10px] font-black uppercase tracking-widest text-amber-400 whitespace-nowrap truncate max-w-[130px] sm:max-w-[160px]"
+              style={{ transform: 'rotate(-90deg)' }}
+            >
+              {comic.mainHero}
+            </span>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="flex-1 p-3 sm:p-3.5 space-y-2.5 min-w-0">
+        {/* LINHA 1: SOMENTE O TÍTULO */}
       <div className="flex items-center gap-1.5 min-w-0">
         <div className="flex items-center gap-0.5 text-slate-500 shrink-0">
           <span className="cursor-grab active:cursor-grabbing p-1 hover:text-white" title="Arraste para reordenar">
@@ -4219,6 +4550,7 @@ function ComicRow({
           {normalChunkStarts.map((chunkStart) => renderChunkBlock(chunkStart))}
         </div>
       )}
+      </div>
     </div>
   );
 }

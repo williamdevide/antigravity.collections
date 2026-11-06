@@ -108,7 +108,7 @@ Aplicação Web First Mobile para controle ágil de coleções de Histórias em 
 * **Isolamento Absoluto por Usuário (Zero Cross-Pollution):**
   - Cada usuário autenticado possui subcoleções isoladas no Cloud Firestore (`/users/{userId}/comics/{comicId}` e `/users/{userId}/settings/preferences`).
   - **Eliminação de Migração Automática:** Novos usuários iniciam estritamente com sua coleção pessoal vazia (`[]`), sem importar dados de sessões anônimas ou de outros usuários que utilizaram o mesmo navegador.
-  - **Chave de Cache Dedicada por UID:** Os dados locais são gravados exclusivamente sob a chave `hq_tracker_collections_${userId}`, enquanto o modo visitante utiliza `hq_tracker_collections_guest`.
+  - **Chave de Cache Dedicada por UID:** Os dados locais são gravados exclusivamente sob a chave `hq_collections_${userId}`, enquanto o modo visitante utiliza `hq_collections_guest`.
   - **Limpeza Atômica de Estado no Logout:** Ao trocar de conta ou deslogar, o estado em memória (`setComics([])`) e as preferências visuais são reinicializados instantaneamente antes do carregamento do próximo usuário.
 * **Regras de Segurança Estritas no Firestore (`firestore.rules`):**
   - Verificação estrita de propriedade `request.auth.uid == userId` sem exceções.

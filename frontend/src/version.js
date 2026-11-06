@@ -1,6 +1,14 @@
 /**
  * Versão e Nome do Sistema
  * Gerenciado automaticamente pelo Agente Orquestrador sob o padrão SemVer (MAJOR.MINOR.PATCH)
+ * v1.11.0: Substituição integral de marca para 'HQ Collections', Tela de Splash animada com logotipo,
+ *          slogan e barra de progresso vinculada ao carregamento completo da coleção, autenticação com
+ *          persistência de sessão ('Manter usuário conectado') no login e no perfil, agrupamentos 01..10
+ *          com bordas neon estilizadas (azul neon para lidos, pink neon para desejo, preenchimento âmbar
+ *          para tenho), recolhimento do bloco expandido ao tocar na área da div, nova ordenação por
+ *          Personagem Principal e título, faixa vertical estilizada (-90°) do Herói/Personagem no lado
+ *          esquerdo de cada card, e módulo de inclusão com busca e escaneamento de código de barras (ISBN)
+ *          via câmera do celular e APIs BrasilAPI / Google Books / OpenLibrary com marcação automática de Tenho.
  * v1.10.2: Endpoint Serverless Panini Brasil oficial (/api/scrape-cover), middleware de desenvolvimento
  *          no Vite (vite.config.js) com fetch Node.js direto contornando bloqueios de proxy/WAF,
  *          priorização de consulta com preenchimento em 2 dígitos ('Wolverine 01'), bônus massivo (+600k)
@@ -50,5 +58,5 @@
  *         filtro rigoroso por número de edição (evitando repetição de capa em edições diferentes) e
  *         fallback progressivo para edições mais antigas ao rejeitar uma capa.
  */
-export const APP_NAME = 'HQs Collections';
-export const APP_VERSION = '1.10.2';
+export const APP_NAME = 'HQ Collections';
+export const APP_VERSION = '1.11.0';

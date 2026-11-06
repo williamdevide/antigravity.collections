@@ -49,7 +49,7 @@
   - Pulsing `⚡ Sugestão da Série` badges in the Cover Search Status panel.
 - **Hamburger Drawer Menu via Brand Logo:** Tapping the app logo or title opens a smooth sliding navigation drawer with user avatar, profile status, and quick shortcuts.
 - **Google Sign-In Diagnostics & Redirect Fallback:** Smart detection of `auth/unauthorized-domain` with a 1-click domain copy button and direct link to Firebase Console's Authorized Domains list (essential for Vercel `*.vercel.app` deployments), plus automatic and manual redirect fallback (`signInWithRedirect` + `getRedirectResult`) for mobile and popup-blocked browsers.
-- **Strict Multi-Tenancy & Absolute Data Isolation:** Each user's comics and settings are strictly isolated in `/users/{userId}/comics` and `/users/{userId}/settings` protected by production Cloud Firestore Security Rules (`request.auth.uid == userId`). No cross-user data migration, isolated local storage per UID (`hq_tracker_collections_{userId}`), and atomic memory clearing upon logout.
+- **Strict Multi-Tenancy & Absolute Data Isolation:** Each user's comics and settings are strictly isolated in `/users/{userId}/comics` and `/users/{userId}/settings` protected by production Cloud Firestore Security Rules (`request.auth.uid == userId`). No cross-user data migration, isolated local storage per UID (`hq_collections_{userId}`), and atomic memory clearing upon logout.
 - **Firebase Authentication & Account Management:** Complete authentication suite supporting Google Sign-In (no password required), email/password login and registration, remembered email, and password recovery.
 - **My Profile Panel:** View account details, update display name, change account password, and access high-risk operations.
 - **Safety-Gated "Clear Collection":** Permanent collection wipe requiring typing the exact security keyword `ZERAR` to unlock the destruction button.
@@ -102,7 +102,7 @@ O **HQs Collections** (v1.9.0) é uma aplicação web mobile-first ultra-rápida
   - Login rápido com Conta Google (dispensa digitação de senha) com suporte a popup e redirecionamento (`signInWithRedirect`).
   - Diagnóstico Inteligente de Domínios Vercel: Detecção automática de `auth/unauthorized-domain` com cópia do hostname em 1 clique e atalho direto para o painel de Domínios Autorizados do Firebase Console.
   - Cadastro e login com E-mail e Senha, recuperação de senha esquecida e opção "Lembrar meu e-mail".
-  - Isolamento estrito de dados na nuvem: cada usuário possui suas próprias HQs e preferências no Firestore (`/users/{userId}/comics`) com regras de segurança de produção (`isOwner(userId)`), cache local dedicado por UID (`hq_tracker_collections_{userId}`) e eliminação total de migração cruzada entre contas.
+  - Isolamento estrito de dados na nuvem: cada usuário possui suas próprias HQs e preferências no Firestore (`/users/{userId}/comics`) com regras de segurança de produção (`isOwner(userId)`), cache local dedicado por UID (`hq_collections_{userId}`) e eliminação total de migração cruzada entre contas.
 - **Painel "Meu Perfil":** Permite atualizar o nome de exibição, alterar a senha de acesso e monitorar o status da conta.
 - **Zerar Minha Coleção com Confirmação Rigorosa:** Ação destrutiva protegida por modal de alerta máximo que exige digitar a palavra `ZERAR` em maiúsculas para liberar a exclusão permanente no Firestore e no cache local.
 - **Tela de Configurações Visuais:**

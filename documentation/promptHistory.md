@@ -468,5 +468,43 @@ atualize com a versão correta o titulo da aba do navegador
 /agente-orquestrador /grill-me /goal a busca no site da panini tambem estava bem melhor. nas buscas por wolverine nem todos estão retornando as capas corretas
 ```
 
+## Sessão: 06/11/2026
+
+### Prompt 31
+```text
+/agente-orquestrador /grill-me /goal construa os seguintes recursos:
+- no header deixe um botão de alternancia (modo consulta, modo edição), sempre o padrão ao abrir o sistema é modo consulta, utilize icones visuais para esses dois modos.
+- quando entro no modo edição a cor de fundo do sistema muda para um azul mais claro e retorna para a corr atual no modo consulta.
+- nos cards, deixe a linha do titulo só com o titulo, o restante dos botoes vão para uma segunda linha alinhados a direita. deixe primeiro a editora, depois o tipo e por ultimo o encerrar. quero os 3 botões com larguras iguais e fixas independente do conteudo.
+- as bolinhas de edições sempre devem exibir as 10 bolinhas eem uma unica linha.
+- ao incluir uma nova hq posso preencher somente os campos atuais direto na tela ou abrir inclusão detalhada onde tenho também campos para ano de inicio, editora de venda no brasil, herói/grupo principal
+- nos cards ao clicar no nome abre a tela de alterar com todos esses campos tambem.
+- no modo consulta quando eu clico no numero de uma edição abre uma tela com as informações detalhadas dessa hq só para consulta (no futuro vai exibir a capa, mas por enquanto não)
+- só consigo clicar em um numero e adicionar aquele numero se estiver no modo edição.
+```
+
+### Prompt 32
+```text
+/agente-orquestrador /grill-me /goal a partir de agora estamos na versão 1.0.1 (esse número será exibido ao lado do nome do sistema. o nome do sistema deverá mudar para HQs Collections. o restante continua exibindo como está.
+a partir de agora sempre que for pedido alterações, mudanças, acescimos, correções ou verificações você controlará o numero da versão sozinho, alterando os 3 digitos de acordo com tipo de coisa que foi solicitado.
+```
+
+### Prompt 33
+```text
+/agente-orquestrador /grill-me /goal no header abaixo do nome do sistema tinha uma frase de slogan, volte ela. o modo edição e modo consulta exibe só o icone no botão, sem escrito.
+o modo de inclusão detalhada tambem é só o icone sem escrito, para caber ao lado do campo incio nº
+```
+
+### Prompt 34
+```text
+/agente-orquestrador /grill-me /goal Procure todas as ocorrências do nome antigo HQ Tracker e substitua pelo novo nome HQ Collections.
+Quando acessar a plataforma quero uma tela de splash (ela deve ter o logotipo o nome do sistema) e deve exibir uma barra de progresso enquanto estiver carregando o sistema. para dar mais sentido a essa tela, quando logarmos no sistema e no nosso perfil, deve haver uma opção do tipo check com "Manter usuário conectado". se estiver marcado essa opção e eu fechar o sistema, ao reabrir ele já loga diretamente na minha conta. por fim a tela de splash deve durar até que toda minha base da coleção tenha sido carregada.
+agora dentro do sistema quando tenho um agrupamento 01..10 e todos já foram lidos o agrupamento deve receber a borda azul neon, se eu marquei todos como desejo recebe a borda pink neon, se eu só tenho todos recebe a cor de preenchimento do Tenho. 
+outra coisa, se eu clico no 01...10 ele expaande a visualização, quero que se eu clicar na vsualização expandida ele volte para a visão 01..10 (importante, tenho que clicar na div, mas não nas bolinhas)
+quero mais um metodo de ordenação dos cards (pelo personagem principal), nesse caso ele ordena primeiro pelo personagem principal e na sequencia ordem alfabetica do titulo.
+quero que o personagem principal fique em uma div escrito na vertical (-90°) do lado esquerdo do card.
+por fim, quando adiciono uma hq pelo metodo completo quero ter um recurso de fazer busca pelo ISBN tanto digitando quanto escaneando com a camera do celular. ele usará esse ISBN para buscar na internet as informações, dai se é a primeira hq daquele titulo, ele já cria o card e preenche o Tenho daquele numero.
+```
+
 
 

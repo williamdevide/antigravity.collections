@@ -82,7 +82,7 @@ async function run() {
   // 3. Adicionar arquivos e criar commit
   console.log('📑 Preparando arquivos e commit inicial...');
   execCommand('git add .');
-  execCommand('git commit -m "feat: initial commit - HQ Tracker Mobile First Collection Manager"');
+  execCommand('git commit -m "feat: initial commit - HQ Collections Mobile First Collection Manager"');
 
   if (!token) {
     console.error('❌ [Erro]: GITHUB_TOKEN não configurado no arquivo .env.');
@@ -111,7 +111,7 @@ async function run() {
     console.log(`🔨 Criando repositório público "${repoName}" no GitHub...`);
     repoCheck = await requestGitHub('/user/repos', 'POST', {
       name: repoName,
-      description: 'HQ Tracker - Aplicação Web First Mobile para Controle Rápido de Coleções de HQs (Google Antigravity)',
+      description: 'HQ Collections - Aplicação Web First Mobile para Controle Rápido de Coleções de HQs (Google Antigravity)',
       private: false
     });
   }

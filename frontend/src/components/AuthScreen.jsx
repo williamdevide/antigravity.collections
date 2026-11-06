@@ -25,7 +25,9 @@ import {
   loginWithGoogle, 
   loginWithGoogleRedirect,
   checkRedirectResult,
-  resetPassword 
+  resetPassword,
+  setAuthPersistence,
+  isKeepLoggedIn
 } from '../firebase';
 import { APP_NAME, APP_VERSION } from '../version';
 
@@ -36,20 +38,14 @@ export default function AuthScreen({ onGuestLogin }) {
   // Campos do formulário
   const [email, setEmail] = useState(() => {
     try {
-      return localStorage.getItem('hq_tracker_remembered_email') || '';
+      return localStorage.getItem('hq_collections_remembered_email') || localStorage.getItem('hq_tracker_remembered_email') || '';
     } catch {
       return '';
     }
   });
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [rememberMe, setRememberMe] = useState(() => {
-    try {
-      return Boolean(localStorage.getItem('hq_tracker_remembered_email'));
-    } catch {
-      return false;
-    }
-  });
+  const [keepLoggedIn, setKeepLoggedIn] = useState(() => isKeepLoggedIn());
   const [showPassword, setShowPassword] = useState(false);
 
   // Estados de feedback
@@ -70,9 +66,10 @@ export default function AuthScreen({ onGuestLogin }) {
   // Salva ou remove o e-mail lembrado
   const persistRememberEmail = (emailToRemember) => {
     try {
-      if (rememberMe && emailToRemember) {
-        localStorage.setItem('hq_tracker_remembered_email', emailToRemember);
+      if (keepLoggedIn && emailToRemember) {
+        localStorage.setItem('hq_collections_remembered_email', emailToRemember);
       } else {
+        localStorage.removeItem('hq_collections_remembered_email');
         localStorage.removeItem('hq_tracker_remembered_email');
       }
     } catch {
@@ -131,6 +128,7 @@ export default function AuthScreen({ onGuestLogin }) {
     setSuccessMsg('');
     setLoading(true);
     try {
+      await setAuthPersistence(keepLoggedIn);
       await loginWithGoogle();
       // O listener onAuthChange atualizará a aplicação
     } catch (err) {
@@ -147,6 +145,7 @@ export default function AuthScreen({ onGuestLogin }) {
     setSuccessMsg('');
     setLoading(true);
     try {
+      await setAuthPersistence(keepLoggedIn);
       await loginWithGoogleRedirect();
     } catch (err) {
       handleGoogleError(err);
@@ -205,6 +204,7 @@ export default function AuthScreen({ onGuestLogin }) {
 
     setLoading(true);
     try {
+      await setAuthPersistence(keepLoggedIn);
       if (mode === 'login') {
         await loginWithEmail(cleanEmail, password);
         persistRememberEmail(cleanEmail);
@@ -506,11 +506,11 @@ export default function AuthScreen({ onGuestLogin }) {
                 <label className="flex items-center gap-2 cursor-pointer text-slate-300 select-none">
                   <input
                     type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
+                    checked={keepLoggedIn}
+                    onChange={(e) => setKeepLoggedIn(e.target.checked)}
                     className="rounded bg-slate-950 border-slate-700 text-amber-500 focus:ring-amber-500"
                   />
-                  <span>Lembrar meu e-mail</span>
+                  <span>Manter usuário conectado</span>
                 </label>
               </div>
             )}
@@ -527,7 +527,7 @@ export default function AuthScreen({ onGuestLogin }) {
                 </>
               ) : mode === 'login' ? (
                 <>
-                  <span>Entrar no HQ Tracker</span>
+                  <span>Entrar no {APP_NAME}</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               ) : mode === 'register' ? (

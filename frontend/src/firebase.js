@@ -21,7 +21,10 @@ import {
   onAuthStateChanged,
   sendPasswordResetEmail,
   updateProfile,
-  updatePassword
+  updatePassword,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence
 } from 'firebase/auth';
 
 const firebaseConfig = {
@@ -99,6 +102,30 @@ export async function logoutUser() {
   await signOut(auth);
 }
 
+/**
+ * Configuração de Persistência de Autenticação (Manter usuário conectado)
+ */
+export async function setAuthPersistence(keepLoggedIn = true) {
+  if (!auth) return;
+  try {
+    const persistence = keepLoggedIn ? browserLocalPersistence : browserSessionPersistence;
+    await setPersistence(auth, persistence);
+    localStorage.setItem('hq_collections_keep_logged_in', keepLoggedIn ? 'true' : 'false');
+  } catch (err) {
+    console.warn('Erro ao configurar persistência de autenticação:', err.message);
+  }
+}
+
+export function isKeepLoggedIn() {
+  try {
+    const val = localStorage.getItem('hq_collections_keep_logged_in');
+    if (val === null) return true; // Padrão: manter conectado
+    return val === 'true';
+  } catch {
+    return true;
+  }
+}
+
 export async function resetPassword(email) {
   if (!auth) throw new Error("Firebase Auth não inicializado");
   await sendPasswordResetEmail(auth, email);
@@ -152,7 +179,14 @@ function resolveUserAndData(arg1, arg2) {
  */
 function getUserStorageKey(userId) {
   const effectiveId = userId || auth?.currentUser?.uid || 'guest';
-  return `hq_tracker_collections_${effectiveId}`;
+  const newKey = `hq_collections_${effectiveId}`;
+  const oldKey = `hq_tracker_collections_${effectiveId}`;
+  try {
+    if (!localStorage.getItem(newKey) && localStorage.getItem(oldKey)) {
+      localStorage.setItem(newKey, localStorage.getItem(oldKey));
+    }
+  } catch (e) {}
+  return newKey;
 }
 
 /**
@@ -420,7 +454,14 @@ export async function clearUserCollection(userId = null) {
  */
 export function loadUserSettings(userId = null) {
   try {
-    const raw = localStorage.getItem(`hq_tracker_settings_${userId || 'default'}`);
+    const effectiveUser = userId || 'default';
+    const newKey = `hq_collections_settings_${effectiveUser}`;
+    const oldKey = `hq_tracker_settings_${effectiveUser}`;
+    let raw = localStorage.getItem(newKey);
+    if (!raw && localStorage.getItem(oldKey)) {
+      raw = localStorage.getItem(oldKey);
+      localStorage.setItem(newKey, raw);
+    }
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -429,7 +470,8 @@ export function loadUserSettings(userId = null) {
 
 export async function saveUserSettings(userId, settings) {
   try {
-    localStorage.setItem(`hq_tracker_settings_${userId || 'default'}`, JSON.stringify(settings));
+    const effectiveUser = userId || 'default';
+    localStorage.setItem(`hq_collections_settings_${effectiveUser}`, JSON.stringify(settings));
     if (db && isFirebaseInitialized && userId) {
       const docRef = doc(db, 'users', userId, 'settings', 'preferences');
       await setDoc(docRef, {
