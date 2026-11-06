@@ -506,5 +506,13 @@ quero que o personagem principal fique em uma div escrito na vertical (-90°) do
 por fim, quando adiciono uma hq pelo metodo completo quero ter um recurso de fazer busca pelo ISBN tanto digitando quanto escaneando com a camera do celular. ele usará esse ISBN para buscar na internet as informações, dai se é a primeira hq daquele titulo, ele já cria o card e preenche o Tenho daquele numero.
 ```
 
+### Prompt 35
+```text
+/agente-orquestrador /grill-me /goal na busca por isbn o botão buscar e podem ter somente o icone sem texto.
+na tela principal os agrupamento 1..10 devem manter  o padrão de cores das bolinhas e não do card em que estão (assim ficam igual a bolinha Tenho se tiver todos, igual a bolinha de Lido se tiver lido todos e assim por diante.
+quando incluo uma nova hq, já deve rolar a pagina até o card desse hq.
+o nome do heroi principal no lado esquerdo do card esta exibindo só 2 letras, como se estivesse corrtando, melhore essa exibição e já deixe o espaço em todos os cards, mesmo que esteja vazio
+```
+
 
 

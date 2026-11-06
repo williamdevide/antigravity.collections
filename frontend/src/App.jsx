@@ -354,6 +354,7 @@ export default function App() {
 
       const updated = await saveComic(updatedComic);
       setComics(updated);
+      scrollToComic(existingComic.id);
 
       setSeriesToast({
         type: 'success',
@@ -392,6 +393,7 @@ export default function App() {
 
       const updated = await saveComic(newComic);
       setComics(updated);
+      scrollToComic(newComic.id);
 
       setSeriesToast({
         type: 'success',
@@ -635,6 +637,21 @@ export default function App() {
     setNewComicPublisher(PUBLISHERS[nextIndex]);
   };
 
+  // Rolar suavemente a tela até o card da HQ cadastrada ou atualizada com animação de foco
+  const scrollToComic = (comicId) => {
+    if (!comicId) return;
+    setTimeout(() => {
+      const el = document.getElementById(`comic-card-${comicId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('ring-4', 'ring-amber-400', 'ring-offset-2', 'ring-offset-slate-950', 'transition-all', 'duration-500');
+        setTimeout(() => {
+          el.classList.remove('ring-4', 'ring-amber-400', 'ring-offset-2', 'ring-offset-slate-950');
+        }, 2200);
+      }
+    }, 250);
+  };
+
   // Cadastro Rápido de HQ
   const handleAddComic = async (e) => {
     e?.preventDefault();
@@ -676,6 +693,7 @@ export default function App() {
       setComics(updated);
       setNewComicName('');
       setNewComicStartFrom('');
+      scrollToComic(newComic.id);
       inputRef.current?.focus();
     } catch (err) {
       console.error('⚠️ Erro ao adicionar HQ:', err);
@@ -729,6 +747,7 @@ export default function App() {
       setDetailedStartFrom('1');
       setIsbnInput('');
       setIsbnFeedback(null);
+      scrollToComic(newComic.id);
     } catch (err) {
       console.error('⚠️ Erro ao cadastrar HQ detalhada:', err);
     }
@@ -803,6 +822,7 @@ export default function App() {
 
         const updated = await saveComic(newComic);
         setComics(updated);
+        scrollToComic(newComic.id);
         setIsbnFeedback({ 
           type: 'success', 
           message: `Nova HQ "${title}" criada com sucesso! Edição #${issueNum} marcada como "Tenho".` 
@@ -833,6 +853,7 @@ export default function App() {
 
         const updated = await saveComic(updatedComic);
         setComics(updated);
+        scrollToComic(existingComic.id);
         setIsbnFeedback({ 
           type: 'success', 
           message: `HQ existente localizada! Edição #${issueNum} marcada como "Tenho" em "${existingComic.name}".` 
@@ -2374,6 +2395,7 @@ export default function App() {
                 return (
                   <div
                     key={comic.id}
+                    id={`comic-card-${comic.id}`}
                     draggable
                     onDragStart={(e) => handleDragStart(e, index)}
                     onDragOver={(e) => handleDragOver(e, index)}
@@ -2468,6 +2490,7 @@ export default function App() {
             sortedAndFilteredComics.map((comic, index) => (
               <div
                 key={comic.id}
+                id={`comic-card-${comic.id}`}
                 draggable
                 onDragStart={(e) => handleDragStart(e, index)}
                 onDragOver={(e) => handleDragOver(e, index)}
@@ -2546,20 +2569,18 @@ export default function App() {
                   type="button"
                   onClick={() => handleSearchISBN()}
                   disabled={isSearchingIsbn || !isbnInput.trim()}
-                  className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-bold text-xs flex items-center gap-1 transition shrink-0 shadow-sm"
+                  className="w-8 h-8 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-bold text-xs flex items-center justify-center transition shrink-0 shadow-sm"
                   title="Consultar dados da HQ via ISBN"
                 >
-                  {isSearchingIsbn ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
-                  <span>Buscar</span>
+                  {isSearchingIsbn ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4 stroke-[2.5]" />}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowBarcodeScanner(true)}
-                  className="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1 transition shrink-0 shadow-sm"
+                  className="w-8 h-8 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center transition shrink-0 shadow-sm"
                   title="Escanear código de barras com a câmera do celular"
                 >
-                  <Camera className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Câmera</span>
+                  <Camera className="w-4 h-4 stroke-[2.2]" />
                 </button>
               </div>
 
@@ -4037,22 +4058,28 @@ function ComicRow({
 
     return (
       <div className={`border rounded-2xl shadow-md transition overflow-hidden flex flex-row ${getCardThemeClasses(comicType)}`}>
-        {/* Lombada vertical do Personagem Principal (-90°) */}
-        {comic.mainHero ? (
-          <div 
-            className="w-7 sm:w-8 bg-slate-950/85 border-r border-slate-800/80 flex items-center justify-center shrink-0 select-none overflow-hidden relative"
-            title={`Personagem Principal: ${comic.mainHero}`}
-          >
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <span 
-                className="text-[10px] font-black uppercase tracking-widest text-amber-400 whitespace-nowrap truncate max-w-[130px] sm:max-w-[160px]"
-                style={{ transform: 'rotate(-90deg)' }}
-              >
-                {comic.mainHero}
-              </span>
-            </div>
-          </div>
-        ) : null}
+        {/* Lombada vertical do Personagem Principal (-90°) - Unificada e presente em todos os cards */}
+        <div 
+          className="w-8 sm:w-9 bg-slate-950/70 border-r border-slate-800/80 flex items-center justify-center shrink-0 select-none py-2 overflow-hidden relative"
+          title={comic.mainHero ? `Personagem Principal: ${comic.mainHero}` : 'Sem personagem principal definido'}
+        >
+          {comic.mainHero ? (
+            <span 
+              className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-amber-400 select-none text-center whitespace-nowrap block"
+              style={{
+                writingMode: 'vertical-rl',
+                transform: 'rotate(180deg)',
+                maxHeight: '150px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}
+            >
+              {comic.mainHero}
+            </span>
+          ) : (
+            <Shield className="w-3.5 h-3.5 text-slate-800/40" />
+          )}
+        </div>
 
         <div className="flex-1 p-3 sm:p-3.5 space-y-2.5 min-w-0">
           {/* LINHA 1: SOMENTE O TÍTULO */}
@@ -4135,16 +4162,29 @@ function ComicRow({
           </div>
         ) : (
           <>
-            <div className="flex items-center flex-wrap gap-2 pt-1">
-              <button
-                onClick={() => onToggleChunkExpand('completed')}
-                className="flex items-center gap-1.5 bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-600/50 text-emerald-200 text-xs font-bold px-3 py-1.5 rounded-xl transition shadow-sm"
-              >
-                <span>{summaryLabel}</span>
-                <span className="text-[10px] text-emerald-400/80 font-normal">({countIssues} edições)</span>
-                {isExpanded ? <ChevronDown className="w-3 h-3 ml-1" /> : <ChevronRight className="w-3 h-3 ml-1" />}
-              </button>
-            </div>
+            {(() => {
+              const completedNumbers = Array.from({ length: countIssues }, (_, i) => startFrom + i);
+              const readCompletedCount = completedNumbers.filter(n => getStage(n) === 'read').length;
+              const isAllCompletedRead = readCompletedCount === countIssues;
+              const completedBadgeStyle = isAllCompletedRead
+                ? 'bg-amber-500 text-slate-950 font-black border-2 border-cyan-400 shadow-[0_0_14px_rgba(34,211,238,0.95)]'
+                : 'bg-amber-500 text-slate-950 font-black border border-amber-400 shadow-md shadow-amber-500/30';
+
+              return (
+                <div className="flex items-center flex-wrap gap-2 pt-1">
+                  <button
+                    onClick={() => onToggleChunkExpand('completed')}
+                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl transition shadow-sm active:scale-95 ${completedBadgeStyle}`}
+                    title={isAllCompletedRead ? "Minissérie/Coleção Completa e Lida (Igual à Bolinha de Lido)" : "Minissérie/Coleção Completa (Igual à Bolinha de Tenho)"}
+                  >
+                    <Check className="w-3.5 h-3.5 stroke-[3] text-slate-950" />
+                    <span>{summaryLabel}</span>
+                    <span className="text-[10px] text-slate-900/80 font-bold">({countIssues} edições)</span>
+                    {isExpanded ? <ChevronDown className="w-3 h-3 ml-1" /> : <ChevronRight className="w-3 h-3 ml-1" />}
+                  </button>
+                </div>
+              );
+            })()}
 
             {/* Edições expandidas em grid */}
             {isExpanded && (
@@ -4267,20 +4307,20 @@ function ComicRow({
     const isChunkComplete = isAllRead || isAllWishlist || isAllOwned;
     const isManuallyExpanded = expandedChunksSet.has(chunkStart);
 
-    // Se estiver 100% completo e não foi expandido: resume como 01..10
+    // Se estiver 100% completo e não foi expandido: resume como 01..10 com o padrão exato de cores das bolinhas
     if (isChunkComplete && !isManuallyExpanded) {
       let badgeStyle = 'bg-amber-500 text-slate-950 font-black border border-amber-400 shadow-md shadow-amber-500/30';
       let icon = <Check className="w-3.5 h-3.5 stroke-[3] text-slate-950" />;
-      let badgeTitle = 'Todas as edições adquiridas (Tenho) - Toque para expandir';
+      let badgeTitle = 'Todas as edições adquiridas (Igual à Bolinha de Tenho) - Toque para expandir';
 
       if (isAllRead) {
-        badgeStyle = 'bg-slate-900/90 text-cyan-300 font-black border-2 border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.85)]';
-        icon = <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 stroke-[2.5]" />;
-        badgeTitle = 'Todas as edições lidas (Borda Azul Neon) - Toque para expandir';
+        badgeStyle = 'bg-amber-500 text-slate-950 font-black border-2 border-cyan-400 shadow-[0_0_14px_rgba(34,211,238,0.95)]';
+        icon = <Check className="w-3.5 h-3.5 stroke-[3] text-slate-950" />;
+        badgeTitle = 'Todas as edições lidas (Igual à Bolinha de Lido) - Toque para expandir';
       } else if (isAllWishlist) {
-        badgeStyle = 'bg-slate-900/90 text-pink-300 font-bold border-2 border-pink-500 shadow-[0_0_15px_rgba(236,72,153,0.85)]';
+        badgeStyle = 'bg-slate-900 text-pink-300 font-bold border-2 border-pink-500 shadow-[0_0_14px_rgba(236,72,153,0.95)]';
         icon = <Bookmark className="w-3.5 h-3.5 text-pink-400 stroke-[2.5]" />;
-        badgeTitle = 'Todas as edições como Desejo (Borda Pink Neon) - Toque para expandir';
+        badgeTitle = 'Todas as edições como Desejo (Igual à Bolinha de Desejo) - Toque para expandir';
       }
 
       return (
@@ -4405,22 +4445,28 @@ function ComicRow({
 
   return (
     <div className={`border rounded-2xl shadow-md transition overflow-hidden flex flex-row ${getCardThemeClasses(comicType)}`}>
-      {/* Lombada vertical do Personagem Principal (-90°) */}
-      {comic.mainHero ? (
-        <div 
-          className="w-7 sm:w-8 bg-slate-950/85 border-r border-slate-800/80 flex items-center justify-center shrink-0 select-none overflow-hidden relative"
-          title={`Personagem Principal: ${comic.mainHero}`}
-        >
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span 
-              className="text-[10px] font-black uppercase tracking-widest text-amber-400 whitespace-nowrap truncate max-w-[130px] sm:max-w-[160px]"
-              style={{ transform: 'rotate(-90deg)' }}
-            >
-              {comic.mainHero}
-            </span>
-          </div>
-        </div>
-      ) : null}
+      {/* Lombada vertical do Personagem Principal (-90°) - Unificada e presente em todos os cards */}
+      <div 
+        className="w-8 sm:w-9 bg-slate-950/70 border-r border-slate-800/80 flex items-center justify-center shrink-0 select-none py-2 overflow-hidden relative"
+        title={comic.mainHero ? `Personagem Principal: ${comic.mainHero}` : 'Sem personagem principal definido'}
+      >
+        {comic.mainHero ? (
+          <span 
+            className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-amber-400 select-none text-center whitespace-nowrap block"
+            style={{
+              writingMode: 'vertical-rl',
+              transform: 'rotate(180deg)',
+              maxHeight: '150px',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}
+          >
+            {comic.mainHero}
+          </span>
+        ) : (
+          <Shield className="w-3.5 h-3.5 text-slate-800/40" />
+        )}
+      </div>
 
       <div className="flex-1 p-3 sm:p-3.5 space-y-2.5 min-w-0">
         {/* LINHA 1: SOMENTE O TÍTULO */}

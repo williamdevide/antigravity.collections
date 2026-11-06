@@ -212,3 +212,4 @@ export async function searchComicByISBN(rawIsbn) {
     synopsis: result.synopsis
   };
 }
+

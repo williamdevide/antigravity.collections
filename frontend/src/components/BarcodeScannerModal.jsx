@@ -168,3 +168,4 @@ export default function BarcodeScannerModal({ isOpen, onClose, onScanSuccess }) 
     </div>
   );
 }
+

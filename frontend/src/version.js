@@ -1,6 +1,13 @@
 /**
  * Versão e Nome do Sistema
  * Gerenciado automaticamente pelo Agente Orquestrador sob o padrão SemVer (MAJOR.MINOR.PATCH)
+ * v1.11.1: Botões da busca por ISBN com exibição compacta exclusiva por ícones (Buscar e Câmera),
+ *          manutenção estrita das cores originais dos 4 estágios das bolinhas (amarelo sólido para Tenho,
+ *          amarelo com borda azul neon vibrante para Lido, escuro com borda pink neon para Desejo) nos
+ *          agrupamentos 01..10 e de minisséries encerradas independentemente do tema do card, rolagem
+ *          suave automática (smooth scroll) até o card da nova HQ cadastrada ou atualizada com animação
+ *          de anel pulsante, e correção da lombada vertical (-90°) do Herói Principal no lado esquerdo
+ *          do card utilizando writing-mode vertical sem corte de caracteres e espaço fixo unificado em todos os cards.
  * v1.11.0: Substituição integral de marca para 'HQ Collections', Tela de Splash animada com logotipo,
  *          slogan e barra de progresso vinculada ao carregamento completo da coleção, autenticação com
  *          persistência de sessão ('Manter usuário conectado') no login e no perfil, agrupamentos 01..10
@@ -59,4 +66,4 @@
  *         fallback progressivo para edições mais antigas ao rejeitar uma capa.
  */
 export const APP_NAME = 'HQ Collections';
-export const APP_VERSION = '1.11.0';
+export const APP_VERSION = '1.11.1';
