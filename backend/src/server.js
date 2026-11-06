@@ -316,14 +316,16 @@ function getEnglishTitle(title) {
   return title;
 }
 
-function getRelevantWikis(title, publisher) {
+function getRelevantWikis(title, publisher, hero = '') {
   const normTitle = (title || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const normPub = (publisher || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const normHero = (hero || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const wikis = [];
 
   if (normTitle.includes('star') || normTitle.includes('wars') || normTitle.includes('vader') || 
       normTitle.includes('jedi') || normTitle.includes('sith') || normTitle.includes('yoda') || 
-      normTitle.includes('mandalorian') || normTitle.includes('aphra') || normPub.includes('star')) {
+      normTitle.includes('mandalorian') || normTitle.includes('aphra') || normPub.includes('star') ||
+      normHero.includes('vader') || normHero.includes('star wars')) {
     wikis.push('starwars');
   }
 
@@ -332,17 +334,20 @@ function getRelevantWikis(title, publisher) {
       normTitle.includes('flash') || normTitle.includes('lantern') || normTitle.includes('mulher-maravilha') || 
       normTitle.includes('wonder woman') || normTitle.includes('justica') || normTitle.includes('justice') ||
       normTitle.includes('encapotados') || normTitle.includes('trenchcoat') || normTitle.includes('constantine') ||
-      normTitle.includes('hellblazer') || normTitle.includes('sandman') || normTitle.includes('magia')) {
+      normTitle.includes('hellblazer') || normTitle.includes('sandman') || normTitle.includes('magia') ||
+      normHero.includes('batman') || normHero.includes('superman') || normHero.includes('flash') ||
+      normHero.includes('coringa') || normHero.includes('sandman') || normHero.includes('mulher-maravilha')) {
     wikis.push('dc');
   }
 
   if (normPub.includes('image') || normTitle.includes('spawn') || normTitle.includes('invincible') || 
-      normTitle.includes('invencivel') || normTitle.includes('walking dead') || normTitle.includes('saga')) {
+      normTitle.includes('invencivel') || normTitle.includes('walking dead') || normTitle.includes('saga') ||
+      normHero.includes('spawn') || normHero.includes('invencivel')) {
     wikis.push('imagecomics');
   }
 
   if (normPub.includes('dark horse') || normTitle.includes('hellboy') || normTitle.includes('sin city') || 
-      normTitle.includes('conan') || normTitle.includes('umbrella')) {
+      normTitle.includes('conan') || normTitle.includes('umbrella') || normHero.includes('hellboy')) {
     wikis.push('darkhorse');
   }
 
@@ -354,7 +359,9 @@ function getRelevantWikis(title, publisher) {
   if (normPub.includes('marvel') || normTitle.includes('aranha') || normTitle.includes('spider') || 
       normTitle.includes('wolverine') || normTitle.includes('x-men') || normTitle.includes('vingadores') || 
       normTitle.includes('avengers') || normTitle.includes('hulk') || normTitle.includes('thor') || 
-      normTitle.includes('ferro') || normTitle.includes('capitao')) {
+      normTitle.includes('ferro') || normTitle.includes('capitao') || normHero.includes('aranha') ||
+      normHero.includes('spider') || normHero.includes('wolverine') || normHero.includes('x-men') ||
+      normHero.includes('demolidor') || normHero.includes('deadpool') || normHero.includes('vingadores')) {
     wikis.push('marvel');
   }
 
@@ -392,7 +399,7 @@ function getWikiLabel(wiki) {
   }
 }
 
-function scoreCandidate(candidate, cleanTitle, issueNum, prefSeries) {
+function scoreCandidate(candidate, cleanTitle, issueNum, prefSeries, extraMeta = {}) {
   const normCandidate = (candidate.title || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const normComic = (cleanTitle || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const engMapped = getEnglishTitle(cleanTitle).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -443,6 +450,23 @@ function scoreCandidate(candidate, cleanTitle, issueNum, prefSeries) {
   if (prefSeries?.source && itemSrc.includes(prefSeries.source.toLowerCase())) score += 300000;
   if (prefSeries?.year && candidate.year === prefSeries.year) score += 400000;
   if (prefSeries?.volume && candidate.volume === prefSeries.volume) score += 350000;
+
+  // Bônus para correspondência das informações complementares (Herói, Editora e Título da Edição)
+  if (extraMeta) {
+    const heroNorm = (extraMeta.hero || extraMeta.mainHero || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const pubNorm = (extraMeta.brazilPub || extraMeta.brazilPublisher || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const issueTitleNorm = (extraMeta.issueTitle || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    if (heroNorm && (normCandidate.includes(heroNorm) || normComic.includes(heroNorm))) {
+      score += 250000;
+    }
+    if (pubNorm && normCandidate.includes(pubNorm)) {
+      score += 200000;
+    }
+    if (issueTitleNorm && normCandidate.includes(issueTitleNorm)) {
+      score += 350000;
+    }
+  }
 
   return score;
 }
@@ -555,12 +579,12 @@ function searchPaniniBrasil(title, issueNum, rejectedUrls = [], returnAll = fals
  * Busca no Fandom MediaWiki com suporte a Multi-Wiki inteligente (Star Wars, Marvel, DC, Image, Dark Horse, Disney)
  * Prioriza a wiki principal detectada e a série preferencial confirmada
  */
-function searchFandom(title, issueNum, publisher, rejectedUrls = [], returnAll = false, prefYear = null, prefVol = null) {
+function searchFandom(title, issueNum, publisher, rejectedUrls = [], returnAll = false, prefYear = null, prefVol = null, extraMeta = {}) {
   return new Promise(async (resolve) => {
     const cleanTitle = String(title).trim();
     const engTitle = await resolveEnglishTitle(cleanTitle);
     const issueStr = String(issueNum);
-    const wikis = getRelevantWikis(cleanTitle, publisher);
+    const wikis = getRelevantWikis(cleanTitle, publisher, extraMeta.hero || extraMeta.mainHero);
 
     // Variações de títulos (com e sem artigos 'The', 'A', 'An', 'O', 'Os', etc.)
     const titleVariants = new Set();
@@ -585,6 +609,9 @@ function searchFandom(title, issueNum, publisher, rejectedUrls = [], returnAll =
         }
         if (issueStr === '1') {
           directTitles.push(tv.replace(/\s+/g, '_'));
+        }
+        if (extraMeta.issueTitle) {
+          directTitles.push(`${tv.replace(/\s+/g, '_')}_${extraMeta.issueTitle.replace(/\s+/g, '_')}`);
         }
       }
 
@@ -633,6 +660,12 @@ function searchFandom(title, issueNum, publisher, rejectedUrls = [], returnAll =
       // Passo B: Generator search para todas as variações
       const queries = [];
       for (const tv of titleVariants) {
+        if (extraMeta.issueTitle) {
+          queries.push(`${tv} ${extraMeta.issueTitle}`);
+        }
+        if (extraMeta.hero && !tv.toLowerCase().includes(extraMeta.hero.toLowerCase())) {
+          queries.push(`${extraMeta.hero} ${tv} ${issueStr}`);
+        }
         queries.push(`${tv} ${issueStr}`);
         if (issueStr === '1') {
           queries.push(tv);
@@ -688,7 +721,7 @@ function searchFandom(title, issueNum, publisher, rejectedUrls = [], returnAll =
       }
     }
 
-    allCandidates.sort((a, b) => scoreCandidate(b, cleanTitle, issueNum, { year: prefYear, volume: prefVol }) - scoreCandidate(a, cleanTitle, issueNum, { year: prefYear, volume: prefVol }));
+    allCandidates.sort((a, b) => scoreCandidate(b, cleanTitle, issueNum, { year: prefYear, volume: prefVol }, extraMeta) - scoreCandidate(a, cleanTitle, issueNum, { year: prefYear, volume: prefVol }, extraMeta));
     return resolve(returnAll ? allCandidates : (allCandidates[0] || null));
   });
 }
@@ -696,12 +729,41 @@ function searchFandom(title, issueNum, publisher, rejectedUrls = [], returnAll =
 /**
  * Busca no Open Library por títulos em português ou traduzidos em inglês
  */
-function searchOpenLibrary(title, issueNum, rejectedUrls = [], returnAll = false, prefSeries = null) {
+function searchOpenLibrary(title, issueNum, rejectedUrls = [], returnAll = false, prefSeries = null, extraMeta = {}) {
   return new Promise((resolve) => {
     const cleanTitle = String(title).trim();
     const engTitle = getEnglishTitle(cleanTitle);
-    const queries = [cleanTitle];
-    if (engTitle && engTitle !== cleanTitle) queries.push(engTitle);
+    const issueStr = String(issueNum);
+    const hero = extraMeta.hero || extraMeta.mainHero || '';
+    const brazilPub = extraMeta.brazilPub || extraMeta.brazilPublisher || '';
+    const issueTitle = extraMeta.issueTitle || '';
+    const startYear = extraMeta.startYear || '';
+
+    // Consultas combinadas priorizando título da edição, herói e editora brasileira
+    const queries = [];
+    if (issueTitle) {
+      queries.push(`${cleanTitle} ${issueTitle}`);
+      if (brazilPub) queries.push(`${cleanTitle} ${issueTitle} ${brazilPub}`);
+      if (hero) queries.push(`${cleanTitle} ${hero} ${issueTitle}`);
+    }
+    if (hero && !cleanTitle.toLowerCase().includes(hero.toLowerCase())) {
+      queries.push(`${cleanTitle} ${hero} ${issueStr}`);
+      queries.push(`${cleanTitle} ${hero}`);
+    }
+    if (brazilPub) {
+      queries.push(`${cleanTitle} ${brazilPub} ${issueStr}`);
+      queries.push(`${cleanTitle} ${brazilPub}`);
+    }
+    if (startYear) {
+      queries.push(`${cleanTitle} ${startYear} ${issueStr}`);
+    }
+    queries.push(`${cleanTitle} ${issueStr}`);
+    queries.push(cleanTitle);
+    if (engTitle && engTitle !== cleanTitle) {
+      if (hero) queries.push(`${engTitle} ${hero} ${issueStr}`);
+      queries.push(`${engTitle} ${issueStr}`);
+      queries.push(engTitle);
+    }
 
     const candidates = [];
     const seenUrls = new Set();
@@ -741,14 +803,14 @@ function searchOpenLibrary(title, issueNum, rejectedUrls = [], returnAll = false
 
           pending--;
           if (pending === 0) {
-            candidates.sort((a, b) => scoreCandidate(b, cleanTitle, issueNum, prefSeries) - scoreCandidate(a, cleanTitle, issueNum, prefSeries));
+            candidates.sort((a, b) => scoreCandidate(b, cleanTitle, issueNum, prefSeries, extraMeta) - scoreCandidate(a, cleanTitle, issueNum, prefSeries, extraMeta));
             return resolve(returnAll ? candidates : (candidates[0] || null));
           }
         });
       }).on('error', () => {
         pending--;
         if (pending === 0) {
-          candidates.sort((a, b) => scoreCandidate(b, cleanTitle, issueNum, prefSeries) - scoreCandidate(a, cleanTitle, issueNum, prefSeries));
+          candidates.sort((a, b) => scoreCandidate(b, cleanTitle, issueNum, prefSeries, extraMeta) - scoreCandidate(a, cleanTitle, issueNum, prefSeries, extraMeta));
           return resolve(returnAll ? candidates : (candidates[0] || null));
         }
       });
@@ -762,7 +824,7 @@ function searchOpenLibrary(title, issueNum, rejectedUrls = [], returnAll = false
  * e suporte a fallback progressivo caso uma capa tenha sido rejeitada
  */
 app.get('/api/scrape-cover', async (req, res) => {
-  const { title, issue, publisher, rejected, prefYear, prefVol, prefSource } = req.query;
+  const { title, issue, publisher, rejected, prefYear, prefVol, prefSource, hero, brazilPub, issueTitle, startYear } = req.query;
   if (!title) {
     return res.status(400).json({ found: false, message: 'Parâmetro "title" é obrigatório.' });
   }
@@ -770,6 +832,7 @@ app.get('/api/scrape-cover', async (req, res) => {
   const issueNum = issue || '1';
   const cleanTitle = String(title).trim();
   const returnAll = req.query.all === 'true' || req.query.all === '1';
+  const extraMeta = { hero, brazilPub, issueTitle, startYear };
 
   // Parâmetros de série preferencial confirmada
   const parsedPrefYear = prefYear ? parseInt(prefYear, 10) : null;
@@ -786,8 +849,8 @@ app.get('/api/scrape-cover', async (req, res) => {
       // Coleta todas as ocorrências encontradas em todas as fontes (Panini + Fandom Multi-Wiki + OpenLibrary)
       const [paniniList, fandomList, olList] = await Promise.all([
         searchPaniniBrasil(cleanTitle, issueNum, rejectedUrls, true, parsedPrefYear),
-        searchFandom(cleanTitle, issueNum, publisher, rejectedUrls, true, parsedPrefYear, parsedPrefVol),
-        searchOpenLibrary(cleanTitle, issueNum, rejectedUrls, true, { year: parsedPrefYear, volume: parsedPrefVol, source: parsedPrefSource })
+        searchFandom(cleanTitle, issueNum, publisher, rejectedUrls, true, parsedPrefYear, parsedPrefVol, extraMeta),
+        searchOpenLibrary(cleanTitle, issueNum, rejectedUrls, true, { year: parsedPrefYear, volume: parsedPrefVol, source: parsedPrefSource }, extraMeta)
       ]);
 
       const seenUrls = new Set();
@@ -800,7 +863,7 @@ app.get('/api/scrape-cover', async (req, res) => {
         }
       }
 
-      combined.sort((a, b) => scoreCandidate(b, cleanTitle, issueNum, { year: parsedPrefYear, volume: parsedPrefVol, source: parsedPrefSource }) - scoreCandidate(a, cleanTitle, issueNum, { year: parsedPrefYear, volume: parsedPrefVol, source: parsedPrefSource }));
+      combined.sort((a, b) => scoreCandidate(b, cleanTitle, issueNum, { year: parsedPrefYear, volume: parsedPrefVol, source: parsedPrefSource }, extraMeta) - scoreCandidate(a, cleanTitle, issueNum, { year: parsedPrefYear, volume: parsedPrefVol, source: parsedPrefSource }, extraMeta));
 
       return res.json({
         found: combined.length > 0,
@@ -814,7 +877,7 @@ app.get('/api/scrape-cover', async (req, res) => {
 
     // Se o usuário confirmou previamente uma série do Fandom, busca no Fandom primeiro
     if (parsedPrefSource && parsedPrefSource.includes('fandom')) {
-      const fandomResult = await searchFandom(cleanTitle, issueNum, publisher, rejectedUrls, false, parsedPrefYear, parsedPrefVol);
+      const fandomResult = await searchFandom(cleanTitle, issueNum, publisher, rejectedUrls, false, parsedPrefYear, parsedPrefVol, extraMeta);
       if (fandomResult) {
         return res.json({
           found: true,
@@ -852,7 +915,7 @@ app.get('/api/scrape-cover', async (req, res) => {
       }
 
       // 2. Se não encontrar na Panini ou se foi rejeitada, buscar no Fandom (Multi-Wiki inteligente)
-      const fandomResult = await searchFandom(cleanTitle, issueNum, publisher, rejectedUrls, false, parsedPrefYear, parsedPrefVol);
+      const fandomResult = await searchFandom(cleanTitle, issueNum, publisher, rejectedUrls, false, parsedPrefYear, parsedPrefVol, extraMeta);
       if (fandomResult) {
         return res.json({
           found: true,
@@ -865,8 +928,8 @@ app.get('/api/scrape-cover', async (req, res) => {
       }
     }
 
-    // 3. Fallback para OpenLibrary com busca multilíngue e suporte a Graphic Novels
-    const olResult = await searchOpenLibrary(cleanTitle, issueNum, rejectedUrls, false, { year: parsedPrefYear, volume: parsedPrefVol, source: parsedPrefSource });
+    // 3. Fallback para OpenLibrary com busca combinada
+    const olResult = await searchOpenLibrary(cleanTitle, issueNum, rejectedUrls, false, { year: parsedPrefYear, volume: parsedPrefVol, source: parsedPrefSource }, extraMeta);
     if (olResult) {
       return res.json({
         found: true,

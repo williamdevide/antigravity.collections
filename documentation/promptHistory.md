@@ -546,3 +546,10 @@ ao cadastrar buscando pelo isbn com a camera ele diz que encontrou, mas não pre
 
 
 
+### Prompt 41
+```text
+/agente-orquestrador /grill-me /goal preciso de setas para esquerda e direita no carrossel de sugestões também (quando usa pelo pc é melhor ter as setas). 
+quero que quando cadastre uma nova hq (seja pelo isbn ou não) tente buscar  o restante das informações da hq, inclusive acredito que teremos que criar um campo descrição / sinopse no card detalhado.
+também quero que na hora de buscar as capas na internet (fora do site da panini) de preferencia por juntar as outras informações como titulo da edição, editora de venda, heroi principal.
+```
+

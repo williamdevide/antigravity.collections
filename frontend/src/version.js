@@ -1,6 +1,14 @@
 /**
  * Versão e Nome do Sistema
  * Gerenciado automaticamente pelo Agente Orquestrador sob o padrão SemVer (MAJOR.MINOR.PATCH)
+ * v1.14.0: Setas de navegação horizontal (esquerda e direita) nos carrosséis de sugestões de capas
+ *          (otimizado para navegação fluida com mouse no PC no Modal de Detalhes da Edição e no Painel de Status de Capas);
+ *          busca e enriquecimento automático na web de metadados da HQ (Ano de Início, Editora de Venda no Brasil,
+ *          Editora Original, Herói Principal e Sinopse da Obra) tanto no Cadastro Rápido quanto no Cadastro Detalhado;
+ *          novo campo dedicado de Descrição / Sinopse no modelo da HQ com visualização no Card Detalhado da Edição,
+ *          no formulário de Cadastro Detalhado e no Modal de Edição da Coleção (com botão de busca assistida na web);
+ *          e aprimoramento da busca de capas na internet fora da Panini (Open Library e Fandom Multi-Wiki)
+ *          com consultas compostas priorizando o Título da Edição/Arco, a Editora de Venda e o Herói Principal.
  * v1.13.1: Correção de persistência do estágio 'Desejo': remoção de mesclagem recursiva ({ merge: true })
  *          no Firestore que preservava chaves excluídas em issueStates durante dessincronizações em tempo real;
  *          e correção integral da busca/escaneamento por ISBN na inclusão detalhada: mapeamento correto das
@@ -89,4 +97,4 @@
  *         fallback progressivo para edições mais antigas ao rejeitar uma capa.
  */
 export const APP_NAME = 'HQ Collections';
-export const APP_VERSION = '1.13.1';
+export const APP_VERSION = '1.14.0';

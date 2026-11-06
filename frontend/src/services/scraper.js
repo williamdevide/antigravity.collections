@@ -257,14 +257,16 @@ export function getEnglishTitle(title) {
   return title;
 }
 
-export function getRelevantWikis(title, publisher) {
+export function getRelevantWikis(title, publisher, hero = '') {
   const normTitle = (title || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const normPub = (publisher || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const normHero = (hero || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const wikis = [];
 
   if (normTitle.includes('star') || normTitle.includes('wars') || normTitle.includes('vader') || 
       normTitle.includes('jedi') || normTitle.includes('sith') || normTitle.includes('yoda') || 
-      normTitle.includes('mandalorian') || normTitle.includes('aphra') || normPub.includes('star')) {
+      normTitle.includes('mandalorian') || normTitle.includes('aphra') || normPub.includes('star') ||
+      normHero.includes('vader') || normHero.includes('star wars')) {
     wikis.push('starwars');
   }
 
@@ -273,17 +275,20 @@ export function getRelevantWikis(title, publisher) {
       normTitle.includes('flash') || normTitle.includes('lantern') || normTitle.includes('mulher-maravilha') || 
       normTitle.includes('wonder woman') || normTitle.includes('justica') || normTitle.includes('justice') ||
       normTitle.includes('encapotados') || normTitle.includes('trenchcoat') || normTitle.includes('constantine') ||
-      normTitle.includes('hellblazer') || normTitle.includes('sandman') || normTitle.includes('magia')) {
+      normTitle.includes('hellblazer') || normTitle.includes('sandman') || normTitle.includes('magia') ||
+      normHero.includes('batman') || normHero.includes('superman') || normHero.includes('flash') ||
+      normHero.includes('coringa') || normHero.includes('sandman') || normHero.includes('mulher-maravilha')) {
     wikis.push('dc');
   }
 
   if (normPub.includes('image') || normTitle.includes('spawn') || normTitle.includes('invincible') || 
-      normTitle.includes('invencivel') || normTitle.includes('walking dead') || normTitle.includes('saga')) {
+      normTitle.includes('invencivel') || normTitle.includes('walking dead') || normTitle.includes('saga') ||
+      normHero.includes('spawn') || normHero.includes('invencivel')) {
     wikis.push('imagecomics');
   }
 
   if (normPub.includes('dark horse') || normTitle.includes('hellboy') || normTitle.includes('sin city') || 
-      normTitle.includes('conan') || normTitle.includes('umbrella')) {
+      normTitle.includes('conan') || normTitle.includes('umbrella') || normHero.includes('hellboy')) {
     wikis.push('darkhorse');
   }
 
@@ -295,7 +300,9 @@ export function getRelevantWikis(title, publisher) {
   if (normPub.includes('marvel') || normTitle.includes('aranha') || normTitle.includes('spider') || 
       normTitle.includes('wolverine') || normTitle.includes('x-men') || normTitle.includes('vingadores') || 
       normTitle.includes('avengers') || normTitle.includes('hulk') || normTitle.includes('thor') || 
-      normTitle.includes('ferro') || normTitle.includes('capitao')) {
+      normTitle.includes('ferro') || normTitle.includes('capitao') || normHero.includes('aranha') ||
+      normHero.includes('spider') || normHero.includes('wolverine') || normHero.includes('x-men') ||
+      normHero.includes('demolidor') || normHero.includes('deadpool') || normHero.includes('vingadores')) {
     wikis.push('marvel');
   }
 
@@ -333,7 +340,7 @@ export function getWikiLabel(wiki) {
   }
 }
 
-export function scoreCandidate(candidate, cleanTitle, issueNum, prefSeries) {
+export function scoreCandidate(candidate, cleanTitle, issueNum, prefSeries, extraMeta = {}) {
   const normCandidate = (candidate.title || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const normComic = (cleanTitle || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const engMapped = getEnglishTitle(cleanTitle).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -384,6 +391,23 @@ export function scoreCandidate(candidate, cleanTitle, issueNum, prefSeries) {
   if (prefSeries?.source && itemSrc.includes(prefSeries.source.toLowerCase())) score += 300000;
   if (prefSeries?.year && candidate.year === prefSeries.year) score += 400000;
   if (prefSeries?.volume && candidate.volume === prefSeries.volume) score += 350000;
+
+  // Bônus para correspondência das informações enriquecidas (Herói, Editora de Venda e Título da Edição)
+  if (extraMeta) {
+    const heroNorm = (extraMeta.mainHero || extraMeta.hero || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const pubNorm = (extraMeta.brazilPublisher || extraMeta.brazilPub || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const issueTitleNorm = (extraMeta.issueTitle || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    if (heroNorm && (normCandidate.includes(heroNorm) || normComic.includes(heroNorm))) {
+      score += 250000;
+    }
+    if (pubNorm && normCandidate.includes(pubNorm)) {
+      score += 200000;
+    }
+    if (issueTitleNorm && normCandidate.includes(issueTitleNorm)) {
+      score += 350000;
+    }
+  }
 
   return score;
 }
@@ -498,6 +522,13 @@ export async function searchIssueCover(comic, issueNum, rejectedUrls = []) {
   const title = comic.name;
   const publisher = comic.publisher || 'Marvel';
   const issue = String(issueNum);
+  const mainHero = comic.mainHero || '';
+  const brazilPublisher = comic.brazilPublisher || '';
+  const issueTitle = comic.issueTitles?.[issueNum] || '';
+  const startYear = comic.startYear || '';
+
+  const extraMeta = { mainHero, brazilPublisher, issueTitle, startYear };
+  const extraParams = `&hero=${encodeURIComponent(mainHero)}&brazilPub=${encodeURIComponent(brazilPublisher)}&issueTitle=${encodeURIComponent(issueTitle)}&startYear=${encodeURIComponent(startYear)}`;
   const rejectedParam = rejectedUrls.length > 0 ? `&rejected=${encodeURIComponent(rejectedUrls.join(','))}` : '';
 
   // Parâmetros da série confirmada para guiar as outras edições
@@ -509,7 +540,7 @@ export async function searchIssueCover(comic, issueNum, rejectedUrls = []) {
 
   // 1. Tentar primeiro o endpoint relativo /api/scrape-cover (Vercel Serverless / Proxy local)
   try {
-    const relativeUrl = `/api/scrape-cover?title=${encodeURIComponent(title)}&issue=${encodeURIComponent(issue)}&publisher=${encodeURIComponent(publisher)}${rejectedParam}${prefParams}`;
+    const relativeUrl = `/api/scrape-cover?title=${encodeURIComponent(title)}&issue=${encodeURIComponent(issue)}&publisher=${encodeURIComponent(publisher)}${rejectedParam}${prefParams}${extraParams}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4000);
 
@@ -535,7 +566,7 @@ export async function searchIssueCover(comic, issueNum, rejectedUrls = []) {
 
   // 2. Tentar endpoint do backend Express local se estiver ativo na porta 3001
   try {
-    const backendUrl = `http://localhost:3001/api/scrape-cover?title=${encodeURIComponent(title)}&issue=${encodeURIComponent(issue)}&publisher=${encodeURIComponent(publisher)}${rejectedParam}${prefParams}`;
+    const backendUrl = `http://localhost:3001/api/scrape-cover?title=${encodeURIComponent(title)}&issue=${encodeURIComponent(issue)}&publisher=${encodeURIComponent(publisher)}${rejectedParam}${prefParams}${extraParams}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3500);
 
@@ -575,9 +606,9 @@ export async function searchIssueCover(comic, issueNum, rejectedUrls = []) {
     // Prosseguir para Fandom
   }
 
-  // 4. Busca direta no Fandom MediaWiki (Multi-Wiki inteligente)
+  // 4. Busca direta no Fandom MediaWiki (Multi-Wiki inteligente com preferências de Herói e Título de Edição)
   try {
-    const fandomResult = await searchFandomClient(title, issueNum, publisher, rejectedUrls, prefSeries, false);
+    const fandomResult = await searchFandomClient(title, issueNum, publisher, rejectedUrls, prefSeries, false, extraMeta);
     if (fandomResult && fandomResult.coverUrl) {
       return {
         found: true,
@@ -591,9 +622,9 @@ export async function searchIssueCover(comic, issueNum, rejectedUrls = []) {
     console.warn('Fandom client fetch error:', err);
   }
 
-  // 5. Fallback no OpenLibrary
+  // 5. Fallback no OpenLibrary (com consultas combinadas de Herói, Editora e Título da Edição)
   try {
-    const olResult = await searchOpenLibraryClient(title, issueNum, rejectedUrls, prefSeries, false);
+    const olResult = await searchOpenLibraryClient(title, issueNum, rejectedUrls, prefSeries, false, extraMeta);
     if (olResult && olResult.coverUrl) {
       return {
         found: true,
@@ -610,11 +641,11 @@ export async function searchIssueCover(comic, issueNum, rejectedUrls = []) {
   return { found: false, message: 'Nenhuma capa encontrada.' };
 }
 
-export async function searchFandomClient(title, issueNum, publisher, rejectedUrls = [], prefSeries = null, returnAll = false) {
+export async function searchFandomClient(title, issueNum, publisher, rejectedUrls = [], prefSeries = null, returnAll = false, extraMeta = {}) {
   const cleanTitle = String(title).trim();
   const engTitle = await resolveEnglishTitle(cleanTitle);
   const issueStr = String(issueNum);
-  const wikis = getRelevantWikis(cleanTitle, publisher);
+  const wikis = getRelevantWikis(cleanTitle, publisher, extraMeta.mainHero);
 
   // Variações abrangentes de títulos (com e sem artigos 'The', 'A', 'An', 'O', 'Os', etc.)
   const titleVariants = new Set();
@@ -639,6 +670,9 @@ export async function searchFandomClient(title, issueNum, publisher, rejectedUrl
       }
       if (issueStr === '1') {
         directTitles.push(tv.replace(/\s+/g, '_'));
+      }
+      if (extraMeta.issueTitle) {
+        directTitles.push(`${tv.replace(/\s+/g, '_')}_${extraMeta.issueTitle.replace(/\s+/g, '_')}`);
       }
     }
 
@@ -675,6 +709,12 @@ export async function searchFandomClient(title, issueNum, publisher, rejectedUrl
     // Passo B: Generator search para todas as variações
     const queries = [];
     for (const tv of titleVariants) {
+      if (extraMeta.issueTitle) {
+        queries.push(`${tv} ${extraMeta.issueTitle}`);
+      }
+      if (extraMeta.mainHero && !tv.toLowerCase().includes(extraMeta.mainHero.toLowerCase())) {
+        queries.push(`${extraMeta.mainHero} ${tv} ${issueStr}`);
+      }
       queries.push(`${tv} ${issueStr}`);
       if (issueStr === '1') {
         queries.push(tv);
@@ -720,15 +760,44 @@ export async function searchFandomClient(title, issueNum, publisher, rejectedUrl
     }
   }
 
-  allCandidates.sort((a, b) => scoreCandidate(b, cleanTitle, issueNum, prefSeries) - scoreCandidate(a, cleanTitle, issueNum, prefSeries));
+  allCandidates.sort((a, b) => scoreCandidate(b, cleanTitle, issueNum, prefSeries, extraMeta) - scoreCandidate(a, cleanTitle, issueNum, prefSeries, extraMeta));
   return returnAll ? allCandidates : (allCandidates[0] || null);
 }
 
-export async function searchOpenLibraryClient(title, issueNum, rejectedUrls = [], prefSeries = null, returnAll = false) {
+export async function searchOpenLibraryClient(title, issueNum, rejectedUrls = [], prefSeries = null, returnAll = false, extraMeta = {}) {
   const cleanTitle = String(title).trim();
   const engTitle = getEnglishTitle(cleanTitle);
-  const queries = [cleanTitle];
-  if (engTitle && engTitle !== cleanTitle) queries.push(engTitle);
+  const issueStr = String(issueNum);
+  const hero = extraMeta.mainHero || extraMeta.hero || '';
+  const brazilPub = extraMeta.brazilPublisher || extraMeta.brazilPub || '';
+  const issueTitle = extraMeta.issueTitle || '';
+  const startYear = extraMeta.startYear || '';
+
+  // Constrói lista de consultas priorizando combinação de informações (Título da Edição, Herói, Editora de Venda)
+  const queries = [];
+  if (issueTitle) {
+    queries.push(`${cleanTitle} ${issueTitle}`);
+    if (brazilPub) queries.push(`${cleanTitle} ${issueTitle} ${brazilPub}`);
+    if (hero) queries.push(`${cleanTitle} ${hero} ${issueTitle}`);
+  }
+  if (hero && !cleanTitle.toLowerCase().includes(hero.toLowerCase())) {
+    queries.push(`${cleanTitle} ${hero} ${issueStr}`);
+    queries.push(`${cleanTitle} ${hero}`);
+  }
+  if (brazilPub) {
+    queries.push(`${cleanTitle} ${brazilPub} ${issueStr}`);
+    queries.push(`${cleanTitle} ${brazilPub}`);
+  }
+  if (startYear) {
+    queries.push(`${cleanTitle} ${startYear} ${issueStr}`);
+  }
+  queries.push(`${cleanTitle} ${issueStr}`);
+  queries.push(cleanTitle);
+  if (engTitle && engTitle !== cleanTitle) {
+    if (hero) queries.push(`${engTitle} ${hero} ${issueStr}`);
+    queries.push(`${engTitle} ${issueStr}`);
+    queries.push(engTitle);
+  }
 
   const candidates = [];
   const seenUrls = new Set();
@@ -759,7 +828,7 @@ export async function searchOpenLibraryClient(title, issueNum, rejectedUrls = []
     } catch {}
   }
 
-  candidates.sort((a, b) => scoreCandidate(b, cleanTitle, issueNum, prefSeries) - scoreCandidate(a, cleanTitle, issueNum, prefSeries));
+  candidates.sort((a, b) => scoreCandidate(b, cleanTitle, issueNum, prefSeries, extraMeta) - scoreCandidate(a, cleanTitle, issueNum, prefSeries, extraMeta));
   return returnAll ? candidates : (candidates[0] || null);
 }
 
@@ -771,6 +840,13 @@ export async function searchAllIssueCovers(comic, issueNum, rejectedUrls = []) {
   const title = comic.name;
   const publisher = comic.publisher || 'Marvel';
   const issue = String(issueNum);
+  const mainHero = comic.mainHero || '';
+  const brazilPublisher = comic.brazilPublisher || '';
+  const issueTitle = comic.issueTitles?.[issueNum] || '';
+  const startYear = comic.startYear || '';
+
+  const extraMeta = { mainHero, brazilPublisher, issueTitle, startYear };
+  const extraParams = `&hero=${encodeURIComponent(mainHero)}&brazilPub=${encodeURIComponent(brazilPublisher)}&issueTitle=${encodeURIComponent(issueTitle)}&startYear=${encodeURIComponent(startYear)}`;
   const rejectedParam = rejectedUrls.length > 0 ? `&rejected=${encodeURIComponent(rejectedUrls.join(','))}` : '';
 
   // Parâmetros da série confirmada para ordenar todas as ocorrências
@@ -782,7 +858,7 @@ export async function searchAllIssueCovers(comic, issueNum, rejectedUrls = []) {
 
   // 1. Tentar endpoint com all=true (Vercel Serverless / Proxy Vite local)
   try {
-    const url = `/api/scrape-cover?title=${encodeURIComponent(title)}&issue=${encodeURIComponent(issue)}&publisher=${encodeURIComponent(publisher)}&all=true${rejectedParam}${prefParams}`;
+    const url = `/api/scrape-cover?title=${encodeURIComponent(title)}&issue=${encodeURIComponent(issue)}&publisher=${encodeURIComponent(publisher)}&all=true${rejectedParam}${prefParams}${extraParams}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6000);
     const resp = await fetch(url, { signal: controller.signal });
@@ -804,7 +880,7 @@ export async function searchAllIssueCovers(comic, issueNum, rejectedUrls = []) {
 
   // 2. Tentar backend local porta 3001
   try {
-    const backendUrl = `http://localhost:3001/api/scrape-cover?title=${encodeURIComponent(title)}&issue=${encodeURIComponent(issue)}&publisher=${encodeURIComponent(publisher)}&all=true${rejectedParam}${prefParams}`;
+    const backendUrl = `http://localhost:3001/api/scrape-cover?title=${encodeURIComponent(title)}&issue=${encodeURIComponent(issue)}&publisher=${encodeURIComponent(publisher)}&all=true${rejectedParam}${prefParams}${extraParams}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4000);
     const resp = await fetch(backendUrl, { signal: controller.signal });
@@ -828,8 +904,8 @@ export async function searchAllIssueCovers(comic, issueNum, rejectedUrls = []) {
   try {
     const [paniniCandidates, fandomCandidates, olCandidates] = await Promise.all([
       searchPaniniClientSide(title, issueNum, rejectedUrls, true, prefSeries).catch(() => []),
-      searchFandomClient(title, issueNum, publisher, rejectedUrls, prefSeries, true).catch(() => []),
-      searchOpenLibraryClient(title, issueNum, rejectedUrls, prefSeries, true).catch(() => [])
+      searchFandomClient(title, issueNum, publisher, rejectedUrls, prefSeries, true, extraMeta).catch(() => []),
+      searchOpenLibraryClient(title, issueNum, rejectedUrls, prefSeries, true, extraMeta).catch(() => [])
     ]);
 
     const seenUrls = new Set();
@@ -842,7 +918,7 @@ export async function searchAllIssueCovers(comic, issueNum, rejectedUrls = []) {
       }
     }
 
-    combined.sort((a, b) => scoreCandidate(b, title, issueNum, prefSeries) - scoreCandidate(a, title, issueNum, prefSeries));
+    combined.sort((a, b) => scoreCandidate(b, title, issueNum, prefSeries, extraMeta) - scoreCandidate(a, title, issueNum, prefSeries, extraMeta));
 
     if (combined.length > 0) {
       return {

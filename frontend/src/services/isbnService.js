@@ -213,3 +213,135 @@ export async function searchComicByISBN(rawIsbn) {
   };
 }
 
+/**
+ * Busca online informações complementares de uma HQ (Ano, Editora, Herói e Sinopse) a partir do título
+ * Utiliza Google Books e Open Library com timeouts seguros para preenchimento automático
+ */
+export async function fetchComicMetadataOnline(title = '', existingData = {}) {
+  const cleanTitle = String(title).trim();
+  if (!cleanTitle) return null;
+
+  let enriched = {
+    startYear: existingData.startYear || '',
+    brazilPublisher: existingData.brazilPublisher || '',
+    publisher: existingData.publisher || '',
+    mainHero: existingData.mainHero || '',
+    synopsis: existingData.synopsis || existingData.description || '',
+    coverUrl: existingData.coverUrl || null
+  };
+
+  // Se já tiver todos os campos principais preenchidos, não precisa buscar
+  if (enriched.startYear && enriched.brazilPublisher && enriched.mainHero && enriched.synopsis) {
+    return enriched;
+  }
+
+  // 1. Tentar Google Books API
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4500);
+
+    // Busca focada em HQs / Quadrinhos
+    const query = `${cleanTitle} quadrinhos OR comic`;
+    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=5`, {
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.totalItems > 0 && Array.isArray(data.items)) {
+        // Encontrar o item mais relevante
+        for (const item of data.items) {
+          const info = item.volumeInfo || {};
+          const itemTitle = info.title || '';
+          const itemDesc = info.description || '';
+          const fullText = `${itemTitle} ${info.subtitle || ''} ${itemDesc} ${(info.authors || []).join(' ')} ${info.publisher || ''}`;
+
+          // Se encontrar sinopse e ainda não tínhamos
+          if (!enriched.synopsis && itemDesc && itemDesc.length > 20) {
+            // Remove tags HTML se houver
+            enriched.synopsis = itemDesc.replace(/<[^>]*>/g, '').trim();
+          }
+
+          // Se encontrar ano e ainda não tínhamos
+          if (!enriched.startYear && info.publishedDate) {
+            const y = info.publishedDate.substring(0, 4);
+            if (/^\d{4}$/.test(y)) enriched.startYear = y;
+          }
+
+          // Se encontrar editora brasileira e ainda não tínhamos
+          if (!enriched.brazilPublisher && info.publisher) {
+            enriched.brazilPublisher = info.publisher.trim();
+          }
+
+          // Inferir herói se ainda não tínhamos
+          if (!enriched.mainHero) {
+            const hero = inferMainHero(fullText);
+            if (hero) enriched.mainHero = hero;
+          }
+
+          // Inferir editora original (Marvel/DC/etc.) se ainda não tínhamos
+          if (!enriched.publisher || enriched.publisher === 'Outras') {
+            const pub = inferPublisher(fullText);
+            if (pub && pub !== 'Outras') enriched.publisher = pub;
+          }
+
+          // Capa se ainda não tínhamos
+          if (!enriched.coverUrl && (info.imageLinks?.thumbnail || info.imageLinks?.smallThumbnail)) {
+            const gCover = info.imageLinks.thumbnail || info.imageLinks.smallThumbnail;
+            enriched.coverUrl = gCover.replace('http://', 'https://');
+          }
+
+          // Se já completamos todos os metadados, encerra o loop
+          if (enriched.startYear && enriched.brazilPublisher && enriched.mainHero && enriched.synopsis) {
+            break;
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Erro ao consultar metadados no Google Books:', err.message);
+  }
+
+  // 2. Se ainda faltar sinopse ou ano, tentar Open Library API
+  if (!enriched.synopsis || !enriched.startYear || !enriched.mainHero) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4000);
+
+      const olRes = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(cleanTitle)}&limit=5`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+
+      if (olRes.ok) {
+        const olData = await olRes.json();
+        if (olData.docs && olData.docs.length > 0) {
+          const doc = olData.docs[0];
+          if (!enriched.startYear && doc.first_publish_year) {
+            enriched.startYear = String(doc.first_publish_year);
+          }
+          if (!enriched.brazilPublisher && doc.publisher && doc.publisher.length > 0) {
+            enriched.brazilPublisher = doc.publisher[0];
+          }
+          if (!enriched.mainHero) {
+            const textToInfer = `${doc.title || ''} ${(doc.subject || []).join(' ')} ${(doc.author_name || []).join(' ')}`;
+            const hero = inferMainHero(textToInfer);
+            if (hero) enriched.mainHero = hero;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Erro ao consultar Open Library para metadados:', err.message);
+    }
+  }
+
+  // Garantir que a editora original tenha um valor padrão válido se não detectada
+  if (!enriched.publisher) {
+    enriched.publisher = inferPublisher(cleanTitle);
+  }
+
+  return enriched;
+}
+
+

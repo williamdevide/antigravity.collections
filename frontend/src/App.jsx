@@ -51,7 +51,8 @@ import {
   ScanBarcode,
   Paperclip,
   ClipboardPaste,
-  Upload
+  Upload,
+  FileText
 } from 'lucide-react';
 import { 
   subscribeComics, 
@@ -76,7 +77,7 @@ import {
 import { APP_NAME, APP_VERSION } from './version';
 import { searchIssueCover, searchAllIssueCovers } from './services/scraper';
 import { parseVoiceComicCommand } from './services/voiceParser';
-import { cleanISBN, searchComicByISBN } from './services/isbnService';
+import { cleanISBN, searchComicByISBN, fetchComicMetadataOnline } from './services/isbnService';
 import AuthScreen from './components/AuthScreen';
 import DrawerMenu from './components/DrawerMenu';
 import ProfileModal from './components/ProfileModal';
@@ -136,8 +137,10 @@ export default function App() {
   const [detailedStartYear, setDetailedStartYear] = useState('');
   const [detailedBrazilPublisher, setDetailedBrazilPublisher] = useState('');
   const [detailedMainHero, setDetailedMainHero] = useState('');
+  const [detailedSynopsis, setDetailedSynopsis] = useState('');
   const [detailedCoverUrl, setDetailedCoverUrl] = useState(null);
   const [detailedAutoOwnedIssue, setDetailedAutoOwnedIssue] = useState(null);
+  const [isEnrichingDetailed, setIsEnrichingDetailed] = useState(false);
 
   // Recursos de Busca por ISBN e Escaneamento por Câmera
   const [isbnInput, setIsbnInput] = useState('');
@@ -177,6 +180,8 @@ export default function App() {
   const [editStartYearInput, setEditStartYearInput] = useState('');
   const [editBrazilPublisherInput, setEditBrazilPublisherInput] = useState('');
   const [editMainHeroInput, setEditMainHeroInput] = useState('');
+  const [editSynopsisInput, setEditSynopsisInput] = useState('');
+  const [isEnrichingEdit, setIsEnrichingEdit] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   // Modal de Consulta de Detalhes da Edição (Modo Consulta com Visual Ampliado)
@@ -696,6 +701,7 @@ export default function App() {
         startYear: '',
         brazilPublisher: '',
         mainHero: '',
+        synopsis: '',
         createdAt: new Date().toISOString()
       };
 
@@ -705,6 +711,25 @@ export default function App() {
       setNewComicStartFrom('');
       scrollToComic(newComic.id);
       inputRef.current?.focus();
+
+      // Busca assíncrona na web para enriquecer dados da nova HQ (Ano, Editora, Herói e Sinopse)
+      fetchComicMetadataOnline(trimmed, newComic).then(async (meta) => {
+        if (!meta) return;
+        const freshComic = (await loadFromLocalStorage())?.find(c => c.id === newComic.id) || newComic;
+        let changed = false;
+        const enriched = { ...freshComic };
+
+        if (!enriched.startYear && meta.startYear) { enriched.startYear = meta.startYear; changed = true; }
+        if (!enriched.brazilPublisher && meta.brazilPublisher) { enriched.brazilPublisher = meta.brazilPublisher; changed = true; }
+        if ((!enriched.mainHero || enriched.mainHero === '') && meta.mainHero) { enriched.mainHero = meta.mainHero; changed = true; }
+        if ((!enriched.publisher || enriched.publisher === 'Outras') && meta.publisher && meta.publisher !== 'Outras') { enriched.publisher = meta.publisher; changed = true; }
+        if (!enriched.synopsis && meta.synopsis) { enriched.synopsis = meta.synopsis; changed = true; }
+
+        if (changed) {
+          const reSaved = await saveComic(enriched);
+          setComics(reSaved);
+        }
+      }).catch(err => console.warn('Erro ao enriquecer metadados automaticamente:', err));
     } catch (err) {
       console.error('⚠️ Erro ao adicionar HQ:', err);
     }
@@ -715,11 +740,47 @@ export default function App() {
     setDetailedStartYear('');
     setDetailedBrazilPublisher('');
     setDetailedMainHero('');
+    setDetailedSynopsis('');
     setDetailedStartFrom('1');
     setDetailedCoverUrl(null);
     setDetailedAutoOwnedIssue(null);
     setIsbnInput('');
     setIsbnFeedback(null);
+  };
+
+  // Busca assistida de metadados para o formulário de inclusão detalhada
+  const handleEnrichDetailedForm = async () => {
+    const trimmed = detailedName.trim();
+    if (!trimmed) {
+      setIsbnFeedback({ type: 'error', message: 'Digite o nome da HQ primeiro para buscar os dados.' });
+      return;
+    }
+    setIsEnrichingDetailed(true);
+    setIsbnFeedback(null);
+    try {
+      const meta = await fetchComicMetadataOnline(trimmed, {
+        startYear: detailedStartYear,
+        brazilPublisher: detailedBrazilPublisher,
+        publisher: detailedPublisher,
+        mainHero: detailedMainHero,
+        synopsis: detailedSynopsis
+      });
+      if (meta) {
+        if (meta.startYear && !detailedStartYear) setDetailedStartYear(meta.startYear);
+        if (meta.brazilPublisher && !detailedBrazilPublisher) setDetailedBrazilPublisher(meta.brazilPublisher);
+        if (meta.mainHero && !detailedMainHero) setDetailedMainHero(meta.mainHero);
+        if (meta.publisher && (!detailedPublisher || detailedPublisher === 'Outras')) setDetailedPublisher(meta.publisher);
+        if (meta.synopsis && !detailedSynopsis) setDetailedSynopsis(meta.synopsis);
+        if (meta.coverUrl && !detailedCoverUrl) setDetailedCoverUrl(meta.coverUrl);
+        setIsbnFeedback({ type: 'success', message: 'Informações complementares localizadas na internet! Revise os campos preenchidos.' });
+      } else {
+        setIsbnFeedback({ type: 'error', message: 'Não encontramos dados adicionais para este título na web.' });
+      }
+    } catch {
+      setIsbnFeedback({ type: 'error', message: 'Falha ao buscar dados na internet.' });
+    } finally {
+      setIsEnrichingDetailed(false);
+    }
   };
 
   // Cadastro Detalhado de HQ (com confirmação explícita na tela)
@@ -781,6 +842,7 @@ export default function App() {
         startYear: detailedStartYear.trim(),
         brazilPublisher: detailedBrazilPublisher.trim(),
         mainHero: detailedMainHero.trim(),
+        synopsis: detailedSynopsis.trim(),
         ownedNumbers: initialOwned,
         issueStates: initialStates,
         issueCovers: initialCovers,
@@ -799,6 +861,26 @@ export default function App() {
       setShowDetailedAddModal(false);
       resetDetailedForm();
       scrollToComic(newComic.id);
+
+      // Se ficaram campos vazios, tenta buscar na web em segundo plano
+      if (!newComic.startYear || !newComic.brazilPublisher || !newComic.mainHero || !newComic.synopsis) {
+        fetchComicMetadataOnline(trimmed, newComic).then(async (meta) => {
+          if (!meta) return;
+          const fresh = (await loadFromLocalStorage())?.find(c => c.id === newComic.id) || newComic;
+          let changed = false;
+          const enriched = { ...fresh };
+
+          if (!enriched.startYear && meta.startYear) { enriched.startYear = meta.startYear; changed = true; }
+          if (!enriched.brazilPublisher && meta.brazilPublisher) { enriched.brazilPublisher = meta.brazilPublisher; changed = true; }
+          if (!enriched.mainHero && meta.mainHero) { enriched.mainHero = meta.mainHero; changed = true; }
+          if (!enriched.synopsis && meta.synopsis) { enriched.synopsis = meta.synopsis; changed = true; }
+
+          if (changed) {
+            const reSaved = await saveComic(enriched);
+            setComics(reSaved);
+          }
+        }).catch(err => console.warn('Erro ao enriquecer após cadastro:', err));
+      }
     } catch (err) {
       console.error('⚠️ Erro ao cadastrar HQ detalhada:', err);
     }
@@ -832,19 +914,21 @@ export default function App() {
       const hero = data.mainHero || '';
       const issueNum = data.issueNum || data.issueNumber || 1;
       const coverUrl = data.coverUrl || null;
+      const synopsis = data.synopsis || '';
 
       if (title) setDetailedName(title);
       if (year) setDetailedStartYear(year);
       if (publisherBR) setDetailedBrazilPublisher(publisherBR);
       if (originalPublisher) setDetailedPublisher(originalPublisher);
       if (hero) setDetailedMainHero(hero);
+      if (synopsis) setDetailedSynopsis(synopsis);
       setDetailedStartFrom(String(issueNum));
       if (coverUrl) setDetailedCoverUrl(coverUrl);
       setDetailedAutoOwnedIssue(issueNum);
 
       setIsbnFeedback({ 
         type: 'success', 
-        message: `HQ localizada: "${title}" (Edição #${issueNum})! Os campos foram preenchidos abaixo. Revise as informações e clique em "Cadastrar HQ" para confirmar.` 
+        message: `HQ localizada: "${title}" (Edição #${issueNum})! Os campos e a sinopse foram preenchidos abaixo. Revise as informações e clique em "Cadastrar HQ" para confirmar.` 
       });
     } catch (err) {
       console.warn('Erro ao consultar ISBN:', err);
@@ -1714,6 +1798,34 @@ export default function App() {
     setEditStartYearInput(comic.startYear || '');
     setEditBrazilPublisherInput(comic.brazilPublisher || '');
     setEditMainHeroInput(comic.mainHero || '');
+    setEditSynopsisInput(comic.synopsis || comic.description || '');
+  };
+
+  // Busca assistida de metadados para o modal de edição
+  const handleEnrichEditForm = async () => {
+    const trimmed = editNameInput.trim();
+    if (!trimmed) return;
+    setIsEnrichingEdit(true);
+    try {
+      const meta = await fetchComicMetadataOnline(trimmed, {
+        startYear: editStartYearInput,
+        brazilPublisher: editBrazilPublisherInput,
+        publisher: editPublisherInput,
+        mainHero: editMainHeroInput,
+        synopsis: editSynopsisInput
+      });
+      if (meta) {
+        if (meta.startYear && !editStartYearInput) setEditStartYearInput(meta.startYear);
+        if (meta.brazilPublisher && !editBrazilPublisherInput) setEditBrazilPublisherInput(meta.brazilPublisher);
+        if (meta.mainHero && !editMainHeroInput) setEditMainHeroInput(meta.mainHero);
+        if (meta.publisher && (!editPublisherInput || editPublisherInput === 'Outras')) setEditPublisherInput(meta.publisher);
+        if (meta.synopsis && !editSynopsisInput) setEditSynopsisInput(meta.synopsis);
+      }
+    } catch (err) {
+      console.warn('Erro ao buscar dados na edição:', err);
+    } finally {
+      setIsEnrichingEdit(false);
+    }
   };
 
   // Salvar alteração no modal de edição
@@ -1732,7 +1844,8 @@ export default function App() {
       startFrom,
       startYear: editStartYearInput.trim(),
       brazilPublisher: editBrazilPublisherInput.trim(),
-      mainHero: editMainHeroInput.trim()
+      mainHero: editMainHeroInput.trim(),
+      synopsis: editSynopsisInput.trim()
     };
 
     const updated = await saveComic(updatedComic);
@@ -2897,7 +3010,19 @@ export default function App() {
 
             <form onSubmit={handleDetailedAddSubmit} className="space-y-3">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-300">Nome da HQ *</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-300">Nome da HQ *</label>
+                  <button
+                    type="button"
+                    onClick={handleEnrichDetailedForm}
+                    disabled={isEnrichingDetailed || !detailedName.trim()}
+                    className="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1 transition disabled:opacity-40"
+                    title="Buscar ano, editora, herói e sinopse na internet"
+                  >
+                    <Sparkles className={`w-3 h-3 ${isEnrichingDetailed ? 'animate-spin' : ''}`} />
+                    <span>{isEnrichingDetailed ? 'Buscando...' : 'Buscar Dados'}</span>
+                  </button>
+                </div>
                 <input
                   type="text"
                   required
@@ -2984,6 +3109,19 @@ export default function App() {
                   onChange={(e) => setDetailedMainHero(e.target.value)}
                   placeholder="Ex: Demolidor, Batman, X-Men..."
                   className="w-full bg-slate-900 text-white px-3.5 py-2 rounded-xl border border-slate-700 text-sm focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-indigo-400" /> Descrição / Sinopse
+                </label>
+                <textarea
+                  rows={3}
+                  value={detailedSynopsis}
+                  onChange={(e) => setDetailedSynopsis(e.target.value)}
+                  placeholder="Resumo ou sinopse da história da HQ (preenchido automaticamente na busca)..."
+                  className="w-full bg-slate-900 text-white px-3.5 py-2 rounded-xl border border-slate-700 text-xs focus:outline-none focus:border-indigo-500 custom-scrollbar resize-none"
                 />
               </div>
 
@@ -3349,52 +3487,85 @@ export default function App() {
                       <span className="text-xs">Buscando edições na Panini e acervos web...</span>
                     </div>
                   ) : candidates.length > 0 ? (
-                    <div className="flex items-stretch gap-2.5 overflow-x-auto pb-2 pt-1 custom-scrollbar snap-x">
-                      {candidates.map((cand, cIdx) => {
-                        const isCurrentActive = currentPendingUrl === cand.coverUrl || currentFixedUrl === cand.coverUrl;
+                    <div className="relative group/carousel">
+                      {/* Seta para Rolar para Esquerda */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const el = document.getElementById(`alts-carousel-${viewingIssueDetail.comic.id}-${viewingIssueDetail.issueNum}`);
+                          if (el) el.scrollBy({ left: -240, behavior: 'smooth' });
+                        }}
+                        className="flex absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 z-20 w-8 h-8 rounded-full bg-slate-900/95 border border-slate-700 text-amber-400 hover:text-white hover:bg-slate-800 shadow-xl items-center justify-center transition-all opacity-85 hover:opacity-100 hover:scale-110 cursor-pointer"
+                        title="Rolar sugestões para a esquerda"
+                        aria-label="Rolar para esquerda"
+                      >
+                        <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
+                      </button>
 
-                        return (
-                          <button
-                            key={`${cand.coverUrl}_${cIdx}`}
-                            type="button"
-                            onClick={() => handleSelectAlternative(viewingIssueDetail.comic.id, viewingIssueDetail.issueNum, cand)}
-                            className={`flex-shrink-0 w-24 sm:w-28 text-left rounded-xl p-1.5 transition border flex flex-col gap-1.5 relative group snap-start cursor-pointer active:scale-95 ${
-                              isCurrentActive
-                                ? 'bg-amber-950/40 border-amber-400 ring-2 ring-amber-400/50 shadow-lg'
-                                : 'bg-slate-950/90 border-slate-800 hover:border-amber-400/60 hover:bg-slate-900'
-                            }`}
-                            title={`Selecionar: ${cand.title || 'Capa'} (${cand.year || ''})`}
-                          >
-                            <div className="w-full aspect-[2/3] rounded-lg overflow-hidden bg-slate-900 border border-slate-800 relative">
-                              <img
-                                src={cand.coverUrl}
-                                alt={cand.title || 'Capa'}
-                                className="w-full h-full object-cover transition group-hover:scale-105"
-                                loading="lazy"
-                              />
-                              {isCurrentActive && (
-                                <div className="absolute top-1 right-1 bg-amber-500 text-slate-950 p-1 rounded-full shadow-md font-bold">
-                                  <Check className="w-3 h-3 stroke-[3]" />
-                                </div>
-                              )}
-                              {cand.year && (
-                                <div className="absolute bottom-1 left-1 bg-black/80 backdrop-blur-sm text-[9px] font-bold text-white px-1.5 py-0.5 rounded border border-white/20">
-                                  {cand.year}
-                                </div>
-                              )}
-                            </div>
+                      <div 
+                        id={`alts-carousel-${viewingIssueDetail.comic.id}-${viewingIssueDetail.issueNum}`}
+                        className="flex items-stretch gap-2.5 overflow-x-auto pb-2 pt-1 custom-scrollbar snap-x scroll-smooth px-1"
+                      >
+                        {candidates.map((cand, cIdx) => {
+                          const isCurrentActive = currentPendingUrl === cand.coverUrl || currentFixedUrl === cand.coverUrl;
 
-                            <div className="space-y-0.5 w-full overflow-hidden">
-                              <p className="text-[10px] font-bold text-slate-200 truncate" title={cand.title}>
-                                {cand.title || `Edição #${viewingIssueDetail.issueNum}`}
-                              </p>
-                              <p className="text-[9px] text-slate-400 truncate" title={cand.source}>
-                                {cand.source || 'Panini / Web'}
-                              </p>
-                            </div>
-                          </button>
-                        );
-                      })}
+                          return (
+                            <button
+                              key={`${cand.coverUrl}_${cIdx}`}
+                              type="button"
+                              onClick={() => handleSelectAlternative(viewingIssueDetail.comic.id, viewingIssueDetail.issueNum, cand)}
+                              className={`flex-shrink-0 w-24 sm:w-28 text-left rounded-xl p-1.5 transition border flex flex-col gap-1.5 relative group snap-start cursor-pointer active:scale-95 ${
+                                isCurrentActive
+                                  ? 'bg-amber-950/40 border-amber-400 ring-2 ring-amber-400/50 shadow-lg'
+                                  : 'bg-slate-950/90 border-slate-800 hover:border-amber-400/60 hover:bg-slate-900'
+                              }`}
+                              title={`Selecionar: ${cand.title || 'Capa'} (${cand.year || ''})`}
+                            >
+                              <div className="w-full aspect-[2/3] rounded-lg overflow-hidden bg-slate-900 border border-slate-800 relative">
+                                <img
+                                  src={cand.coverUrl}
+                                  alt={cand.title || 'Capa'}
+                                  className="w-full h-full object-cover transition group-hover:scale-105"
+                                  loading="lazy"
+                                />
+                                {isCurrentActive && (
+                                  <div className="absolute top-1 right-1 bg-amber-500 text-slate-950 p-1 rounded-full shadow-md font-bold">
+                                    <Check className="w-3 h-3 stroke-[3]" />
+                                  </div>
+                                )}
+                                {cand.year && (
+                                  <div className="absolute bottom-1 left-1 bg-black/80 backdrop-blur-sm text-[9px] font-bold text-white px-1.5 py-0.5 rounded border border-white/20">
+                                    {cand.year}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="space-y-0.5 w-full overflow-hidden">
+                                <p className="text-[10px] font-bold text-slate-200 truncate" title={cand.title}>
+                                  {cand.title || `Edição #${viewingIssueDetail.issueNum}`}
+                                </p>
+                                <p className="text-[9px] text-slate-400 truncate" title={cand.source}>
+                                  {cand.source || 'Panini / Web'}
+                                </p>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Seta para Rolar para Direita */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const el = document.getElementById(`alts-carousel-${viewingIssueDetail.comic.id}-${viewingIssueDetail.issueNum}`);
+                          if (el) el.scrollBy({ left: 240, behavior: 'smooth' });
+                        }}
+                        className="flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 z-20 w-8 h-8 rounded-full bg-slate-900/95 border border-slate-700 text-amber-400 hover:text-white hover:bg-slate-800 shadow-xl items-center justify-center transition-all opacity-85 hover:opacity-100 hover:scale-110 cursor-pointer"
+                        title="Rolar sugestões para a direita"
+                        aria-label="Rolar para direita"
+                      >
+                        <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+                      </button>
                     </div>
                   ) : (
                     <div className="py-3.5 px-3 bg-slate-950/50 rounded-xl border border-dashed border-slate-800 text-center space-y-1">
@@ -3434,6 +3605,17 @@ export default function App() {
                   </span>
                 </div>
               </div>
+            </div>
+
+            {/* Sinopse / Descrição da HQ */}
+            <div className="bg-slate-900/60 rounded-xl p-3 border border-slate-800 space-y-1.5 text-xs text-left">
+              <span className="text-slate-400 block text-[10px] font-semibold uppercase tracking-wider flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-cyan-400" />
+                Descrição / Sinopse:
+              </span>
+              <p className="text-slate-300 text-[11px] leading-relaxed max-h-32 overflow-y-auto custom-scrollbar italic bg-slate-950/40 p-2.5 rounded-lg border border-slate-800/60">
+                {viewingIssueDetail.comic.synopsis || viewingIssueDetail.comic.description || 'Nenhuma sinopse cadastrada para esta obra.'}
+              </p>
             </div>
 
             <div className="pt-1">
@@ -3741,6 +3923,31 @@ export default function App() {
                   onChange={(e) => setEditMainHeroInput(e.target.value)}
                   placeholder="Ex: Demolidor, Batman, X-Men..."
                   className="w-full bg-slate-900 text-white px-3.5 py-2 rounded-xl border border-slate-700 text-sm focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-amber-400" /> Descrição / Sinopse
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleEnrichEditForm}
+                    disabled={isEnrichingEdit || !editNameInput.trim()}
+                    className="text-[11px] text-amber-400 hover:text-amber-300 font-medium flex items-center gap-1 transition disabled:opacity-40"
+                    title="Buscar sinopse e dados na internet"
+                  >
+                    <Sparkles className={`w-3 h-3 ${isEnrichingEdit ? 'animate-spin' : ''}`} />
+                    <span>{isEnrichingEdit ? 'Buscando...' : 'Buscar na Web'}</span>
+                  </button>
+                </div>
+                <textarea
+                  rows={3}
+                  value={editSynopsisInput}
+                  onChange={(e) => setEditSynopsisInput(e.target.value)}
+                  placeholder="Resumo da história ou sinopse da obra..."
+                  className="w-full bg-slate-900 text-white px-3.5 py-2 rounded-xl border border-slate-700 text-xs focus:outline-none focus:border-amber-500 custom-scrollbar resize-none"
                 />
               </div>
             </div>
@@ -4268,50 +4475,81 @@ export default function App() {
                               <span>Buscando todas as edições na Panini Brasil e Web...</span>
                             </div>
                           ) : (altState?.candidates || []).length > 0 ? (
-                            <div className="flex gap-2.5 overflow-x-auto pb-2 pt-1 px-0.5 scrollbar-thin">
-                              {altState.candidates.map((cand, cIdx) => {
-                                const isCurrentSelected = item.coverUrl === cand.coverUrl;
-                                return (
-                                  <button
-                                    key={`${cand.coverUrl}_${cIdx}`}
-                                    type="button"
-                                    onClick={() => handleSelectAlternative(item.comicId, item.issueNum, cand)}
-                                    className={`flex-shrink-0 w-24 sm:w-28 text-left rounded-xl p-1.5 transition border flex flex-col gap-1.5 relative group ${
-                                      isCurrentSelected
-                                        ? 'bg-amber-950/40 border-amber-400 ring-2 ring-amber-400/40 shadow-lg'
-                                        : 'bg-slate-900/90 border-slate-800 hover:border-amber-400/60 hover:bg-slate-850'
-                                    }`}
-                                    title="Clique para definir esta capa como sugestão pendente"
-                                  >
-                                    <div className="w-full aspect-[2/3] rounded-lg overflow-hidden bg-slate-950 relative border border-slate-800/80">
-                                      <img
-                                        src={cand.coverUrl}
-                                        alt={cand.title || `Opção ${cIdx + 1}`}
-                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                        loading="lazy"
-                                      />
-                                      {isCurrentSelected && (
-                                        <div className="absolute top-1 right-1 bg-amber-500 text-slate-950 rounded p-0.5 shadow">
-                                          <Check className="w-3 h-3 stroke-[3]" />
-                                        </div>
-                                      )}
-                                      {cand.year && (
-                                        <div className="absolute bottom-1 left-1 bg-black/85 backdrop-blur-sm px-1.5 py-0.2 rounded text-[9px] font-mono font-bold text-amber-300 border border-white/10">
-                                          {cand.year}
-                                        </div>
-                                      )}
-                                    </div>
-                                    <div className="w-full text-[10px] leading-tight">
-                                      <div className="font-semibold text-slate-200 truncate" title={cand.title}>
-                                        {cand.title || `Opção #${cIdx + 1}`}
+                            <div className="relative group/statuscarousel">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const el = document.getElementById(`alts-status-${itemKey}`);
+                                  if (el) el.scrollBy({ left: -220, behavior: 'smooth' });
+                                }}
+                                className="flex absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 z-20 w-7 h-7 rounded-full bg-slate-900/95 border border-slate-700 text-amber-400 hover:text-white hover:bg-slate-800 shadow-xl items-center justify-center transition-all opacity-85 hover:opacity-100 hover:scale-110 cursor-pointer"
+                                title="Rolar sugestões para a esquerda"
+                                aria-label="Rolar para esquerda"
+                              >
+                                <ChevronLeft className="w-4 h-4 stroke-[2.5]" />
+                              </button>
+
+                              <div 
+                                id={`alts-status-${itemKey}`}
+                                className="flex gap-2.5 overflow-x-auto pb-2 pt-1 px-1 scrollbar-thin scroll-smooth"
+                              >
+                                {altState.candidates.map((cand, cIdx) => {
+                                  const isCurrentSelected = item.coverUrl === cand.coverUrl;
+                                  return (
+                                    <button
+                                      key={`${cand.coverUrl}_${cIdx}`}
+                                      type="button"
+                                      onClick={() => handleSelectAlternative(item.comicId, item.issueNum, cand)}
+                                      className={`flex-shrink-0 w-24 sm:w-28 text-left rounded-xl p-1.5 transition border flex flex-col gap-1.5 relative group ${
+                                        isCurrentSelected
+                                          ? 'bg-amber-950/40 border-amber-400 ring-2 ring-amber-400/40 shadow-lg'
+                                          : 'bg-slate-900/90 border-slate-800 hover:border-amber-400/60 hover:bg-slate-850'
+                                      }`}
+                                      title="Clique para definir esta capa como sugestão pendente"
+                                    >
+                                      <div className="w-full aspect-[2/3] rounded-lg overflow-hidden bg-slate-950 relative border border-slate-800/80">
+                                        <img
+                                          src={cand.coverUrl}
+                                          alt={cand.title || `Opção ${cIdx + 1}`}
+                                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                          loading="lazy"
+                                        />
+                                        {isCurrentSelected && (
+                                          <div className="absolute top-1 right-1 bg-amber-500 text-slate-950 rounded p-0.5 shadow">
+                                            <Check className="w-3 h-3 stroke-[3]" />
+                                          </div>
+                                        )}
+                                        {cand.year && (
+                                          <div className="absolute bottom-1 left-1 bg-black/85 backdrop-blur-sm px-1.5 py-0.2 rounded text-[9px] font-mono font-bold text-amber-300 border border-white/10">
+                                            {cand.year}
+                                          </div>
+                                        )}
                                       </div>
-                                      <div className="text-[9px] text-slate-400 truncate mt-0.5" title={cand.source}>
-                                        {cand.source || 'Web'}
+                                      <div className="w-full text-[10px] leading-tight">
+                                        <div className="font-semibold text-slate-200 truncate" title={cand.title}>
+                                          {cand.title || `Opção #${cIdx + 1}`}
+                                        </div>
+                                        <div className="text-[9px] text-slate-400 truncate mt-0.5" title={cand.source}>
+                                          {cand.source || 'Web'}
+                                        </div>
                                       </div>
-                                    </div>
-                                  </button>
-                                );
-                              })}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const el = document.getElementById(`alts-status-${itemKey}`);
+                                  if (el) el.scrollBy({ left: 220, behavior: 'smooth' });
+                                }}
+                                className="flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 z-20 w-7 h-7 rounded-full bg-slate-900/95 border border-slate-700 text-amber-400 hover:text-white hover:bg-slate-800 shadow-xl items-center justify-center transition-all opacity-85 hover:opacity-100 hover:scale-110 cursor-pointer"
+                                title="Rolar sugestões para a direita"
+                                aria-label="Rolar para direita"
+                              >
+                                <ChevronRight className="w-4 h-4 stroke-[2.5]" />
+                              </button>
                             </div>
                           ) : (
                             <div className="py-4 text-center text-slate-500 text-xs bg-slate-950/40 rounded-xl border border-slate-800/60">

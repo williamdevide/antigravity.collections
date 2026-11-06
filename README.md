@@ -1,9 +1,9 @@
 <div align="center">
 
-# 📚 HQs Collections `v1.13.1` - Mobile First Collection Manager
+# 📚 HQs Collections `v1.14.0` - Mobile First Collection Manager
 ### *Gerenciador Ágil de Coleções de Quadrinhos e Minisséries*
 
-[![Version](https://img.shields.io/badge/version-1.13.1-amber?style=for-the-badge&logo=semver&logoColor=white)](#)
+[![Version](https://img.shields.io/badge/version-1.14.0-amber?style=for-the-badge&logo=semver&logoColor=white)](#)
 [![Powered by Antigravity](https://img.shields.io/badge/Powered%20by-Google%20Antigravity-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://deepmind.google/technologies/antigravity/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
@@ -22,10 +22,14 @@
 ## 🇺🇸 English
 
 ### 🎯 Overview
-**HQs Collections** (v1.13.1) is an ultra-fast, mobile-first web application designed for comic book readers and collectors to track monthly publications, collections, and miniseries in a single streamlined screen.
+**HQs Collections** (v1.14.0) is an ultra-fast, mobile-first web application designed for comic book readers and collectors to track monthly publications, collections, and miniseries in a single streamlined screen.
 
-### ✨ Key Features & Improvements in `v1.13.1`
-- **Wishlist Issue Deselection & Sync Fix:** Resolved issue where deselected wishlist items would automatically reappear due to Firestore `{ merge: true }` retaining missing map keys. Document replacement now guarantees clean deletion of unset issue states.
+### ✨ Key Features & Improvements in `v1.14.0`
+- **Horizontal Carousel Navigation Arrows (PC / Desktop):** Left and right chevron buttons (`ChevronLeft` / `ChevronRight`) added to both the Edition Detail Modal alternative suggestions and the Cover Search Status panel, providing mouse users on PC smooth, instant horizontal scrolling without needing touch swipe.
+- **Automatic Online Metadata & Synopsis Enrichment:** When creating a comic (quick name entry or detailed registration), the system automatically queries Google Books and Open Library in the background to discover missing Start Year, Brazilian Publisher, Original Publisher, Main Hero, and book/comic Synopsis without interrupting the workflow.
+- **Description / Synopsis Dedicated Field:** Added full support for comic synopses and descriptions across the data model, displayed in the Edition Detail Modal, editable in the Edit Collection Modal (with a 1-click "Buscar na Web" assistant), and pre-filled in the Detailed Add Modal.
+- **Multi-Criteria Composite External Cover Searches:** Non-Panini searches (Open Library, Fandom Multi-Wiki, and backend scrapers) now intelligently construct composite queries combining Comic Title, Edition Title / Story Arc, Brazilian Publisher, and Main Hero, giving high priority (+250k to +350k score bonus) to exact matches.
+- **Wishlist Issue Deselection & Sync Fix:** Clean document replacement in Firestore ensuring removed wishlist issues are permanently purged rather than merged back by realtime snapshots.
 - **ISBN Camera Barcode & Text Search Pre-fill Flow:** Scanning or typing an ISBN fills all detailed registration fields (Title, Start Year, Brazilian Publisher, Original Publisher, Main Hero, Issue Number, and Cover thumbnail preview) and holds in the modal awaiting explicit user confirmation before saving.
 - **Local File & Clipboard Image Attachment:** Directly upload cover images from your local device or paste images directly from the system clipboard in the Detailed Issue Modal.
 - **Sequential Issue Navigation Arrows:** Navigate smoothly through issues (1 to 10 or cross-comic) using left/right arrows inside the Detailed Issue Modal.
@@ -79,9 +83,13 @@ This application was architected and built using **Google Antigravity**, utilizi
 ## 🇧🇷 Versão em Português (Brasil)
 
 ### 🎯 Visão Geral
-O **HQs Collections** (v1.13.1) é uma aplicação web mobile-first ultra-rápida criada sob medida para colecionadores de quadrinhos organizarem edições mensais, coleções e minisséries em apenas uma tela.
+O **HQs Collections** (v1.14.0) é uma aplicação web mobile-first ultra-rápida criada sob medida para colecionadores de quadrinhos organizarem edições mensais, coleções e minisséries em apenas uma tela.
 
-### ✨ Novidades e Melhorias da Versão `1.13.1`
+### ✨ Novidades e Melhorias da Versão `1.14.0`
+- **Setas de Navegação Horizontal no Carrossel de Sugestões (PC / Desktop):** Botões laterais com setas (`ChevronLeft` / `ChevronRight`) tanto no Modal de Detalhes da Edição quanto no Painel de Status de Capas, permitindo rolar as capas horizontalmente com facilidade no computador via mouse sem depender de gestos táteis.
+- **Busca e Enriquecimento Automático de Metadados na Web:** Ao cadastrar qualquer HQ (seja pelo cadastro rápido ou pela inclusão detalhada), o sistema consulta Google Books e Open Library em segundo plano para identificar automaticamente o Ano de Início, Editora de Venda no Brasil, Herói Principal e a Sinopse completa da obra.
+- **Campo de Descrição / Sinopse Dedicado:** A Sinopse/Descrição agora é integrada ao modelo de dados de cada HQ, exibida no Card Detalhado da Edição, visualizável e editável no Modal de Edição (com botão de busca assistida "Buscar na Web") e pré-preenchida no cadastro detalhado via ISBN ou busca.
+- **Busca de Capas Externa com Critérios Compostos Inteligentes:** As buscas fora do site da Panini (Open Library e Fandom Multi-Wiki no cliente e no backend) agora compõem consultas avançadas combinando Título da HQ, Título da Edição/Arco, Editora de Venda e Herói Principal, priorizando com bônus expressivo de pontuação (+250k a +350k) os itens que correspondem a todos os critérios.
 - **Correção Definitiva de Persistência ao Desmarcar Desejo:** Solucionado o bug em que desmarcar edições marcadas como Desejo fazia com que voltassem sozinhas após alguns segundos. A remoção do parâmetro `{ merge: true }` nas gravações no Firestore garante a exclusão permanente das chaves do mapa `issueStates`.
 - **Fluxo com Pré-Preenchimento e Confirmação de ISBN via Câmera/Texto:** Ao escanear código de barras de ISBN com a câmera ou digitar manualmente, todos os campos do formulário detalhado (Título, Ano, Editora BR, Editora Original, Herói Principal, Nº Edição e miniatura da capa) são preenchidos e a tela aguarda a conferência e confirmação do usuário antes de salvar.
 - **Anexo de Imagem Local e Colagem via Clipboard:** Adicionados botões para anexar arquivos de imagem salvos no dispositivo e modal para colar capas diretamente da área de transferência (Ctrl+V) no modal de detalhes da edição.
