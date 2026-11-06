@@ -48,7 +48,10 @@ import {
   LogOut,
   Zap,
   Camera,
-  ScanBarcode
+  ScanBarcode,
+  Paperclip,
+  ClipboardPaste,
+  Upload
 } from 'lucide-react';
 import { 
   subscribeComics, 
@@ -177,6 +180,10 @@ export default function App() {
   // Modal de Consulta de Detalhes da Edição (Modo Consulta com Visual Ampliado)
   const [viewingIssueDetail, setViewingIssueDetail] = useState(null); // { comic, issueNum }
   const [isSearchingSingleCover, setIsSearchingSingleCover] = useState(false);
+  const [showPasteCoverModal, setShowPasteCoverModal] = useState(false);
+  const [pastedCoverUrl, setPastedCoverUrl] = useState('');
+  const [pasteUrlInput, setPasteUrlInput] = useState('');
+  const [isReadingClipboard, setIsReadingClipboard] = useState(false);
 
   // Modal Detalhado de Status da Busca de Capas
   const [showCoverSearchModal, setShowCoverSearchModal] = useState(false);
@@ -1099,6 +1106,164 @@ export default function App() {
 
     // Auxilia na escolha de capas para as outras edições da mesma HQ
     propagateSeriesSuggestions(updatedComic, preferredSeries);
+  };
+
+  // Compactar e converter arquivos de imagem ou Blobs em DataURL otimizada para capa
+  const compressImageFile = (fileOrBlob, maxWidth = 600, maxHeight = 900, quality = 0.85) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth || height > maxHeight) {
+            const ratio = Math.min(maxWidth / width, maxHeight / height);
+            width = Math.round(width * ratio);
+            height = Math.round(height * ratio);
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(dataUrl);
+        };
+        img.onerror = () => reject(new Error('Falha ao decodificar imagem'));
+        img.src = e.target.result;
+      };
+      reader.onerror = () => reject(new Error('Falha ao ler arquivo'));
+      reader.readAsDataURL(fileOrBlob);
+    });
+  };
+
+  // Salvar capa personalizada na edição (via Colar da área de transferência ou Anexo de Arquivo)
+  const handleSaveCustomCover = async (comicId, issueNum, coverUrl) => {
+    const comic = comics.find(c => c.id === comicId);
+    if (!comic || !coverUrl) return;
+
+    const updatedCovers = { ...(comic.issueCovers || {}), [issueNum]: coverUrl };
+    const updatedPending = { ...(comic.pendingCovers || {}) };
+    delete updatedPending[issueNum];
+
+    const updatedComic = {
+      ...comic,
+      issueCovers: updatedCovers,
+      pendingCovers: updatedPending
+    };
+
+    const updated = await saveComic(updatedComic);
+    setComics(updated);
+
+    if (viewingIssueDetail && viewingIssueDetail.comic.id === comicId) {
+      setViewingIssueDetail({ comic: updatedComic, issueNum: viewingIssueDetail.issueNum });
+    }
+  };
+
+  // Anexar imagem a partir de um arquivo salvo no dispositivo
+  const handleAttachCoverFromFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !viewingIssueDetail) return;
+    e.target.value = '';
+
+    try {
+      const compressedDataUrl = await compressImageFile(file);
+      await handleSaveCustomCover(
+        viewingIssueDetail.comic.id,
+        viewingIssueDetail.issueNum,
+        compressedDataUrl
+      );
+    } catch (err) {
+      console.error('Erro ao anexar arquivo de imagem:', err);
+      alert('Não foi possível processar a imagem do dispositivo. Tente outro arquivo.');
+    }
+  };
+
+  // Captura global de colagem (Ctrl + V) enquanto o Modal de Colar estiver aberto
+  useEffect(() => {
+    if (!showPasteCoverModal) return;
+
+    const handleWindowPaste = async (e) => {
+      const items = e.clipboardData?.items;
+      if (items) {
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type.startsWith('image/')) {
+            e.preventDefault();
+            const file = items[i].getAsFile();
+            if (file) {
+              try {
+                const dataUrl = await compressImageFile(file);
+                setPastedCoverUrl(dataUrl);
+                return;
+              } catch (err) {
+                console.error('Erro ao processar imagem colada:', err);
+              }
+            }
+          }
+        }
+      }
+
+      const text = e.clipboardData?.getData('text');
+      if (text && (text.startsWith('http') || text.startsWith('data:image'))) {
+        setPastedCoverUrl(text.trim());
+      }
+    };
+
+    window.addEventListener('paste', handleWindowPaste);
+    return () => window.removeEventListener('paste', handleWindowPaste);
+  }, [showPasteCoverModal]);
+
+  // Ação de colar via API de Clipboard do navegador
+  const handleReadFromClipboard = async () => {
+    setIsReadingClipboard(true);
+    try {
+      if (navigator.clipboard && navigator.clipboard.read) {
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          const imageType = item.types.find(t => t.startsWith('image/'));
+          if (imageType) {
+            const blob = await item.getType(imageType);
+            const dataUrl = await compressImageFile(blob);
+            setPastedCoverUrl(dataUrl);
+            setIsReadingClipboard(false);
+            return;
+          }
+        }
+      }
+
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        const text = await navigator.clipboard.readText();
+        if (text && (text.startsWith('http') || text.startsWith('data:image'))) {
+          setPastedCoverUrl(text.trim());
+          setIsReadingClipboard(false);
+          return;
+        }
+      }
+
+      alert('Nenhuma imagem detectada na área de transferência. Copie uma imagem (Ctrl+C ou botão direito) ou cole a URL no campo abaixo.');
+    } catch (err) {
+      console.warn('Clipboard read error:', err);
+      alert('Não foi possível acessar a área de transferência automaticamente. Pressione Ctrl+V no teclado ou cole a URL da imagem.');
+    } finally {
+      setIsReadingClipboard(false);
+    }
+  };
+
+  // Confirmar e salvar a capa colada
+  const handleConfirmPastedCover = async () => {
+    if (!pastedCoverUrl || !viewingIssueDetail) return;
+    await handleSaveCustomCover(
+      viewingIssueDetail.comic.id,
+      viewingIssueDetail.issueNum,
+      pastedCoverUrl
+    );
+    setShowPasteCoverModal(false);
+    setPastedCoverUrl('');
+    setPasteUrlInput('');
   };
 
   // Rejeitar Capa Pendente (Botão com X vermelho sem texto)
@@ -3104,26 +3269,55 @@ export default function App() {
               ) : (
                 /* CENÁRIO 3: Sem Capa / Em Busca */
                 <div className="space-y-3 py-6 px-4">
-                  <div className="w-16 h-24 mx-auto rounded-xl bg-slate-900 border-2 border-dashed border-slate-700 flex flex-col items-center justify-center text-slate-500 shadow-inner">
-                    <ImageIcon className="w-7 h-7 text-slate-500 mb-1" />
-                    <span className="text-[9px] uppercase tracking-wider font-bold text-slate-400">Sem Capa</span>
+                  <div 
+                    onClick={() => {
+                      setPastedCoverUrl('');
+                      setPasteUrlInput('');
+                      setShowPasteCoverModal(true);
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    className="w-20 h-28 mx-auto rounded-xl bg-slate-900 border-2 border-dashed border-slate-700 hover:border-cyan-400 hover:bg-slate-800/80 cursor-pointer flex flex-col items-center justify-center text-slate-500 hover:text-cyan-300 transition group active:scale-95 shadow-inner"
+                    title="Clique para abrir o modal e colar capa da área de transferência"
+                  >
+                    <ClipboardPaste className="w-7 h-7 text-slate-500 group-hover:text-cyan-400 transition mb-1" />
+                    <span className="text-[9px] uppercase tracking-wider font-bold text-slate-400 group-hover:text-cyan-300">Sem Capa</span>
+                    <span className="text-[8px] text-cyan-400/90 font-medium mt-0.5">Toque p/ colar</span>
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs font-semibold text-slate-300">
                       {isSearchingSingleCover ? 'Buscando capa nos servidores Panini/Web...' : 'Nenhuma capa aprovada para esta edição'}
                     </p>
                     <p className="text-[10px] text-slate-500">
-                      O sistema busca capas em segundo plano automaticamente.
+                      Toque na área da capa para colar da área de transferência ou anexe um arquivo salvo.
                     </p>
                   </div>
-                  <button
-                    onClick={() => handleManualSearchCover(viewingIssueDetail.comic, viewingIssueDetail.issueNum)}
-                    disabled={isSearchingSingleCover}
-                    className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 text-xs font-bold transition flex items-center gap-1.5 mx-auto"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isSearchingSingleCover ? 'animate-spin' : ''}`} />
-                    <span>Buscar Capa Agora</span>
-                  </button>
+                  <div className="flex items-center justify-center gap-2 flex-wrap pt-1">
+                    <button
+                      type="button"
+                      onClick={() => handleManualSearchCover(viewingIssueDetail.comic, viewingIssueDetail.issueNum)}
+                      disabled={isSearchingSingleCover}
+                      className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 text-xs font-bold transition flex items-center gap-1.5 active:scale-95"
+                      title="Buscar capa automaticamente na internet"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isSearchingSingleCover ? 'animate-spin' : ''}`} />
+                      <span>Buscar Capa Agora</span>
+                    </button>
+
+                    <label 
+                      className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-cyan-500 hover:text-slate-950 text-cyan-400 hover:border-cyan-400 border border-slate-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm"
+                      title="Anexar imagem a partir de um arquivo salvo no seu dispositivo"
+                    >
+                      <Paperclip className="w-3.5 h-3.5" />
+                      <span>Anexar Imagem</span>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={handleAttachCoverFromFile}
+                      />
+                    </label>
+                  </div>
                 </div>
               )}
             </div>
@@ -3266,6 +3460,180 @@ export default function App() {
                 Fechar Detalhes
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL GRANDE PARA COLAR CAPA A PARTIR DA ÁREA DE TRANSFERÊNCIA */}
+      {showPasteCoverModal && viewingIssueDetail && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn overflow-y-auto">
+          <div className="bg-[#101726] border border-cyan-500/50 w-full max-w-xl rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 my-auto">
+            {/* Header do Modal de Colar */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div>
+                <h3 className="font-bold text-base text-white flex items-center gap-2">
+                  <ClipboardPaste className="w-5 h-5 text-cyan-400" />
+                  <span>Colar Capa da Área de Transferência</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {viewingIssueDetail.comic.name} • Edição #{format2(viewingIssueDetail.issueNum)}
+                </p>
+              </div>
+              <button 
+                onClick={() => {
+                  setShowPasteCoverModal(false);
+                  setPastedCoverUrl('');
+                  setPasteUrlInput('');
+                }}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+                title="Fechar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Conteúdo: Área de Prévia ou Área de Colar */}
+            {pastedCoverUrl ? (
+              <div className="space-y-4 text-center">
+                <div className="p-3 bg-slate-950/80 rounded-2xl border border-slate-800 flex flex-col items-center">
+                  <div className="relative group max-w-[220px] rounded-xl overflow-hidden shadow-2xl border-2 border-cyan-400 bg-slate-900">
+                    <img 
+                      src={pastedCoverUrl} 
+                      alt="Capa colada da área de transferência"
+                      className="w-full h-auto max-h-[320px] object-cover"
+                    />
+                    <div className="absolute top-2 right-2 bg-cyan-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-md shadow-md flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" /> Pré-visualização
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPastedCoverUrl('');
+                      setPasteUrlInput('');
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition border border-slate-700 active:scale-95"
+                  >
+                    Trocar Imagem
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmPastedCover}
+                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition shadow-lg shadow-emerald-600/30 flex items-center gap-2 active:scale-95 border border-emerald-400/40"
+                  >
+                    <Check className="w-4 h-4 stroke-[3]" />
+                    <span>Salvar como Capa Oficial</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Zona de Drop / Paste */}
+                <div 
+                  onClick={handleReadFromClipboard}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+                    const file = e.dataTransfer?.files?.[0];
+                    if (file && file.type.startsWith('image/')) {
+                      try {
+                        const dataUrl = await compressImageFile(file);
+                        setPastedCoverUrl(dataUrl);
+                      } catch (err) {
+                        console.error('Erro ao processar imagem arrastada:', err);
+                      }
+                    }
+                  }}
+                  className="border-2 border-dashed border-cyan-500/40 hover:border-cyan-400 rounded-2xl p-6 sm:p-10 text-center bg-slate-900/60 hover:bg-slate-900/90 transition cursor-pointer space-y-3 group"
+                  title="Clique para colar ou arraste uma imagem para cá"
+                >
+                  <div className="w-14 h-14 mx-auto rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 group-hover:scale-110 transition shadow-inner">
+                    <ClipboardPaste className="w-7 h-7" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-base font-bold text-white group-hover:text-cyan-300 transition">
+                      Pressione <kbd className="px-2 py-0.5 bg-slate-800 border border-slate-700 rounded text-cyan-400 font-mono text-xs">Ctrl + V</kbd> ou Toque Aqui
+                    </h4>
+                    <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                      Cole uma imagem da internet, captura de tela ou arraste um arquivo para cá.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isReadingClipboard}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleReadFromClipboard();
+                    }}
+                    className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs transition shadow-md shadow-cyan-500/20 flex items-center gap-2 mx-auto active:scale-95 disabled:opacity-50"
+                  >
+                    {isReadingClipboard ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Acessando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <ClipboardPaste className="w-3.5 h-3.5" />
+                        <span>Colar da Área de Transferência</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Entrada alternativa via URL direta */}
+                <div className="p-3 bg-slate-900/50 rounded-xl border border-slate-800 space-y-2">
+                  <label className="text-[11px] font-bold text-slate-300 block">
+                    Ou cole o link direto da imagem (URL):
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="url"
+                      value={pasteUrlInput}
+                      onChange={(e) => setPasteUrlInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && pasteUrlInput.trim()) {
+                          setPastedCoverUrl(pasteUrlInput.trim());
+                          setPasteUrlInput('');
+                        }
+                      }}
+                      placeholder="https://exemplo.com/capa.jpg"
+                      className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (pasteUrlInput.trim()) {
+                          setPastedCoverUrl(pasteUrlInput.trim());
+                          setPasteUrlInput('');
+                        }
+                      }}
+                      disabled={!pasteUrlInput.trim()}
+                      className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 disabled:opacity-30 text-xs font-bold transition shrink-0 active:scale-95"
+                    >
+                      Carregar
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-1 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPasteCoverModal(false);
+                      setPastedCoverUrl('');
+                      setPasteUrlInput('');
+                    }}
+                    className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700 transition"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

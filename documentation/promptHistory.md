@@ -529,6 +529,12 @@ o nome do heroi principal no lado esquerdo do card esta exibindo só 2 letras, c
 /agente-orquestrador /grill-me /goal na tela de card detalhado da hq, quero setas laterais para ir para a hq anterior ou para a proxima (importante quanto ao comportamento: determinada hq estou lançando do 1 ao 10 as setas vão avançando do 1 a 10 independente se eu tenho ou não, quando chegar no 10, se já houver lançamento do 11 ao 20 ele continua na hq, se não houver ele pula para a proxima hq cadastrada
 ```
 
+### Prompt 39
+```text
+/agente-orquestrador /grill-me /goal no card detalhado da hq, se eu clicar na área da capa quando estiver exibindo sem capa, abre um modal grande para eu colar a partir da área de transferencia. ainda na area do card detalhado, ao lado do botão Buscar Capa Agora crie um botão Anexar Imagem onde posso pegar a imagem a partir de um arquivo salvo no dispositivo.
+```
+
+
 
 
 

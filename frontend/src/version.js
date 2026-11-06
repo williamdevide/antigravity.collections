@@ -1,6 +1,11 @@
 /**
  * Versão e Nome do Sistema
  * Gerenciado automaticamente pelo Agente Orquestrador sob o padrão SemVer (MAJOR.MINOR.PATCH)
+ * v1.13.0: Módulo de Inserção de Capas Personalizadas no Card Detalhado da HQ:
+ *          ao clicar na área da capa quando sem capa, abertura de Modal Grande imersivo para colar imagem
+ *          a partir da área de transferência (Ctrl+V, Clipboard API, URL direta ou Drag & Drop) com
+ *          pré-visualização e compressão automática via HTML5 Canvas; e novo botão dedicado 'Anexar Imagem'
+ *          ao lado de 'Buscar Capa Agora' para carregar capas diretamente de arquivos locais salvos no dispositivo.
  * v1.12.0: Navegação lateral interativa no Card Detalhado da HQ: setas anterior e próxima (no cabeçalho,
  *          em botões flutuantes sobre a capa e via atalhos de teclado ⬅️ / ➡️ / Esc), permitindo percorrer
  *          todas as edições da dezena (1 a 10) independentemente de tê-las ou não; ao atingir o final da dezena,
@@ -79,4 +84,4 @@
  *         fallback progressivo para edições mais antigas ao rejeitar uma capa.
  */
 export const APP_NAME = 'HQ Collections';
-export const APP_VERSION = '1.12.0';
+export const APP_VERSION = '1.13.0';
