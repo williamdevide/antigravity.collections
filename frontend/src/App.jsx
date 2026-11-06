@@ -4163,21 +4163,33 @@ function ComicRow({
             {(() => {
               const completedNumbers = Array.from({ length: countIssues }, (_, i) => startFrom + i);
               const readCompletedCount = completedNumbers.filter(n => getStage(n) === 'read').length;
+              const wishlistCompletedCount = completedNumbers.filter(n => getStage(n) === 'wishlist').length;
               const isAllCompletedRead = readCompletedCount === countIssues;
-              const completedBadgeStyle = isAllCompletedRead
-                ? 'bg-amber-500 text-slate-950 font-black border-2 border-cyan-400 shadow-[0_0_14px_rgba(34,211,238,0.95)]'
-                : 'bg-amber-500 text-slate-950 font-black border border-amber-400 shadow-md shadow-amber-500/30';
+              const isAllCompletedWishlist = wishlistCompletedCount === countIssues;
+
+              let completedBadgeStyle = 'bg-amber-500 text-slate-950 font-black border border-amber-400 shadow-md shadow-amber-500/30';
+              let completedIcon = <Check className="w-3.5 h-3.5 stroke-[3] text-slate-950" />;
+              let completedTitle = "Minissérie/Coleção Completa (Igual à Bolinha de Tenho)";
+
+              if (isAllCompletedRead) {
+                completedBadgeStyle = 'bg-amber-500 text-slate-950 font-black border-2 border-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.95)] hover:shadow-[0_0_16px_rgba(34,211,238,1)]';
+                completedTitle = "Minissérie/Coleção Completa e Lida (Borda Azul Neon igual à Bolinha de Lido)";
+              } else if (isAllCompletedWishlist) {
+                completedBadgeStyle = 'bg-slate-900 text-pink-300 font-bold border-2 border-pink-500 shadow-[0_0_12px_rgba(236,72,153,0.95)] hover:shadow-[0_0_16px_rgba(236,72,153,1)]';
+                completedIcon = <Bookmark className="w-3.5 h-3.5 text-pink-400 stroke-[2.5]" />;
+                completedTitle = "Minissérie/Coleção Toda em Desejo (Borda Pink Neon e Preenchimento igual à Bolinha de Desejo)";
+              }
 
               return (
                 <div className="flex items-center flex-wrap gap-2 pt-1">
                   <button
                     onClick={() => onToggleChunkExpand('completed')}
-                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl transition shadow-sm active:scale-95 ${completedBadgeStyle}`}
-                    title={isAllCompletedRead ? "Minissérie/Coleção Completa e Lida (Igual à Bolinha de Lido)" : "Minissérie/Coleção Completa (Igual à Bolinha de Tenho)"}
+                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl transition active:scale-95 ${completedBadgeStyle}`}
+                    title={completedTitle}
                   >
-                    <Check className="w-3.5 h-3.5 stroke-[3] text-slate-950" />
+                    {completedIcon}
                     <span>{summaryLabel}</span>
-                    <span className="text-[10px] text-slate-900/80 font-bold">({countIssues} edições)</span>
+                    <span className={`text-[10px] font-bold ${isAllCompletedWishlist ? 'text-pink-300/80' : 'text-slate-900/80'}`}>({countIssues} edições)</span>
                     {isExpanded ? <ChevronDown className="w-3 h-3 ml-1" /> : <ChevronRight className="w-3 h-3 ml-1" />}
                   </button>
                 </div>
@@ -4258,14 +4270,19 @@ function ComicRow({
   }
 
   // CÁLCULO ESTRITO DE DEZENAS
-  const ownedNumbers = comic.ownedNumbers || [];
+  const allActiveNumbers = [
+    ...(comic.ownedNumbers || []),
+    ...Object.entries(comic.issueStates || {})
+      .filter(([_, state]) => state === 'owned' || state === 'read' || state === 'wishlist')
+      .map(([num]) => Number(num))
+  ];
   let currentChunkLimit = initialChunkStart + 9;
-  if (ownedNumbers.length > 0) {
-    const highestOwned = Math.max(...ownedNumbers);
-    if (highestOwned % 10 === 0) {
-      currentChunkLimit = Math.max(currentChunkLimit, highestOwned + 10);
+  if (allActiveNumbers.length > 0) {
+    const highestActive = Math.max(...allActiveNumbers);
+    if (highestActive % 10 === 0) {
+      currentChunkLimit = Math.max(currentChunkLimit, highestActive + 10);
     } else {
-      currentChunkLimit = Math.max(currentChunkLimit, Math.ceil(highestOwned / 10) * 10);
+      currentChunkLimit = Math.max(currentChunkLimit, Math.ceil(highestActive / 10) * 10);
     }
   }
 
@@ -4312,25 +4329,27 @@ function ComicRow({
       let badgeTitle = 'Todas as edições adquiridas (Igual à Bolinha de Tenho) - Toque para expandir';
 
       if (isAllRead) {
-        badgeStyle = 'bg-amber-500 text-slate-950 font-black border-2 border-cyan-400 shadow-[0_0_14px_rgba(34,211,238,0.95)]';
+        // Borda azul neon vibrante igual à das bolinhas individuais e preenchimento amarelo
+        badgeStyle = 'bg-amber-500 text-slate-950 font-black border-2 border-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.95)] hover:shadow-[0_0_16px_rgba(34,211,238,1)]';
         icon = <Check className="w-3.5 h-3.5 stroke-[3] text-slate-950" />;
-        badgeTitle = 'Todas as edições lidas (Igual à Bolinha de Lido) - Toque para expandir';
+        badgeTitle = 'Todas as edições lidas (Borda Azul Neon igual à Bolinha de Lido) - Toque para expandir';
       } else if (isAllWishlist) {
-        badgeStyle = 'bg-slate-900 text-pink-300 font-bold border-2 border-pink-500 shadow-[0_0_14px_rgba(236,72,153,0.95)]';
+        // Quando forem todas as bolinhas desejo: borda pink neon e preenchimento igual às bolinhas (bg-slate-900 text-pink-300)
+        badgeStyle = 'bg-slate-900 text-pink-300 font-bold border-2 border-pink-500 shadow-[0_0_12px_rgba(236,72,153,0.95)] hover:shadow-[0_0_16px_rgba(236,72,153,1)]';
         icon = <Bookmark className="w-3.5 h-3.5 text-pink-400 stroke-[2.5]" />;
-        badgeTitle = 'Todas as edições como Desejo (Igual à Bolinha de Desejo) - Toque para expandir';
+        badgeTitle = 'Todas as edições em Desejo (Borda Pink Neon e Preenchimento igual à Bolinha de Desejo) - Toque para expandir';
       }
 
       return (
         <div key={chunkStart} className="inline-block mr-2 mb-1">
           <button
             onClick={() => onToggleChunkExpand(chunkStart)}
-            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl transition shadow-sm active:scale-95 ${badgeStyle}`}
+            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl transition active:scale-95 ${badgeStyle}`}
             title={badgeTitle}
           >
             {icon}
             <span>{format2(chunkStart)}..{format2(chunkEnd)}</span>
-            <ChevronRight className="w-3 h-3 opacity-70" />
+            <ChevronRight className={`w-3 h-3 ${isAllWishlist ? 'text-pink-400/80' : 'text-slate-950/80'}`} />
           </button>
         </div>
       );

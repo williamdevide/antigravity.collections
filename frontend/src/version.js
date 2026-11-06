@@ -1,6 +1,11 @@
 /**
  * Versão e Nome do Sistema
  * Gerenciado automaticamente pelo Agente Orquestrador sob o padrão SemVer (MAJOR.MINOR.PATCH)
+ * v1.11.3: Refinamento dos agrupamentos 01..10 e de minisséries completas: borda azul neon vibrante
+ *          (border-2 border-cyan-400 com brilho neon) idêntica à das bolinhas individuais para edições lidas,
+ *          e quando todas forem desejo, agrupamento com borda pink neon (border-2 border-pink-500) e
+ *          preenchimento escuro com texto rosa (bg-slate-900 text-pink-300) idêntico às bolinhas de Desejo,
+ *          eliminação de interferência de sombra CSS e suporte dinâmico a avanços de dezenas por edições desejadas.
  * v1.11.2: Refinamento estético da barra de ordenação mobile: botões A-Z e Z-A compactos apenas com ícones,
  *          renomeação de 'Personagem' para 'Herói' e de 'Pessoal' para 'Usuário' com ícone dedicado e
  *          encaixe fluido em linha única em todas as resoluções de smartphone.
@@ -69,4 +74,4 @@
  *         fallback progressivo para edições mais antigas ao rejeitar uma capa.
  */
 export const APP_NAME = 'HQ Collections';
-export const APP_VERSION = '1.11.2';
+export const APP_VERSION = '1.11.3';

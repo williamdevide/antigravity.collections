@@ -519,5 +519,11 @@ o nome do heroi principal no lado esquerdo do card esta exibindo só 2 letras, c
 /agente-orquestrador /grill-me /goal os metodos de ordenação quando exibidos no celular estão ficando feios (A-Z e Z-A deixe só o icone, troque personagem por Herói e troque Pessoal por Usuário
 ```
 
+### Prompt 37
+```text
+/agente-orquestrador /grill-me /goal nos botoes 01..10 a bordal azul deve ficar azul neon igual das bolinhas individuais, e quando forem todas as bolinhas desejo (borda pink neon) o agrupado também deve ficar com a borda pink neon e seu preenchimento igual as bolinhas
+```
+
+
 
 
