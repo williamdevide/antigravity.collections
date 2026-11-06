@@ -2124,13 +2124,13 @@ export default function App() {
 
         {/* CONTROLES: ORDENAÇÃO + BUSCA + FILTROS */}
         <section className="space-y-2">
-          {/* BARRA DE ORDENAÇÃO (A-Z / Z-A / ORDEM PESSOAL) */}
-          <div className="flex items-center justify-between bg-[#0F1626] p-1.5 rounded-xl border border-slate-800 text-xs">
-            <span className="text-[11px] font-semibold text-slate-400 pl-2">Ordenar por:</span>
-            <div className="flex gap-1">
+          {/* BARRA DE ORDENAÇÃO (A-Z / Z-A / HERÓI / USUÁRIO) */}
+          <div className="flex items-center justify-between bg-[#0F1626] p-1.5 rounded-xl border border-slate-800 text-xs gap-1.5">
+            <span className="text-[11px] font-semibold text-slate-400 pl-1 shrink-0">Ordenar por:</span>
+            <div className="flex gap-1 shrink-0">
               <button
                 onClick={() => setSortOrder('A-Z')}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${
+                className={`p-1.5 sm:px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center ${
                   sortOrder === 'A-Z'
                     ? 'bg-amber-500 text-slate-950 shadow-sm'
                     : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
@@ -2138,12 +2138,11 @@ export default function App() {
                 title="Ordem Alfabética Crescente (A-Z)"
               >
                 <ArrowDownAZ className="w-3.5 h-3.5" />
-                <span>A-Z</span>
               </button>
 
               <button
                 onClick={() => setSortOrder('Z-A')}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${
+                className={`p-1.5 sm:px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center ${
                   sortOrder === 'Z-A'
                     ? 'bg-amber-500 text-slate-950 shadow-sm'
                     : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
@@ -2151,7 +2150,6 @@ export default function App() {
                 title="Ordem Alfabética Decrescente (Z-A)"
               >
                 <ArrowDownZA className="w-3.5 h-3.5" />
-                <span>Z-A</span>
               </button>
 
               <button
@@ -2161,10 +2159,10 @@ export default function App() {
                     ? 'bg-amber-500 text-slate-950 shadow-sm'
                     : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
                 }`}
-                title="Ordenar por Personagem Principal e Título"
+                title="Ordenar por Herói Principal e Título"
               >
                 <Shield className="w-3.5 h-3.5" />
-                <span>Personagem</span>
+                <span>Herói</span>
               </button>
 
               <button
@@ -2174,10 +2172,10 @@ export default function App() {
                     ? 'bg-amber-500 text-slate-950 shadow-sm'
                     : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
                 }`}
-                title="Ordem Pessoal (Arrastar e Soltar)"
+                title="Ordem do Usuário (Arrastar e Soltar)"
               >
-                <GripVertical className="w-3.5 h-3.5" />
-                <span>Pessoal</span>
+                <User className="w-3.5 h-3.5" />
+                <span>Usuário</span>
               </button>
             </div>
           </div>

@@ -514,5 +514,10 @@ quando incluo uma nova hq, já deve rolar a pagina até o card desse hq.
 o nome do heroi principal no lado esquerdo do card esta exibindo só 2 letras, como se estivesse corrtando, melhore essa exibição e já deixe o espaço em todos os cards, mesmo que esteja vazio
 ```
 
+### Prompt 36
+```text
+/agente-orquestrador /grill-me /goal os metodos de ordenação quando exibidos no celular estão ficando feios (A-Z e Z-A deixe só o icone, troque personagem por Herói e troque Pessoal por Usuário
+```
+
 
 

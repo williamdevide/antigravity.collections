@@ -1,6 +1,9 @@
 /**
  * Versão e Nome do Sistema
  * Gerenciado automaticamente pelo Agente Orquestrador sob o padrão SemVer (MAJOR.MINOR.PATCH)
+ * v1.11.2: Refinamento estético da barra de ordenação mobile: botões A-Z e Z-A compactos apenas com ícones,
+ *          renomeação de 'Personagem' para 'Herói' e de 'Pessoal' para 'Usuário' com ícone dedicado e
+ *          encaixe fluido em linha única em todas as resoluções de smartphone.
  * v1.11.1: Botões da busca por ISBN com exibição compacta exclusiva por ícones (Buscar e Câmera),
  *          manutenção estrita das cores originais dos 4 estágios das bolinhas (amarelo sólido para Tenho,
  *          amarelo com borda azul neon vibrante para Lido, escuro com borda pink neon para Desejo) nos
@@ -66,4 +69,4 @@
  *         fallback progressivo para edições mais antigas ao rejeitar uma capa.
  */
 export const APP_NAME = 'HQ Collections';
-export const APP_VERSION = '1.11.1';
+export const APP_VERSION = '1.11.2';
