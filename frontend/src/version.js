@@ -1,6 +1,11 @@
 /**
  * Versão e Nome do Sistema
  * Gerenciado automaticamente pelo Agente Orquestrador sob o padrão SemVer (MAJOR.MINOR.PATCH)
+ * v1.12.0: Navegação lateral interativa no Card Detalhado da HQ: setas anterior e próxima (no cabeçalho,
+ *          em botões flutuantes sobre a capa e via atalhos de teclado ⬅️ / ➡️ / Esc), permitindo percorrer
+ *          todas as edições da dezena (1 a 10) independentemente de tê-las ou não; ao atingir o final da dezena,
+ *          se houver lançamentos subsequentes (ex: 11 ao 20) a navegação continua na mesma HQ, caso contrário
+ *          avança de forma fluida para a próxima HQ cadastrada na ordem da coleção (com retorno recíproco para a anterior).
  * v1.11.3: Refinamento dos agrupamentos 01..10 e de minisséries completas: borda azul neon vibrante
  *          (border-2 border-cyan-400 com brilho neon) idêntica à das bolinhas individuais para edições lidas,
  *          e quando todas forem desejo, agrupamento com borda pink neon (border-2 border-pink-500) e
@@ -74,4 +79,4 @@
  *         fallback progressivo para edições mais antigas ao rejeitar uma capa.
  */
 export const APP_NAME = 'HQ Collections';
-export const APP_VERSION = '1.11.3';
+export const APP_VERSION = '1.12.0';

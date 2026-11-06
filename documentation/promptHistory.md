@@ -524,6 +524,12 @@ o nome do heroi principal no lado esquerdo do card esta exibindo só 2 letras, c
 /agente-orquestrador /grill-me /goal nos botoes 01..10 a bordal azul deve ficar azul neon igual das bolinhas individuais, e quando forem todas as bolinhas desejo (borda pink neon) o agrupado também deve ficar com a borda pink neon e seu preenchimento igual as bolinhas
 ```
 
+### Prompt 38
+```text
+/agente-orquestrador /grill-me /goal na tela de card detalhado da hq, quero setas laterais para ir para a hq anterior ou para a proxima (importante quanto ao comportamento: determinada hq estou lançando do 1 ao 10 as setas vão avançando do 1 a 10 independente se eu tenho ou não, quando chegar no 10, se já houver lançamento do 11 ao 20 ele continua na hq, se não houver ele pula para a proxima hq cadastrada
+```
+
+
 
 
 

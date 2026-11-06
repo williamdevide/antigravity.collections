@@ -7,6 +7,7 @@ import {
   Check, 
   Trash2, 
   Edit3, 
+  ChevronLeft,
   ChevronRight, 
   ChevronDown, 
   Flag, 
@@ -1818,6 +1819,169 @@ export default function App() {
 
   const hasActiveFilters = filterType !== 'Todos' || filterPublisher !== 'Todas' || filterStatus !== 'Todos' || viewMode !== 'all';
 
+  // Limites de edições navegáveis para uma HQ no modal de detalhes
+  const getComicMinNavigableIssue = (comic) => {
+    if (!comic) return 1;
+    const startFrom = typeof comic.startFrom === 'number' && comic.startFrom > 1 ? comic.startFrom : 1;
+    const initialChunkStart = Math.floor((startFrom - 1) / 10) * 10 + 1;
+    const hasHiddenPriorChunks = initialChunkStart > 1;
+    return (hasHiddenPriorChunks && comic.showHiddenChunks) ? 1 : startFrom;
+  };
+
+  const getComicMaxNavigableIssue = (comic) => {
+    if (!comic) return 10;
+    const startFrom = typeof comic.startFrom === 'number' && comic.startFrom > 1 ? comic.startFrom : 1;
+    const initialChunkStart = Math.floor((startFrom - 1) / 10) * 10 + 1;
+
+    // Se for minissérie ou coleção encerrada com total pré-definido em completedUntil
+    if ((comic.isCompleted || comic.type === 'Minissérie' || comic.type === 'Coleção') && 
+        typeof comic.completedUntil === 'number' && comic.completedUntil >= startFrom) {
+      return comic.completedUntil;
+    }
+
+    // Edições com algum lançamento ou registro (owned, read, wishlist, título específico ou capa)
+    const activeNums = [
+      ...(comic.ownedNumbers || []),
+      ...Object.keys(comic.issueStates || {})
+        .filter(n => comic.issueStates[n] && comic.issueStates[n] !== 'none')
+        .map(Number),
+      ...Object.keys(comic.issueTitles || {}).map(Number),
+      ...Object.keys(comic.issueCovers || {}).map(Number)
+    ];
+
+    const baseChunkEnd = initialChunkStart + 9;
+    if (activeNums.length === 0) {
+      return baseChunkEnd;
+    }
+
+    const highestActive = Math.max(...activeNums);
+    if (highestActive <= baseChunkEnd) {
+      // Se não houver nenhum lançamento além da primeira dezena (1..10), o teto é 10
+      return baseChunkEnd;
+    }
+
+    // Se houver lançamentos além da primeira dezena (ex: 11 ao 20), continua avançando até a dezena do maior lançamento
+    const chunkOfHighest = Math.ceil(highestActive / 10) * 10;
+    return Math.max(baseChunkEnd, chunkOfHighest);
+  };
+
+  // Metadados de Navegação Lateral no Modal de Detalhes da Edição
+  const issueNavigationInfo = useMemo(() => {
+    if (!viewingIssueDetail) {
+      return {
+        hasPrev: false,
+        hasNext: false,
+        prevTitle: '',
+        nextTitle: '',
+        prevComic: null,
+        prevIssue: null,
+        nextComic: null,
+        nextIssue: null
+      };
+    }
+
+    const comicList = sortedAndFilteredComics.length > 0 ? sortedAndFilteredComics : comics;
+    const currentComicIndex = comicList.findIndex(c => c.id === viewingIssueDetail.comic.id);
+    const currentComic = (currentComicIndex !== -1 ? comicList[currentComicIndex] : null) || viewingIssueDetail.comic;
+    const currentIssue = viewingIssueDetail.issueNum;
+
+    const minIssue = getComicMinNavigableIssue(currentComic);
+    const maxIssue = getComicMaxNavigableIssue(currentComic);
+
+    let hasPrev = false;
+    let prevTitle = '';
+    let prevComic = null;
+    let prevIssue = null;
+
+    if (currentIssue > minIssue) {
+      hasPrev = true;
+      prevComic = currentComic;
+      prevIssue = currentIssue - 1;
+      prevTitle = `Edição anterior (#${format2(prevIssue)})`;
+    } else if (currentComicIndex > 0) {
+      hasPrev = true;
+      prevComic = comicList[currentComicIndex - 1];
+      prevIssue = getComicMaxNavigableIssue(prevComic);
+      prevTitle = `HQ Anterior: ${prevComic.name} (#${format2(prevIssue)})`;
+    }
+
+    let hasNext = false;
+    let nextTitle = '';
+    let nextComic = null;
+    let nextIssue = null;
+
+    if (currentIssue < maxIssue) {
+      hasNext = true;
+      nextComic = currentComic;
+      nextIssue = currentIssue + 1;
+      nextTitle = `Próxima edição (#${format2(nextIssue)})`;
+    } else if (currentComicIndex !== -1 && currentComicIndex < comicList.length - 1) {
+      hasNext = true;
+      nextComic = comicList[currentComicIndex + 1];
+      nextIssue = getComicMinNavigableIssue(nextComic);
+      nextTitle = `Próxima HQ: ${nextComic.name} (#${format2(nextIssue)})`;
+    }
+
+    return {
+      hasPrev,
+      hasNext,
+      prevTitle,
+      nextTitle,
+      prevComic,
+      prevIssue,
+      nextComic,
+      nextIssue
+    };
+  }, [viewingIssueDetail, sortedAndFilteredComics, comics]);
+
+  const handlePrevIssueDetail = () => {
+    if (!issueNavigationInfo.hasPrev || !issueNavigationInfo.prevComic) return;
+    setViewingIssueDetail({
+      comic: issueNavigationInfo.prevComic,
+      issueNum: issueNavigationInfo.prevIssue
+    });
+  };
+
+  const handleNextIssueDetail = () => {
+    if (!issueNavigationInfo.hasNext || !issueNavigationInfo.nextComic) return;
+    setViewingIssueDetail({
+      comic: issueNavigationInfo.nextComic,
+      issueNum: issueNavigationInfo.nextIssue
+    });
+  };
+
+  // Atalhos de teclado (Seta Esquerda / Seta Direita / Escape) no Modal de Detalhes
+  useEffect(() => {
+    if (!viewingIssueDetail) return;
+
+    const handleKeyDown = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        if (issueNavigationInfo.hasPrev && issueNavigationInfo.prevComic) {
+          setViewingIssueDetail({
+            comic: issueNavigationInfo.prevComic,
+            issueNum: issueNavigationInfo.prevIssue
+          });
+        }
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        if (issueNavigationInfo.hasNext && issueNavigationInfo.nextComic) {
+          setViewingIssueDetail({
+            comic: issueNavigationInfo.nextComic,
+            issueNum: issueNavigationInfo.nextIssue
+          });
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setViewingIssueDetail(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [viewingIssueDetail, issueNavigationInfo]);
+
   // Cor de fundo dinâmica a partir das configurações do usuário
   const activeBgColor = useMemo(() => {
     if (appMode === 'edicao') return userSettings.editModeBg || '#0c1e38';
@@ -2720,13 +2884,36 @@ export default function App() {
           <div className="bg-[#101726] border border-cyan-500/40 w-full max-w-md rounded-2xl p-5 shadow-2xl space-y-4 my-auto">
             {/* Header do Modal */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="font-bold text-base text-white flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-cyan-400" />
-                <span>Edição #{format2(viewingIssueDetail.issueNum)}</span>
-              </h3>
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <button
+                  type="button"
+                  onClick={handlePrevIssueDetail}
+                  disabled={!issueNavigationInfo.hasPrev}
+                  className="p-1.5 rounded-xl bg-slate-800/90 hover:bg-cyan-500 hover:text-slate-950 text-slate-300 border border-slate-700 hover:border-cyan-400 disabled:opacity-20 disabled:pointer-events-none transition active:scale-90"
+                  title={issueNavigationInfo.prevTitle}
+                  aria-label="Edição ou HQ anterior"
+                >
+                  <ChevronLeft className="w-4 h-4 stroke-[2.5]" />
+                </button>
+                <h3 className="font-bold text-base text-white flex items-center gap-1.5 sm:gap-2">
+                  <BookOpen className="w-4 h-4 text-cyan-400 shrink-0" />
+                  <span>Edição #{format2(viewingIssueDetail.issueNum)}</span>
+                </h3>
+                <button
+                  type="button"
+                  onClick={handleNextIssueDetail}
+                  disabled={!issueNavigationInfo.hasNext}
+                  className="p-1.5 rounded-xl bg-slate-800/90 hover:bg-cyan-500 hover:text-slate-950 text-slate-300 border border-slate-700 hover:border-cyan-400 disabled:opacity-20 disabled:pointer-events-none transition active:scale-90"
+                  title={issueNavigationInfo.nextTitle}
+                  aria-label="Próxima edição ou HQ"
+                >
+                  <ChevronRight className="w-4 h-4 stroke-[2.5]" />
+                </button>
+              </div>
               <button 
                 onClick={() => setViewingIssueDetail(null)}
-                className="text-slate-400 hover:text-white p-1"
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+                title="Fechar detalhes"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -2798,7 +2985,31 @@ export default function App() {
             </div>
 
             {/* ÁREA DE CAPA AMPLIADA COM VISUAL ESTÉTICO DE GIBI */}
-            <div className="bg-slate-950/90 border border-slate-800 rounded-2xl p-4 flex flex-col items-center justify-center text-center relative overflow-hidden shadow-inner">
+            <div className="bg-slate-950/90 border border-slate-800 rounded-2xl p-4 flex flex-col items-center justify-center text-center relative overflow-hidden shadow-inner min-h-[220px]">
+              {/* Botões Laterais Flutuantes de Navegação Rápida (Anterior / Próximo) */}
+              {issueNavigationInfo.hasPrev && (
+                <button
+                  type="button"
+                  onClick={handlePrevIssueDetail}
+                  className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-slate-900/80 hover:bg-cyan-500 hover:text-slate-950 text-slate-300 border border-slate-700/80 hover:border-cyan-400 shadow-xl backdrop-blur-md flex items-center justify-center transition active:scale-90 z-20"
+                  title={issueNavigationInfo.prevTitle}
+                  aria-label="Edição ou HQ anterior"
+                >
+                  <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
+                </button>
+              )}
+
+              {issueNavigationInfo.hasNext && (
+                <button
+                  type="button"
+                  onClick={handleNextIssueDetail}
+                  className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-slate-900/80 hover:bg-cyan-500 hover:text-slate-950 text-slate-300 border border-slate-700/80 hover:border-cyan-400 shadow-xl backdrop-blur-md flex items-center justify-center transition active:scale-90 z-20"
+                  title={issueNavigationInfo.nextTitle}
+                  aria-label="Próxima edição ou HQ"
+                >
+                  <ChevronRight className="w-5 h-5 stroke-[2.5]" />
+                </button>
+              )}
               {/* CENÁRIO 1: Capa Fixada Oficialmente */}
               {viewingIssueDetail.comic.issueCovers?.[viewingIssueDetail.issueNum] ? (
                 <div className="space-y-3 w-full flex flex-col items-center">
