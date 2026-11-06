@@ -534,6 +534,13 @@ o nome do heroi principal no lado esquerdo do card esta exibindo só 2 letras, c
 /agente-orquestrador /grill-me /goal no card detalhado da hq, se eu clicar na área da capa quando estiver exibindo sem capa, abre um modal grande para eu colar a partir da área de transferencia. ainda na area do card detalhado, ao lado do botão Buscar Capa Agora crie um botão Anexar Imagem onde posso pegar a imagem a partir de um arquivo salvo no dispositivo.
 ```
 
+### Prompt 40
+```text
+/agente-orquestrador /grill-me /goal estamos com um problema, quando cliquei em 3 edições e deixei como desejo, se depois tento desmarcar de desejo, na sequencia elas voltam a ficar como desejo sozinhas.
+ao cadastrar buscando pelo isbn com a camera ele diz que encontrou, mas não preenche nada nos campos e volta para a tela principal. quero que ele preencha na tela de cadastro as informações e aguarde a confirmação la mesmo
+```
+
+
 
 
 

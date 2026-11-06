@@ -1,6 +1,11 @@
 /**
  * Versão e Nome do Sistema
  * Gerenciado automaticamente pelo Agente Orquestrador sob o padrão SemVer (MAJOR.MINOR.PATCH)
+ * v1.13.1: Correção de persistência do estágio 'Desejo': remoção de mesclagem recursiva ({ merge: true })
+ *          no Firestore que preservava chaves excluídas em issueStates durante dessincronizações em tempo real;
+ *          e correção integral da busca/escaneamento por ISBN na inclusão detalhada: mapeamento correto das
+ *          propriedades do serviço (título, ano, editora Brasil, herói, capa e nº da edição), preenchimento
+ *          imediato de todos os campos do formulário na tela e espera obrigatória pela confirmação do usuário.
  * v1.13.0: Módulo de Inserção de Capas Personalizadas no Card Detalhado da HQ:
  *          ao clicar na área da capa quando sem capa, abertura de Modal Grande imersivo para colar imagem
  *          a partir da área de transferência (Ctrl+V, Clipboard API, URL direta ou Drag & Drop) com
@@ -84,4 +89,4 @@
  *         fallback progressivo para edições mais antigas ao rejeitar uma capa.
  */
 export const APP_NAME = 'HQ Collections';
-export const APP_VERSION = '1.13.0';
+export const APP_VERSION = '1.13.1';

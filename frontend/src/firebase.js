@@ -309,7 +309,7 @@ export async function saveComic(arg1, arg2) {
         mainHero: comic.mainHero || '',
         preferredSeries: comic.preferredSeries || null,
         updatedAt: new Date().toISOString()
-      }, { merge: true });
+      });
     } catch (e) {
       console.warn('⚠️ Falha ao sincronizar com o Firestore:', e.message);
     }
@@ -412,7 +412,7 @@ export async function saveComicsBatch(arg1, arg2) {
           mainHero: comic.mainHero || '',
           preferredSeries: comic.preferredSeries || null,
           updatedAt: new Date().toISOString()
-        }, { merge: true });
+        });
       });
       await Promise.all(promises);
     } catch (e) {

@@ -1,9 +1,9 @@
 <div align="center">
 
-# 📚 HQs Collections `v1.10.0` - Mobile First Collection Manager
+# 📚 HQs Collections `v1.13.1` - Mobile First Collection Manager
 ### *Gerenciador Ágil de Coleções de Quadrinhos e Minisséries*
 
-[![Version](https://img.shields.io/badge/version-1.10.0-amber?style=for-the-badge&logo=semver&logoColor=white)](#)
+[![Version](https://img.shields.io/badge/version-1.13.1-amber?style=for-the-badge&logo=semver&logoColor=white)](#)
 [![Powered by Antigravity](https://img.shields.io/badge/Powered%20by-Google%20Antigravity-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://deepmind.google/technologies/antigravity/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
@@ -22,9 +22,16 @@
 ## 🇺🇸 English
 
 ### 🎯 Overview
-**HQs Collections** (v1.9.0) is an ultra-fast, mobile-first web application designed for comic book readers and collectors to track monthly publications, collections, and miniseries in a single streamlined screen. Version 1.9.0 introduces **Drawer Navigation via Logo Tap**, full **User Authentication** (Firebase Auth with Google Single Sign-On and Email/Password), **My Profile Panel** with name updates, password change, and a protected "Clear My Collection" safety gate requiring the `ZERAR` security passphrase, a comprehensive **Visual Settings Panel** with 5 elegant color presets and free hex pickers for Consultation, Edit, and Cover modes, and a dedicated **Voice Input Module** powered by the Web Speech API (PT-BR) with semantic parsing and automatic Panini cover scraping.
+**HQs Collections** (v1.13.1) is an ultra-fast, mobile-first web application designed for comic book readers and collectors to track monthly publications, collections, and miniseries in a single streamlined screen.
 
-### ✨ Key Features & Improvements in `v1.10.0`
+### ✨ Key Features & Improvements in `v1.13.1`
+- **Wishlist Issue Deselection & Sync Fix:** Resolved issue where deselected wishlist items would automatically reappear due to Firestore `{ merge: true }` retaining missing map keys. Document replacement now guarantees clean deletion of unset issue states.
+- **ISBN Camera Barcode & Text Search Pre-fill Flow:** Scanning or typing an ISBN fills all detailed registration fields (Title, Start Year, Brazilian Publisher, Original Publisher, Main Hero, Issue Number, and Cover thumbnail preview) and holds in the modal awaiting explicit user confirmation before saving.
+- **Local File & Clipboard Image Attachment:** Directly upload cover images from your local device or paste images directly from the system clipboard in the Detailed Issue Modal.
+- **Sequential Issue Navigation Arrows:** Navigate smoothly through issues (1 to 10 or cross-comic) using left/right arrows inside the Detailed Issue Modal.
+- **Dynamic Splash Screen & "Keep Connected" Option:** Splash screen with animated progress bar tracking collection sync, backed by a persistent login toggle.
+- **Neon Glow Grouped Decades (`01..10`):** Decade blocks adapt dynamically with cyan neon borders (all read), pink neon borders (all wishlist), or yellow background (all owned).
+- **Vertical Hero Badge & Hero-First Sorting:** Main Hero displayed vertically on the left edge of comic cards, with custom sorting by Hero + Title.
 - **4th Viewing Mode: "Full Cover View" (`LayoutGrid`):** Direct 4-mode cyclic toggle in the header:
   - `view`: Standard Consultation (numbers and collapsible decades)
   - `edit`: Edition Mode (tactile stages and comic editing)
@@ -72,9 +79,16 @@ This application was architected and built using **Google Antigravity**, utilizi
 ## 🇧🇷 Versão em Português (Brasil)
 
 ### 🎯 Visão Geral
-O **HQs Collections** (v1.9.0) é uma aplicação web mobile-first ultra-rápida criada sob medida para colecionadores de quadrinhos organizarem edições mensais, coleções e minisséries em apenas uma tela. A versão 1.9.0 traz a nova **Gaveta Lateral de Navegação (Menu Hambúrguer)** acionada ao tocar no logotipo da aplicação, **Autenticação Completa com Firebase Auth** (Google e E-mail/Senha), painel **Meu Perfil** com alteração de dados e ação de segurança para zerar a coleção digitando `ZERAR`, tela de **Configurações Visuais** com 5 presets de cores e seletores livres de cor para os fundos dos modos Consulta, Edição e Capas, e **Módulo de Entrada por Voz** com Web Speech API em PT-BR para ditar e cadastrar HQs automaticamente.
+O **HQs Collections** (v1.13.1) é uma aplicação web mobile-first ultra-rápida criada sob medida para colecionadores de quadrinhos organizarem edições mensais, coleções e minisséries em apenas uma tela.
 
-### ✨ Novidades e Melhorias da Versão `1.10.0`
+### ✨ Novidades e Melhorias da Versão `1.13.1`
+- **Correção Definitiva de Persistência ao Desmarcar Desejo:** Solucionado o bug em que desmarcar edições marcadas como Desejo fazia com que voltassem sozinhas após alguns segundos. A remoção do parâmetro `{ merge: true }` nas gravações no Firestore garante a exclusão permanente das chaves do mapa `issueStates`.
+- **Fluxo com Pré-Preenchimento e Confirmação de ISBN via Câmera/Texto:** Ao escanear código de barras de ISBN com a câmera ou digitar manualmente, todos os campos do formulário detalhado (Título, Ano, Editora BR, Editora Original, Herói Principal, Nº Edição e miniatura da capa) são preenchidos e a tela aguarda a conferência e confirmação do usuário antes de salvar.
+- **Anexo de Imagem Local e Colagem via Clipboard:** Adicionados botões para anexar arquivos de imagem salvos no dispositivo e modal para colar capas diretamente da área de transferência (Ctrl+V) no modal de detalhes da edição.
+- **Setas Laterais de Navegação Sequencial:** Navegue entre edições (#01 a #10 ou entre HQs cadastradas) usando as novas setas laterais no modal de detalhes.
+- **Tela de Splash com Barra de Progresso Real e "Manter Conectado":** Inicialização com logotipo, barra de carregamento baseada na coleção e persistência de sessão configurável.
+- **Bordas Neon nos Agrupamentos `01..10`:** Blocos de dezenas agora refletem o status com borda azul neon (todos lidos), borda pink neon (todos desejados) e preenchimento amarelo (todos adquiridos).
+- **Nome do Herói na Vertical e Ordenação por Herói:** Exibição do herói na lateral esquerda do card a -90° e novo critério de ordenação (Herói + Título).
 - **4º Modo de Visualização: "Consulta Total com Capas" (`LayoutGrid`):** Alternador cíclico no cabeçalho em 4 passos:
   - `consulta`: Modo Consulta tradicional (com bolinhas e blocos de dezenas resumidas `01..10`)
   - `edicao`: Modo Edição (preenchimento dos 4 estágios táteis e edição de cards)

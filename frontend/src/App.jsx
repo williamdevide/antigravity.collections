@@ -136,6 +136,8 @@ export default function App() {
   const [detailedStartYear, setDetailedStartYear] = useState('');
   const [detailedBrazilPublisher, setDetailedBrazilPublisher] = useState('');
   const [detailedMainHero, setDetailedMainHero] = useState('');
+  const [detailedCoverUrl, setDetailedCoverUrl] = useState(null);
+  const [detailedAutoOwnedIssue, setDetailedAutoOwnedIssue] = useState(null);
 
   // Recursos de Busca por ISBN e Escaneamento por Câmera
   const [isbnInput, setIsbnInput] = useState('');
@@ -708,19 +710,66 @@ export default function App() {
     }
   };
 
-  // Cadastro Detalhado de HQ
+  const resetDetailedForm = () => {
+    setDetailedName('');
+    setDetailedStartYear('');
+    setDetailedBrazilPublisher('');
+    setDetailedMainHero('');
+    setDetailedStartFrom('1');
+    setDetailedCoverUrl(null);
+    setDetailedAutoOwnedIssue(null);
+    setIsbnInput('');
+    setIsbnFeedback(null);
+  };
+
+  // Cadastro Detalhado de HQ (com confirmação explícita na tela)
   const handleDetailedAddSubmit = async (e) => {
     e?.preventDefault();
     const trimmed = detailedName.trim();
     if (!trimmed) return;
 
     try {
+      const parsedStart = parseInt(detailedStartFrom, 10);
+      const startFrom = !isNaN(parsedStart) && parsedStart > 1 ? parsedStart : 1;
+      const targetIssue = detailedAutoOwnedIssue || startFrom;
+
+      // Verifica se já existe HQ com esse título cadastrado
+      const existingComic = comics.find(c => c.name.trim().toLowerCase() === trimmed.toLowerCase());
+
+      if (existingComic) {
+        // Já existe um card com esse título: adiciona a edição como "Tenho" e vincula capa se disponível
+        const currentStates = existingComic.issueStates || {};
+        const currentOwned = existingComic.ownedNumbers || [];
+        const newStates = { ...currentStates, [targetIssue]: 'owned' };
+        const newOwned = Array.from(new Set([...currentOwned, targetIssue])).sort((a, b) => a - b);
+        const covers = { ...(existingComic.issueCovers || {}) };
+        if (detailedCoverUrl && !covers[targetIssue]) {
+          covers[targetIssue] = detailedCoverUrl;
+        }
+
+        const updatedComic = {
+          ...existingComic,
+          issueStates: newStates,
+          ownedNumbers: newOwned,
+          issueCovers: covers
+        };
+
+        const updated = await saveComic(updatedComic);
+        setComics(updated);
+        setShowDetailedAddModal(false);
+        resetDetailedForm();
+        scrollToComic(existingComic.id);
+        return;
+      }
+
+      // Nova HQ: cria com a edição indicada marcada como "Tenho" se veio de busca por ISBN
       const nextPosition = comics.length > 0 
         ? Math.max(...comics.map(c => typeof c.position === 'number' ? c.position : 0)) + 1 
         : 0;
 
-      const parsedStart = parseInt(detailedStartFrom, 10);
-      const startFrom = !isNaN(parsedStart) && parsedStart > 1 ? parsedStart : 1;
+      const initialOwned = detailedAutoOwnedIssue ? [detailedAutoOwnedIssue] : [];
+      const initialStates = detailedAutoOwnedIssue ? { [detailedAutoOwnedIssue]: 'owned' } : {};
+      const initialCovers = (detailedAutoOwnedIssue && detailedCoverUrl) ? { [detailedAutoOwnedIssue]: detailedCoverUrl } : {};
 
       const newComic = {
         id: 'comic_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
@@ -732,9 +781,9 @@ export default function App() {
         startYear: detailedStartYear.trim(),
         brazilPublisher: detailedBrazilPublisher.trim(),
         mainHero: detailedMainHero.trim(),
-        ownedNumbers: [],
-        issueStates: {},
-        issueCovers: {},
+        ownedNumbers: initialOwned,
+        issueStates: initialStates,
+        issueCovers: initialCovers,
         pendingCovers: {},
         searchedIssues: {},
         issueTitles: {},
@@ -748,20 +797,14 @@ export default function App() {
       const updated = await saveComic(newComic);
       setComics(updated);
       setShowDetailedAddModal(false);
-      setDetailedName('');
-      setDetailedStartYear('');
-      setDetailedBrazilPublisher('');
-      setDetailedMainHero('');
-      setDetailedStartFrom('1');
-      setIsbnInput('');
-      setIsbnFeedback(null);
+      resetDetailedForm();
       scrollToComic(newComic.id);
     } catch (err) {
       console.error('⚠️ Erro ao cadastrar HQ detalhada:', err);
     }
   };
 
-  // Busca na Internet por ISBN e Auto-Criação / Atualização de "Tenho"
+  // Busca na Internet por ISBN e Preenchimento Automático dos Campos (aguarda confirmação na tela)
   const handleSearchISBN = async (codeToSearch) => {
     const raw = codeToSearch || isbnInput;
     const clean = cleanISBN(raw);
@@ -781,98 +824,28 @@ export default function App() {
         return;
       }
 
-      // Preenche os campos do formulário detalhado
-      const title = data.title || '';
-      const year = data.year || '';
-      const publisherBR = data.publisher || '';
-      const originalPublisher = data.originalPublisher || 'Marvel';
+      // Preenche os campos do formulário detalhado com as propriedades normalizadas do isbnService
+      const title = data.name || data.fullTitle || data.title || '';
+      const year = data.startYear || data.year || '';
+      const publisherBR = data.brazilPublisher || data.publisherBrazil || '';
+      const originalPublisher = data.publisher || data.originalPublisher || 'Marvel';
       const hero = data.mainHero || '';
-      const issueNum = data.issueNumber || 1;
+      const issueNum = data.issueNum || data.issueNumber || 1;
+      const coverUrl = data.coverUrl || null;
 
-      setDetailedName(title);
+      if (title) setDetailedName(title);
       if (year) setDetailedStartYear(year);
       if (publisherBR) setDetailedBrazilPublisher(publisherBR);
       if (originalPublisher) setDetailedPublisher(originalPublisher);
       if (hero) setDetailedMainHero(hero);
       setDetailedStartFrom(String(issueNum));
+      if (coverUrl) setDetailedCoverUrl(coverUrl);
+      setDetailedAutoOwnedIssue(issueNum);
 
-      // Verifica se é a primeira HQ daquele título na coleção do usuário
-      const existingComic = comics.find(c => c.name.trim().toLowerCase() === title.trim().toLowerCase());
-
-      if (!existingComic) {
-        // Primeira HQ do título: cria o card e preenche "Tenho" daquele número
-        const nextPosition = comics.length > 0 
-          ? Math.max(...comics.map(c => typeof c.position === 'number' ? c.position : 0)) + 1 
-          : 0;
-
-        const newComic = {
-          id: 'comic_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-          name: title,
-          type: detailedType,
-          publisher: originalPublisher,
-          startFrom: 1,
-          showHiddenChunks: false,
-          startYear: year,
-          brazilPublisher: publisherBR,
-          mainHero: hero,
-          ownedNumbers: [issueNum],
-          issueStates: { [issueNum]: 'owned' },
-          issueCovers: data.coverUrl ? { [issueNum]: data.coverUrl } : {},
-          pendingCovers: {},
-          searchedIssues: {},
-          issueTitles: {},
-          position: nextPosition,
-          isCompleted: false,
-          completedUntil: null,
-          expandedChunks: [],
-          createdAt: new Date().toISOString()
-        };
-
-        const updated = await saveComic(newComic);
-        setComics(updated);
-        scrollToComic(newComic.id);
-        setIsbnFeedback({ 
-          type: 'success', 
-          message: `Nova HQ "${title}" criada com sucesso! Edição #${issueNum} marcada como "Tenho".` 
-        });
-
-        setTimeout(() => {
-          setShowDetailedAddModal(false);
-          setIsbnInput('');
-          setIsbnFeedback(null);
-        }, 1600);
-      } else {
-        // Já existe um card com esse título: marca a edição encontrada como Tenho
-        const currentStates = existingComic.issueStates || {};
-        const currentOwned = existingComic.ownedNumbers || [];
-        const newStates = { ...currentStates, [issueNum]: 'owned' };
-        const newOwned = Array.from(new Set([...currentOwned, issueNum]));
-        const covers = { ...(existingComic.issueCovers || {}) };
-        if (data.coverUrl && !covers[issueNum]) {
-          covers[issueNum] = data.coverUrl;
-        }
-
-        const updatedComic = {
-          ...existingComic,
-          issueStates: newStates,
-          ownedNumbers: newOwned,
-          issueCovers: covers
-        };
-
-        const updated = await saveComic(updatedComic);
-        setComics(updated);
-        scrollToComic(existingComic.id);
-        setIsbnFeedback({ 
-          type: 'success', 
-          message: `HQ existente localizada! Edição #${issueNum} marcada como "Tenho" em "${existingComic.name}".` 
-        });
-
-        setTimeout(() => {
-          setShowDetailedAddModal(false);
-          setIsbnInput('');
-          setIsbnFeedback(null);
-        }, 1600);
-      }
+      setIsbnFeedback({ 
+        type: 'success', 
+        message: `HQ localizada: "${title}" (Edição #${issueNum})! Os campos foram preenchidos abaixo. Revise as informações e clique em "Cadastrar HQ" para confirmar.` 
+      });
     } catch (err) {
       console.warn('Erro ao consultar ISBN:', err);
       setIsbnFeedback({ type: 'error', message: err.message || 'Erro ao consultar serviço de ISBN.' });
@@ -893,9 +866,9 @@ export default function App() {
   const handleCycleIssueState = async (comic, num) => {
     // Obter estágio atual
     let currentStage = 'none';
-    if (comic.issueStates && comic.issueStates[num]) {
-      currentStage = comic.issueStates[num];
-    } else if (comic.ownedNumbers?.includes(num)) {
+    if (comic.issueStates && (comic.issueStates[num] || comic.issueStates[String(num)])) {
+      currentStage = comic.issueStates[num] || comic.issueStates[String(num)];
+    } else if (comic.ownedNumbers?.includes(num) || comic.ownedNumbers?.includes(Number(num))) {
       currentStage = 'owned';
     }
 
@@ -913,16 +886,15 @@ export default function App() {
     const updatedStates = { ...(comic.issueStates || {}) };
     if (nextStage === 'none') {
       delete updatedStates[num];
+      delete updatedStates[String(num)];
     } else {
       updatedStates[num] = nextStage;
     }
 
     // Sincronizar com ownedNumbers (apenas 'owned' e 'read' contam como possuídos)
-    let newOwned = [...(comic.ownedNumbers || [])];
+    let newOwned = (comic.ownedNumbers || []).filter(n => Number(n) !== Number(num));
     if (nextStage === 'owned' || nextStage === 'read') {
-      if (!newOwned.includes(num)) newOwned.push(num);
-    } else {
-      newOwned = newOwned.filter(n => n !== num);
+      newOwned.push(Number(num));
     }
     newOwned.sort((a, b) => a - b);
 
@@ -2862,7 +2834,7 @@ export default function App() {
                 <Sparkles className="w-4 h-4 text-indigo-400" /> Cadastro Detalhado de HQ
               </h3>
               <button 
-                onClick={() => setShowDetailedAddModal(false)}
+                onClick={() => { setShowDetailedAddModal(false); resetDetailedForm(); }}
                 className="text-slate-400 hover:text-white p-1"
               >
                 <X className="w-4 h-4" />
@@ -3015,10 +2987,22 @@ export default function App() {
                 />
               </div>
 
+              {detailedCoverUrl && (
+                <div className="flex items-center gap-2.5 p-2.5 bg-slate-900/90 border border-slate-700/80 rounded-xl animate-fadeIn">
+                  <img src={detailedCoverUrl} alt="Capa da HQ" className="w-10 h-14 object-cover rounded-lg border border-slate-700 shrink-0 shadow" />
+                  <div className="text-[11px] min-w-0">
+                    <span className="text-emerald-400 font-bold flex items-center gap-1">
+                      <Check className="w-3 h-3 stroke-[3]" /> Capa Localizada via ISBN
+                    </span>
+                    <p className="text-slate-400 text-[10px] truncate">Será salva na edição #{detailedStartFrom || '1'}</p>
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-2 pt-3">
                 <button
                   type="button"
-                  onClick={() => setShowDetailedAddModal(false)}
+                  onClick={() => { setShowDetailedAddModal(false); resetDetailedForm(); }}
                   className="flex-1 px-3 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700 transition"
                 >
                   Cancelar
